@@ -14,14 +14,14 @@
 * 🖼 [Weights and Biases](https://wandb.ai/site) integration
 
 ----
-* ⭐ If you're interested in __discrete control__, make sure to check out our new library — [Katakomba](https://github.com/tinkoff-ai/katakomba). It provides both discrete control algorithms augmented with recurrence and an offline RL benchmark for the NetHack Learning environment.
+* ⭐ If you're interested in __discrete control__, make sure to check out our new library — [Katakomba](https://github.com/corl-team/katakomba). It provides both discrete control algorithms augmented with recurrence and an offline RL benchmark for the NetHack Learning environment.
 ----
 
 
 ## Getting started
 
 ```bash
-git clone https://github.com/tinkoff-ai/CORL.git && cd CORL
+git clone https://github.com/corl-team/CORL.git && cd CORL
 pip install -r requirements/requirements_dev.txt
 
 # alternatively, you could use docker
