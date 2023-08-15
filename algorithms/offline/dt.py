@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from typing import Any, DefaultDict, Dict, List, Optional, Tuple, Union
 
-import d4rl
+import d4rl # noqa
 import gym
 import numpy as np
 import pyrallis
@@ -17,6 +17,7 @@ import torch.nn as nn
 import wandb
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, IterableDataset
+
 from tqdm.auto import tqdm, trange
 
 
