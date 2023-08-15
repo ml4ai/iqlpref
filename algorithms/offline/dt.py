@@ -8,18 +8,17 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from typing import Any, DefaultDict, Dict, List, Optional, Tuple, Union
 
-import d4rl # noqa
+import d4rl  # noqa
 import gym
 import numpy as np
 import pyrallis
 import torch
 import torch.nn as nn
-import wandb
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, IterableDataset
+from tqdm.auto import trange
 
-from tqdm.auto import tqdm, trange
-
+import wandb
 
 @dataclass
 class TrainConfig:
@@ -61,7 +60,7 @@ class TrainConfig:
     batch_size: int = 64
     # total training steps
     update_steps: int = 100_000
-    # warmup steps for the learning rate scheduler (increasing from zero to learning_rate)
+    # warmup steps for the learning rate scheduler
     warmup_steps: int = 10_000
     # reward scaling, to reduce the magnitude
     reward_scale: float = 0.001
@@ -75,7 +74,8 @@ class TrainConfig:
     eval_every: int = 10_000
     # path for checkpoints saving, optional
     checkpoints_path: Optional[str] = None
-    # configure PyTorch to use deterministic algorithms instead of nondeterministic ones where available
+    # configure PyTorch to use deterministic algorithms instead
+    # of nondeterministic ones
     deterministic_torch: bool = False
     # training random seed
     train_seed: int = 10
