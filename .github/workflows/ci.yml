@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - howuhh/docs-wip
 permissions:
   contents: write
 jobs:
