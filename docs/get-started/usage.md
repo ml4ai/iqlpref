@@ -54,7 +54,7 @@ update_steps: 100000
 warmup_steps: 10000
 weight_decay: 0.0001
 ```
-After that we can supply all hyperparameters from config with `config-path` argument:
+After that we can supply all hyperparameters from config with `config_path` argument:
 ```commandline
 python algorithms/offline/dt.py \
     --config_path="dt_example_config.yaml"
