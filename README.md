@@ -13,13 +13,21 @@
 * 📈 Benchmarked Implementation (11+ offline algorithms, 5+ offline-to-online algorithms, 30+ datasets with detailed logs)
 * 🖼 [Weights and Biases](https://wandb.ai/site) integration
 
+You can read more about CORL design and main results in our [technical paper](https://arxiv.org/abs/2210.07105).
+
 ----
 * ⭐ If you're interested in __discrete control__, make sure to check out our new library — [Katakomba](https://github.com/corl-team/katakomba). It provides both discrete control algorithms augmented with recurrence and an offline RL benchmark for the NetHack Learning environment.
 ----
 
-You can read more about CORL design and main results in our [technical paper](https://arxiv.org/abs/2210.07105).
+> ⚠️ **NOTE**: CORL (similarily to CleanRL) is not a modular library and therefore it is not meant to be imported.
+At the cost of duplicate code, we make all implementation details of an ORL algorithm variant easy 
+to understand. You should consider using CORL if you want to 1) understand and control all implementation details 
+of an algorithm or 2) rapidly prototype advanced features that other modular ORL libraries do not support.
+
 
 ## Getting started
+
+Please refer to the [documentation](https://corl-team.github.io/CORL/get-started/install/) for more details. TLDR:
 
 ```bash
 git clone https://github.com/corl-team/CORL.git && cd CORL
