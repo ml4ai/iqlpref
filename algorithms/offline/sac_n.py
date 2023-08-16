@@ -72,7 +72,7 @@ class TrainConfig:
     # frequency of metrics logging to the wandb
     log_every: int = 100
     # training device
-    device: str = "cpu"
+    device: str = "cuda"
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.env_name}-{str(uuid.uuid4())[:8]}"
