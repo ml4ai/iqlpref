@@ -10,13 +10,14 @@
 🧵 CORL is an Offline Reinforcement Learning library that provides high-quality and easy-to-follow single-file implementations of SOTA ORL algorithms. Each implementation is backed by a research-friendly codebase, allowing you to run or tune thousands of experiments. Heavily inspired by [cleanrl](https://github.com/vwxyzjn/cleanrl) for online RL, check them out too!<br/>
 
 * 📜 Single-file implementation
-* 📈 Benchmarked Implementation for N algorithms
+* 📈 Benchmarked Implementation (11+ offline algorithms, 5+ offline-to-online algorithms, 30+ datasets with detailed logs)
 * 🖼 [Weights and Biases](https://wandb.ai/site) integration
 
 ----
 * ⭐ If you're interested in __discrete control__, make sure to check out our new library — [Katakomba](https://github.com/corl-team/katakomba). It provides both discrete control algorithms augmented with recurrence and an offline RL benchmark for the NetHack Learning environment.
 ----
 
+You can read more about CORL design and main results in our [technical paper](https://arxiv.org/abs/2210.07105).
 
 ## Getting started
 
