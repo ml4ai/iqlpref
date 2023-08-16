@@ -16,7 +16,7 @@ you to run or tune thousands of experiments. Heavily inspired by [cleanrl](https
 check them out too! The highlight features of CORL are:<br/>
 
 * 📜 Single-file implementation
-* 📈 Benchmarked Implementation (11+ offline algorithms, 5+ offline-to-online algorithms, 30+ datasets with detailed logs)
+* 📈 Benchmarked Implementation (11+ offline algorithms, 5+ offline-to-online algorithms, 30+ datasets with detailed logs :material-arm-flex:)
 * 🖼 [Weights and Biases](https://wandb.ai/site) integration
 
 You can read more about CORL design and main results in our [technical paper](https://arxiv.org/abs/2210.07105).
