@@ -1,16 +1,25 @@
+---
+hide:
+  - toc        # Hide table of contents
+---
+
+
 # Cal-QL
 
 ## Overview
 
-The Calibrated Q-Learning (Cal-QL) is a modification for offline Actor Critic algorithms which aims to improve their offline-to-online transfer.
-Offline RL algorithms which try to minimize the out-of-distribution values for Q function may lower this value to much which lead to unlearning at early finetuning steps.
-Originally it was proposed for CQL and our implementation also builds upon it.
+Calibrated Q-Learning (Cal-QL) is an extension for offline Actor Critic algorithms that aims to improve their 
+offline-to-online fine-tuning performance. Offline RL algorithms that minimize out-of-distribution values for 
+the Q function may reduce this value too much, leading to unlearning in the early fine-tuning steps.
+It was originally proposed for CQL, and our implementation also builds on it. 
 
-In order to resolve the problem with unrealistically low Q values the following change to the critic loss function is done (change in blue)
+To solve the problem of unrealistically low Q-values, following change is made to the critic loss function (change in blue):
+
 
 $$
-\min _{\phi_i} \mathbb{E}_{\mathbf{s}, \mathbf{a}, \mathbf{s}^{\prime} \sim \mathcal{D}}\left[\left(Q_{\phi_i}(\mathbf{s}, \mathbf{a})-\left(r(\mathbf{s}, \mathbf{a})+\gamma \mathbb{E}_{\mathbf{a}^{\prime} \sim \pi_\theta\left(\cdot \mid \mathbf{s}^{\prime}\right)}\left[\min _{j=1, 2}} Q_{\phi_j^{\prime}}\left(\mathbf{s}^{\prime}, \mathbf{a}^{\prime}\right)-\alpha \log \pi_\theta\left(\mathbf{a}^{\prime} \mid \mathbf{s}^{\prime}\right)\right]\right)\right)^2\right] + {\mathbb{E}_{\mathbf{s} \sim \mathcal{D}, \mathbf{a} \sim \mathcal{\mu(a | s)}}\left[{\color{blue}\max(Q_{\phi_i^{\prime}}(s, a), V^\nu(s))\right] - \mathbb{E}_{\mathbf{s} \sim \mathcal{D}, \mathbf{a} \sim \mathcal{\hat{\pi}_\beta(a | s)}}\left[Q_{\phi_i^{\prime}}(s, a)\right]}
+\min _{\phi_i} \mathbb{E}_{\mathbf{s}, \mathbf{a}, \mathbf{s}^{\prime} \sim \mathcal{D}}\left[\left(Q_{\phi_i}(\mathbf{s}, \mathbf{a})-\left(r(\mathbf{s}, \mathbf{a})+\gamma \mathbb{E}_{\mathbf{a}^{\prime} \sim \pi_\theta\left(\cdot \mid \mathbf{s}^{\prime}\right)}\left[\min _{j=1, 2} Q_{\phi_j^{\prime}}\left(\mathbf{s}^{\prime}, \mathbf{a}^{\prime}\right)-\alpha \log \pi_\theta\left(\mathbf{a}^{\prime} \mid \mathbf{s}^{\prime}\right)\right]\right)\right)^2\right] + {\mathbb{E}_{\mathbf{s} \sim \mathcal{D}, \mathbf{a} \sim \mathcal{\mu(a | s)}}\left[\color{blue}\max(Q_{\phi_i^{\prime}}(s, a), V^\nu(s))\right] - \mathbb{E}_{\mathbf{s} \sim \mathcal{D}, \mathbf{a} \sim \mathcal{\hat{\pi}_\beta(a | s)}}\left[Q_{\phi_i^{\prime}}(s, a)\right]}
 $$
+
 where $V^\nu(s)$ is value function approximation. Simple return-to-go calculated from the dataset is used for this purpose.
 
 Original paper:
@@ -21,15 +30,14 @@ Reference resources:
 
 * :material-github: [Official codebase for Cal-QL](https://github.com/nakamotoo/Cal-QL)
 
+!!! success
+        Cal-QL is the state-of-the-art method for challenging AntMaze domain in offline-to-online domain.
 
 !!! warning
         Cal-QL is originally based on CQL and inherits all the weaknesses which CQL has (e.g. slow training or hyperparameters sensitivity). 
 
 !!! warning
-        Cal-QL performs worse in offline setup than some of the other algorithms but finetunes much better. 
-
-!!! success
-        Cal-QL is the state-of-the-art solution for challenging AntMaze domain in offline-to-online domain.
+        Cal-QL performs worse in offline setup than some other algorithms but finetunes much better. 
 
 
 ## Implemented Variants
@@ -39,7 +47,7 @@ Reference resources:
 | :material-github: [`finetune/cal_ql.py`](https://github.com/corl-team/CORL/blob/main/algorithms/finetune/cal_ql.py) <br> :material-database: [configs](https://github.com/corl-team/CORL/tree/main/configs/finetune/cal_ql) | For continuous action spaces and offline-to-online RL. |
 
 
-## Explanation of some of logged metrics
+## Explanation of logged metrics
 
 * `policy_loss`: mean actor loss.
 * `alpha_loss`: mean SAC entropy loss.
@@ -48,7 +56,9 @@ Reference resources:
 * `d4rl_normalized_score`: mean evaluation normalized score. Should be between 0 and 100, where 100+ is the 
   performance above expert for this environment. Implemented by D4RL library [[:material-github: source](https://github.com/Farama-Foundation/D4RL/blob/71a9549f2091accff93eeff68f1f3ab2c0e0a288/d4rl/offline_env.py#L71)].
 
-## Implementation details (for more see CQL)
+## Implementation details
+
+Also see implementation [details from CQL](cql.md), as Cal-QL is based on it.
 
 1. Return-to-go calculation (:material-github: [algorithms/finetune/cal_ql.py#L275](https://github.com/corl-team/CORL/blob/e9768f90a95c809a5587dd888e203d0b76b07a39/algorithms/finetune/cal_ql.py#L275))
 2. Offline and online data constant proportion (:material-github: [algorithms/finetune/cal_ql.py#L1187](https://github.com/corl-team/CORL/blob/e9768f90a95c809a5587dd888e203d0b76b07a39/algorithms/finetune/cal_ql.py#LL1187))
