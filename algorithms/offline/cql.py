@@ -56,15 +56,16 @@ class TrainConfig:
     q_n_hidden_layers: int = 3  # Number of hidden layers in Q networks
     reward_scale: float = 1.0  # Reward scale for normalization
     reward_bias: float = 0.0  # Reward bias for normalization
-    bc_steps: int = int(0)  # Number of BC steps at start (AntMaze hacks)
-    reward_scale: float = 5.0
-    reward_bias: float = -1.0
-    policy_log_std_multiplier: float = 1.0
+
+    bc_steps: int = int(0)  # Number of BC steps at start
+    reward_scale: float = 5.0  # Reward scale for normalization
+    reward_bias: float = -1.0  # Reward bias for normalization
+    policy_log_std_multiplier: float = 1.0  # Stochastic policy std multiplier
 
     # Wandb logging
-    project: str = "CORL"
-    group: str = "CQL-D4RL"
-    name: str = "CQL"
+    project: str = "CORL"  # wandb project name
+    group: str = "CQL-D4RL"  # wandb group name
+    name: str = "CQL"  # wandb run name
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
