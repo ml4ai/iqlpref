@@ -108,8 +108,7 @@ def wrap_env(
         # Please be careful, here reward is multiplied by scale!
         return reward_scale * reward
 
-    env = gym.wrappers.TransformObservation(env, normalize_state,
-                                            env.observation_space)
+    env = gym.wrappers.TransformObservation(env, normalize_state, env.observation_space)
     if reward_scale != 1.0:
         env = gym.wrappers.TransformReward(env, scale_reward)
     return env
@@ -182,7 +181,9 @@ class ReplayBuffer:
         self._actions = torch.zeros(
             (buffer_size, action_dim), dtype=torch.float32, device=device
         )
-        self._rewards = torch.zeros((buffer_size, 1), dtype=torch.float32, device=device)
+        self._rewards = torch.zeros(
+            (buffer_size, 1), dtype=torch.float32, device=device
+        )
         self._next_states = torch.zeros(
             (buffer_size, state_dim), dtype=torch.float32, device=device
         )
@@ -303,7 +304,9 @@ class GaussianPolicy(nn.Module):
         state = torch.tensor(state.reshape(1, -1), device=device, dtype=torch.float32)
         dist = self(state)
         action = dist.mean if not self.training else dist.sample()
-        action = torch.clamp(self.max_action * action, -self.max_action, self.max_action)
+        action = torch.clamp(
+            self.max_action * action, -self.max_action, self.max_action
+        )
         return action.cpu().data.numpy().flatten()
 
 
@@ -332,7 +335,9 @@ class DeterministicPolicy(nn.Module):
     def act(self, state: np.ndarray, device: str = "cpu"):
         state = torch.tensor(state.reshape(1, -1), device=device, dtype=torch.float32)
         return (
-            torch.clamp(self(state) * self.max_action, -self.max_action, self.max_action)
+            torch.clamp(
+                self(state) * self.max_action, -self.max_action, self.max_action
+            )
             .cpu()
             .data.numpy()
             .flatten()
@@ -610,7 +615,9 @@ def train(config: TrainConfig):
         tau=config.tau,
         device=DEVICE,
     )
-
+    best_score = -np.inf
+    normalized_score = None
+    best_step = 0
     for step in trange(config.update_steps):
         batch = [b.to(DEVICE) for b in replay_buffer.sample(config.batch_size)]
         log_dict = trainer.train(batch)
@@ -625,7 +632,8 @@ def train(config: TrainConfig):
                 seed=config.eval_seed,
                 device=DEVICE,
             )
-            wandb.log({"evaluation_return": eval_scores.mean()}, step=step)
+            mean_eval = eval_scores.mean()
+            wandb.log({"evaluation_return": mean_eval}, step=step)
             # optional normalized score logging, only if dataset has reference scores
             with contextlib.suppress(ValueError):
                 normalized_score = (
@@ -633,6 +641,26 @@ def train(config: TrainConfig):
                 )
                 wandb.log({"normalized_score": normalized_score}, step=step)
 
+            if normalized_score is not None:
+                if normalized_score > best_score:
+                    best_score = normalized_score
+                    best_step = step
+                    if config.checkpoints_path is not None:
+                        torch.save(
+                            trainer.state_dict(),
+                            os.path.join(config.checkpoints_path, f"best_model.pt"),
+                        )
+            else:
+                if mean_eval > best_score:
+                    best_score = mean_eval
+                    best_step = step
+                    if config.checkpoints_path is not None:
+                        torch.save(
+                            trainer.state_dict(),
+                            os.path.join(config.checkpoints_path, f"best_model.pt"),
+                        )
+            wandb.log({"best_score_so_far": best_score}, step=step)
+            wandb.log({"best_step_so_far": best_step}, step=step)
             if config.checkpoints_path is not None:
                 torch.save(
                     trainer.state_dict(),
