@@ -396,7 +396,7 @@ class ImplicitQLearning:
         attn_mask: torch.Tensor,
         log_dict: Dict,
     ):
-        targets = rewards + attn_mask.float * self.gamma * next_v.detach()
+        targets = rewards + attn_mask.float() * self.gamma * next_v.detach()
         qs = self.qf.both(states, actions)
         q_loss = sum(F.mse_loss(q, targets) for q in qs) / len(qs)
         log_dict["q_loss"] = q_loss.item()
@@ -446,7 +446,7 @@ class ImplicitQLearning:
         # Update value function
         adv = self._update_v(states, actions, log_dict)
         rewards = rewards.squeeze(dim=-1)
-        dones = dones.squeeze(dim=-1)
+        attn_mask = attn_mask.squeeze(dim=-1)
         # Update Q function
         self._update_q(next_v, states, actions, rewards, attn_mask, log_dict)
         # Update actor
