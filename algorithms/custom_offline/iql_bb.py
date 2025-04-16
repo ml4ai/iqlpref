@@ -26,7 +26,7 @@ from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm.auto import trange
 
-sys.path.insert(0, os.path.abspath("../.."))
+sys.path.insert(0, os.path.abspath("../"))
 
 from CORL.reward_models.pref_transformer import load_PT
 
@@ -57,6 +57,7 @@ class TrainConfig:
     actor_lr: float = 3e-4  # Actor learning rate
     actor_dropout: Optional[float] = None  # Adroit uses dropout for policy network
     # training params
+    dataset_id: str = "bbway1"
     dataset_path: str = (
         "~/CORL/t0012/reward_data_1/bbway1_t0012.hdf5"  # Minari remote dataset name
     )
@@ -775,8 +776,8 @@ def train(config: TrainConfig):
     )
 
     state_shape, action_shape = data.shapes()
-    _, query_len, state_dim = state_shape
-    action_dim = action_shape[2]
+    state_dim = state_shape[1]
+    action_dim = action_shape[1]
     max_actions = data.max_actions()
     min_actions = data.min_actions()
 

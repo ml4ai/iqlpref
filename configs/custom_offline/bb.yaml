@@ -2,10 +2,11 @@ actor_dropout: 0.1
 actor_lr: 0.0003
 batch_size: 256
 beta: 3.0
-checkpoints_path: "~/CORL/BB"
-dataset_path: "~/CORL/t0012/reward_data_1/bbway1_t0012.hdf5"
-reward_model_path: "~/CORL/t0012/pt_rewards_1/best_model.ckpt"
-move_stats_path: "~/CORL/t0012/cache/p_stats.npy"
+checkpoints_path: ~/CORL/BB
+dataset_id: bbway1
+dataset_path: ~/CORL/t0012/reward_data_1/bbway1_t0012.hdf5
+reward_model_path: ~/CORL/t0012/pt_rewards_1/best_model.ckpt
+move_stats_path: ~/CORL/t0012/cache/p_stats.npy
 eval_episodes: 10
 eval_every: 5000
 eval_seed: 0
