@@ -4,7 +4,7 @@ method: grid
 parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
-    value: "CORL/configs/minari/offline/iql/pen/human_v1.yaml"
+    value: "configs/minari/offline/iql/pen/human_v1.yaml"
   train_seed:
     values: [0, 1, 2, 3]
   dataset_id:
