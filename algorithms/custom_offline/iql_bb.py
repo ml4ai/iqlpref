@@ -8,6 +8,7 @@
 import contextlib
 import copy
 import os
+import sys
 import random
 import uuid
 from dataclasses import asdict, dataclass
@@ -24,6 +25,9 @@ import wandb
 from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm.auto import trange
+
+sys.path.insert(0, os.path.abspath("../.."))
+
 from CORL.reward_models.pref_transformer import load_PT
 
 import h5py
@@ -604,7 +608,7 @@ def bb_run_eval_IQL(
     days=181,
     context_length=100,
     seed=4,
-    device,
+    device="cpu",
 ):
     actor.eval()
     episode_returns = []
