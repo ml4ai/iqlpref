@@ -1,4 +1,3 @@
-entity: ml4ai
 project: CORL
 program: algorithms/minari/iql.py
 method: grid
