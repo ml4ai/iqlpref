@@ -175,7 +175,7 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
         )
 
     def sample(self, batch_size: int) -> TensorBatch:
-        indices = np.random.randint(0, len(self), size=batch_size)
+        indices = np.random.choice(len(self), size=batch_size,replace=False)
         sa_indices = np.argsort(indices)
         ra_indices = np.argsort(sa_indices)
         return [x[ra_indices, ...] for x in self[indices[sa_indices]]]
