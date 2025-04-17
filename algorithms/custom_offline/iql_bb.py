@@ -839,7 +839,7 @@ def train(config: TrainConfig):
         device=DEVICE,
     )
     best_score = -np.inf
-    normalized_score = None
+    # normalized_score = None
     best_step = 0
     for step, batch in tqdm(enumerate(training_data_loader), total=config.update_steps):
         batch = [b.to(DEVICE) for b in batch]
@@ -859,23 +859,32 @@ def train(config: TrainConfig):
             mean_eval = eval_scores.mean()
             wandb.log({"evaluation_return": mean_eval}, step=step)
             # optional normalized score logging, only if dataset has reference scores
-            with contextlib.suppress(ValueError):
-                normalized_score = (
-                    minari.get_normalized_score(dataset, eval_scores).mean() * 100
-                )
-                wandb.log({"normalized_score": normalized_score}, step=step)
+            # with contextlib.suppress(ValueError):
+            #     normalized_score = (
+            #         minari.get_normalized_score(dataset, eval_scores).mean() * 100
+            #     )
+            #     wandb.log({"normalized_score": normalized_score}, step=step)
 
-            if normalized_score is not None:
-                if normalized_score > best_score:
-                    best_score = normalized_score
-                    best_step = step
-                    if config.checkpoints_path is not None:
-                        torch.save(
-                            trainer.state_dict(),
-                            os.path.join(config.checkpoints_path, f"best_model.pt"),
-                        )
-            else:
-                if mean_eval > best_score:
+            # if normalized_score is not None:
+            #     if normalized_score > best_score:
+            #         best_score = normalized_score
+            #         best_step = step
+            #         if config.checkpoints_path is not None:
+            #             torch.save(
+            #                 trainer.state_dict(),
+            #                 os.path.join(config.checkpoints_path, f"best_model.pt"),
+            #             )
+            # else:
+            #     if mean_eval > best_score:
+            #         best_score = mean_eval
+            #         best_step = step
+            #         if config.checkpoints_path is not None:
+            #             torch.save(
+            #                 trainer.state_dict(),
+            #                 os.path.join(config.checkpoints_path, f"best_model.pt"),
+            #             )
+
+            if mean_eval > best_score:
                     best_score = mean_eval
                     best_step = step
                     if config.checkpoints_path is not None:
