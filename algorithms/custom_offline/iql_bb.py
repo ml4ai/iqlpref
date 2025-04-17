@@ -24,7 +24,8 @@ import torch.nn.functional as F
 import wandb
 from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from tqdm.auto import trange
+from torch.utils.data import DataLoader, RandomSampler, BatchSampler
+from tqdm.auto import tqdm
 
 sys.path.insert(0, os.path.abspath("../"))
 
@@ -173,12 +174,6 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
                 self.attn_mask[index, ...], dtype=torch.float32, device=self._device
             ),
         )
-
-    def sample(self, batch_size: int) -> TensorBatch:
-        indices = np.random.choice(len(self), size=batch_size, replace=False)
-        sa_indices = np.argsort(indices)
-        ra_indices = np.argsort(sa_indices)
-        return [x[ra_indices, ...] for x in self[indices[sa_indices]]]
 
     def __len__(self):
         return self._sts_shape[0]
@@ -765,13 +760,27 @@ def train(config: TrainConfig):
     reward_model_path = os.path.expanduser(config.reward_model_path)
 
     checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
-    reward_model = load_PT(reward_model_path, checkpointer, on_cpu=True)
+    reward_model = load_PT(reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available())
     reward_model = nnx.jit(reward_model, static_argnums=4)
     checkpointer.close()
     move_stats = load_stats(config.move_stats_path)
 
     data = IQL_H5Dataset(
         dataset_path, normalized_rewards=config.normalize_reward, device=DEVICE
+    )
+
+    sampler = RandomSampler(
+        data, replacement=True, num_samples=config.update_steps * config.batch_size
+    )
+
+    batch_sampler = BatchSampler(sampler, batch_size=config.batch_size, drop_last=False)
+
+    training_data_loader = DataLoader(
+        data,
+        batch_sampler=batch_sampler,
+        num_workers=0,
+        pin_memory=True,
+        pin_memory_device=DEVICE,
     )
 
     state_shape, action_shape = data.shapes()
@@ -832,8 +841,8 @@ def train(config: TrainConfig):
     best_score = -np.inf
     normalized_score = None
     best_step = 0
-    for step in trange(config.update_steps):
-        batch = [b.to(DEVICE) for b in data.sample(config.batch_size)]
+    for step, batch in tqdm(enumerate(training_data_loader), total=config.update_steps):
+        batch = [b.to(DEVICE) for b in batch]
         log_dict = trainer.train(batch)
 
         wandb.log(log_dict, step=step)
