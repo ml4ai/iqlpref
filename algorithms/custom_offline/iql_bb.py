@@ -735,11 +735,11 @@ def bb_run_eval_IQL(
                 radius_2=1.0,
             )
 
-            s = jnp.concat([s, create_new_state().reshape(1, 1, -1)], axis=1)
+            s = np.concat([s, create_new_state().reshape(1, 1, -1)], axis=1)
 
             s = s[:, -context_length:, :]
 
-            t = jnp.concat([t, (t[-1][-1] + 1).reshape(1, -1)], axis=1)
+            t = np.concat([t, (t[-1][-1] + 1).reshape(1, -1)], axis=1)
             t = t[:, -context_length:]
 
             episode_return += reward
