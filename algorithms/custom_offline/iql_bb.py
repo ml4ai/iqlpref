@@ -781,7 +781,6 @@ def train(config: TrainConfig):
         data,
         batch_sampler=batch_sampler,
         num_workers=0,
-        pin_memory=True,
     )
 
     state_shape, action_shape = data.shapes()
