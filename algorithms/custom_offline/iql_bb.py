@@ -760,7 +760,9 @@ def train(config: TrainConfig):
     reward_model_path = os.path.expanduser(config.reward_model_path)
 
     checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
-    reward_model = load_PT(reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available())
+    reward_model = load_PT(
+        reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available()
+    )
     reward_model = nnx.jit(reward_model, static_argnums=4)
     checkpointer.close()
     move_stats = load_stats(config.move_stats_path)
@@ -780,7 +782,6 @@ def train(config: TrainConfig):
         batch_sampler=batch_sampler,
         num_workers=0,
         pin_memory=True,
-        pin_memory_device=DEVICE,
     )
 
     state_shape, action_shape = data.shapes()
