@@ -175,7 +175,7 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
         )
 
     def sample(self, batch_size: int) -> TensorBatch:
-        indices = np.random.choice(len(self), size=batch_size,replace=False)
+        indices = np.random.choice(len(self), size=batch_size, replace=False)
         sa_indices = np.argsort(indices)
         ra_indices = np.argsort(sa_indices)
         return [x[ra_indices, ...] for x in self[indices[sa_indices]]]
@@ -681,7 +681,6 @@ def bb_run_eval_IQL(
         episode_return = 0.0
         for i in range(max_horizon):
             action = actor.act(s[-1, -1], device)
-            action = np.where(np.array([True, False]), np.clip(action, 0.0), action)
             a = np.concat([a, action.reshape(1, 1, -1)], axis=1)
             a = a[:, -context_length:, :]
 
