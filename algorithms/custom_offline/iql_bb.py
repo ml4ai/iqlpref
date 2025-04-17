@@ -853,7 +853,7 @@ def train(config: TrainConfig):
                 num_episodes=config.eval_episodes,
                 r_model=reward_model,
                 move_stats=move_stats,
-                seed=config.eval_seed,
+                seed=config.eval_seed + step,
                 device=DEVICE,
             )
             mean_eval = eval_scores.mean()
@@ -885,13 +885,13 @@ def train(config: TrainConfig):
             #             )
 
             if mean_eval > best_score:
-                    best_score = mean_eval
-                    best_step = step
-                    if config.checkpoints_path is not None:
-                        torch.save(
-                            trainer.state_dict(),
-                            os.path.join(config.checkpoints_path, f"best_model.pt"),
-                        )
+                best_score = mean_eval
+                best_step = step
+                if config.checkpoints_path is not None:
+                    torch.save(
+                        trainer.state_dict(),
+                        os.path.join(config.checkpoints_path, f"best_model.pt"),
+                    )
             wandb.log({"best_score_so_far": best_score}, step=step)
             wandb.log({"best_step_so_far": best_step}, step=step)
             if config.checkpoints_path is not None:
