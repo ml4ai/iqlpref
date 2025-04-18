@@ -1,7 +1,7 @@
 actor_dropout: 0.1
 actor_lr: 0.0003
 batch_size: 256
-beta: 3.0
+beta: 10.0
 checkpoints_path: BB
 dataset_id: bbway1
 dataset_path: ~/CORL/t0012/reward_data_1/bbway1_t0012.hdf5
@@ -13,9 +13,9 @@ eval_seed: 0
 gamma: 0.99
 group: iql-bb
 iql_deterministic: false
-iql_tau: 0.8
+iql_tau: 0.9
 name: iql
-normalize_reward: false
+normalize_reward: true
 project: CORL
 qf_lr: 0.0003
 tau: 0.005
