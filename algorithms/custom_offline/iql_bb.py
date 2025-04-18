@@ -25,7 +25,7 @@ import wandb
 from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader, Sampler, BatchSampler
-from tqdm.auto import tqdm
+from tqdm.auto import trange
 
 sys.path.insert(0, os.path.abspath("../"))
 
@@ -828,7 +828,11 @@ def train(config: TrainConfig):
         data,
         batch_size=config.batch_size,
     )
-
+    interval = len(data) / config.batch_size
+    if int(interval) < interval:
+        interval = int(interval + 1)
+    else:
+        interval = int(interval)
     state_shape, action_shape = data.shapes()
     state_dim = state_shape[1]
     action_dim = action_shape[1]
@@ -887,8 +891,10 @@ def train(config: TrainConfig):
     best_score = -np.inf
     # normalized_score = None
     best_step = 0
-    for step, batch in tqdm(enumerate(training_data_loader), total=config.update_steps):
-        batch = [b.to(DEVICE) for b in batch]
+    for step in trange(config.update_steps):
+        if step % interval == 0:
+            tdl = iter(training_data_loader)
+        batch = [b.to(DEVICE) for b in next(tdl)]
         log_dict = trainer.train(batch)
 
         wandb.log(log_dict, step=step)
