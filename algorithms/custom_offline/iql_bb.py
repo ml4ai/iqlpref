@@ -8,30 +8,29 @@
 import contextlib
 import copy
 import os
-import sys
 import random
+import sys
 import uuid
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-from flax import nnx
 import orbax.checkpoint as ocp
 import pyrallis
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import wandb
+from flax import nnx
 from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader, Sampler, BatchSampler
+from torch.utils.data import BatchSampler, DataLoader, Sampler
 from tqdm.auto import trange
 
 sys.path.insert(0, os.path.abspath("../"))
 
-from CORL.reward_models.pref_transformer import load_PT
-
 import h5py
+from CORL.reward_models.pref_transformer import load_PT
 
 TensorBatch = List[torch.Tensor]
 
@@ -66,6 +65,7 @@ class TrainConfig:
     move_stats_path: str = "~/CORL/t0012/cache/p_stats.npy"
     update_steps: int = int(1e6)  # Total training networks updates
     batch_size: int = 256  # Batch size for all networks
+    normalize_state: bool = False
     normalize_reward: bool = False  # Normalize reward
     # evaluation params
     eval_every: int = int(5e3)  # How often (time steps) we evaluate
@@ -124,8 +124,10 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
     def __init__(
         self,
         file_path,
+        normalized_states=True,
         normalized_rewards=True,
         reward_adjustment=0.0,
+        eps=1e-3,
         device: str = "cpu",
     ):
         super(IQL_H5Dataset, self).__init__()
@@ -140,6 +142,11 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
             self._min_speed = 0.0
             self._max_angle = 180.0
             self._min_angle = -180.0
+            self._state_mean = np.zeros(self._sts_shape)
+            self._state_std = np.ones(self._sts_shape)
+            if normalized_states:
+                self._state_mean[:-4] = f["states"][:, :-4].mean(0)
+                self._state_std[:-4] = f["states"][:, :-4].std(0) + eps
 
     def open_hdf5(self):
         self.h5_file = h5py.File(self.file_path, "r")
@@ -157,7 +164,9 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
             self.open_hdf5()
         return (
             torch.tensor(
-                self.states[index, ...], dtype=torch.float32, device=self._device
+                (self.states[index, ...] - self._state_mean) / self._state_std,
+                dtype=torch.float32,
+                device=self._device,
             ),
             torch.tensor(
                 self.actions[index, ...], dtype=torch.float32, device=self._device
@@ -168,7 +177,9 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
                 device=self._device,
             ),
             torch.tensor(
-                self.next_states[index, ...], dtype=torch.float32, device=self._device
+                (self.next_states[index, ...] - self._state_mean) / self._state_std,
+                dtype=torch.float32,
+                device=self._device,
             ),
             torch.tensor(
                 self.attn_mask[index, ...], dtype=torch.float32, device=self._device
@@ -186,6 +197,12 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
 
     def min_actions(self):
         return torch.tensor([self._min_speed, self._min_angle], device=self._device)
+
+    def state_mean(self):
+        return self._state_mean
+
+    def state_std(self):
+        return self._state_std
 
 
 class RandomBatchSampler(Sampler):
@@ -661,6 +678,8 @@ def bb_run_eval_IQL(
     num_episodes,
     r_model,
     move_stats,
+    state_mean=0,
+    state_std=1,
     max_horizon=500,
     n_min_obstacles=6,
     days=181,
@@ -760,7 +779,7 @@ def bb_run_eval_IQL(
 
         episode_return = 0.0
         for i in range(max_horizon):
-            action = actor.act(s[-1, -1], device)
+            action = actor.act((s[-1, -1] - state_mean)/state_std, device)
             a = np.concat([a, action.reshape(1, 1, -1)], axis=1)
             a = a[:, -context_length:, :]
 
@@ -871,7 +890,10 @@ def train(config: TrainConfig):
     move_stats = load_stats(config.move_stats_path)
 
     data = IQL_H5Dataset(
-        dataset_path, normalized_rewards=config.normalize_reward, device=DEVICE
+        dataset_path,
+        normalized_states=config.normalize_state,
+        normalized_rewards=config.normalize_reward,
+        device=DEVICE,
     )
 
     training_data_loader = fast_loader(
@@ -955,6 +977,8 @@ def train(config: TrainConfig):
                 num_episodes=config.eval_episodes,
                 r_model=reward_model,
                 move_stats=move_stats,
+                state_mean=data.state_mean,
+                state_std=data.state_std,
                 seed=config.eval_seed + step,
                 device=DEVICE,
             )

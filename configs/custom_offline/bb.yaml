@@ -15,6 +15,7 @@ group: iql-bb
 iql_deterministic: false
 iql_tau: 0.9
 name: iql
+normalize_state: true
 normalize_reward: true
 project: CORL
 qf_lr: 0.0003
