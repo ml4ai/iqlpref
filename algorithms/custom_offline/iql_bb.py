@@ -142,8 +142,8 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
             self._min_speed = 0.0
             self._max_angle = 180.0
             self._min_angle = -180.0
-            self._state_mean = np.zeros(self._sts_shape)
-            self._state_std = np.ones(self._sts_shape)
+            self._state_mean = np.zeros(self._sts_shape[1])
+            self._state_std = np.ones(self._sts_shape[1])
             if normalized_states:
                 self._state_mean[:-4] = f["states"][:, :-4].mean(0)
                 self._state_std[:-4] = f["states"][:, :-4].std(0) + eps
@@ -779,7 +779,7 @@ def bb_run_eval_IQL(
 
         episode_return = 0.0
         for i in range(max_horizon):
-            action = actor.act((s[-1, -1] - state_mean)/state_std, device)
+            action = actor.act((s[-1, -1] - state_mean) / state_std, device)
             a = np.concat([a, action.reshape(1, 1, -1)], axis=1)
             a = a[:, -context_length:, :]
 
