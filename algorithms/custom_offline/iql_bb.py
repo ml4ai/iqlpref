@@ -977,8 +977,8 @@ def train(config: TrainConfig):
                 num_episodes=config.eval_episodes,
                 r_model=reward_model,
                 move_stats=move_stats,
-                state_mean=data.state_mean,
-                state_std=data.state_std,
+                state_mean=data.state_mean(),
+                state_std=data.state_std(),
                 seed=config.eval_seed + step,
                 device=DEVICE,
             )
