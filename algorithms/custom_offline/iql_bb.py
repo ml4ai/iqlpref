@@ -187,6 +187,7 @@ class IQL_H5Dataset(torch.utils.data.Dataset):
     def min_actions(self):
         return torch.tensor([self._min_speed, self._min_angle], device=self._device)
 
+
 class RandomBatchSampler(Sampler):
     """Sampling class to create random sequential batches from a given dataset
     E.g. if data is [1,2,3,4] with bs=2. Then first batch, [[1,2], [3,4]] then shuffle batches -> [[3,4],[1,2]]
@@ -197,6 +198,7 @@ class RandomBatchSampler(Sampler):
     :type batch_size: int
     :returns: generator object of shuffled batch indices
     """
+
     def __init__(self, dataset, batch_size):
         self.batch_size = batch_size
         self.dataset_length = len(dataset)
@@ -212,9 +214,12 @@ class RandomBatchSampler(Sampler):
             for index in idx:
                 yield int(index)
         if int(self.n_batches) < self.n_batches:
-            idx = torch.arange(int(self.n_batches) * self.batch_size, self.dataset_length)
+            idx = torch.arange(
+                int(self.n_batches) * self.batch_size, self.dataset_length
+            )
             for index in idx:
                 yield int(index)
+
 
 def fast_loader(dataset, batch_size=32, drop_last=False, transforms=None):
     """Implements fast loading by taking advantage of .h5 dataset
@@ -235,10 +240,14 @@ def fast_loader(dataset, batch_size=32, drop_last=False, transforms=None):
     :rtype: torch.utils.data.DataLoader
     """
     return DataLoader(
-        dataset, batch_size=None,  # must be disabled when using samplers
-        sampler=BatchSampler(RandomBatchSampler(dataset, batch_size), batch_size=batch_size, drop_last=drop_last)
+        dataset,
+        batch_size=None,  # must be disabled when using samplers
+        sampler=BatchSampler(
+            RandomBatchSampler(dataset, batch_size),
+            batch_size=batch_size,
+            drop_last=drop_last,
+        ),
     )
-
 
 
 def asymmetric_l2_loss(u: torch.Tensor, tau: float) -> torch.Tensor:
@@ -693,7 +702,19 @@ def bb_run_eval_IQL(
             if ((g[0] ** 2) + (g[1] ** 2)) <= 2500:
                 break
 
-        def create_new_state():
+        def create_new_state(
+            g,
+            p_posX,
+            p_posY,
+            O_posX,
+            O_posY,
+            O_angle,
+            level,
+            ai,
+            attempt,
+            day,
+            n_min_obstacles,
+        ):
             s = [p_posX, p_posY]
             obs_distances = point_dist(
                 O_posX,
@@ -717,12 +738,23 @@ def bb_run_eval_IQL(
             s.append(ai * 1.0)
             s.append(attempt * 1.0)
 
-            if days is not None:
-                s.append(day * 1.0)
+            s.append(day * 1.0)
 
             return np.asarray(s)
 
-        s = create_new_state().reshape(1, 1, -1)
+        s = create_new_state(
+            g,
+            p_posX,
+            p_posY,
+            O_posX,
+            O_posY,
+            O_angle,
+            level,
+            ai,
+            attempt,
+            day,
+            n_min_obstacles,
+        ).reshape(1, 1, -1)
         a = np.zeros((1, 0, 2))
         t = np.zeros((1, 1), dtype=np.int32)
 
@@ -783,7 +815,25 @@ def bb_run_eval_IQL(
                 radius_2=1.0,
             )
 
-            s = np.concat([s, create_new_state().reshape(1, 1, -1)], axis=1)
+            s = np.concat(
+                [
+                    s,
+                    create_new_state(
+                        g,
+                        p_posX,
+                        p_posY,
+                        O_posX,
+                        O_posY,
+                        O_angle,
+                        level,
+                        ai,
+                        attempt,
+                        day,
+                        n_min_obstacles,
+                    ).reshape(1, 1, -1),
+                ],
+                axis=1,
+            )
 
             s = s[:, -context_length:, :]
 
