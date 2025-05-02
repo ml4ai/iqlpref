@@ -40,7 +40,7 @@ class EvalConfig:
         "~/CORL/human_pen_models/iql-D4RL/pen/human-v2-0f6ecda0/best_model.pt"
     )
     iql_deterministic: bool = False  # Use deterministic actor
-    actor_dropout: Optional[float] = None  # Adroit uses dropout for policy network
+    actor_dropout: Optional[float] = 0.1  # Adroit uses dropout for policy network
     # training params
     dataset_id: str = "D4RL/pen/human-v2"  # Minari remote dataset name
     normalize_state: bool = True  # Normalize states
@@ -252,14 +252,15 @@ def eval_actor(config: EvalConfig):
             state_dim, action_dim, max_action, dropout=config.actor_dropout
         ).to(DEVICE)
 
+    actor_path = os.path.expanduser(config.actor_path)
     if DEVICE == "cuda":
         actor.load_state_dict(
-            torch.load(config.actor_path, weights_only=False)["actor"]
+            torch.load(actor_path, weights_only=False)["actor"]
         )
         actor.to(DEVICE)
     else:
         actor.load_state_dict(
-            torch.load(config.actor_path, map_location=DEVICE, weights_only=False)[
+            torch.load(actor_path, map_location=DEVICE, weights_only=False)[
                 "actor"
             ]
         )
@@ -282,6 +283,7 @@ def eval_actor(config: EvalConfig):
         mean_n_s = normalized_scores.mean()
         std_n_s = normalized_scores.std(ddof=1)
 
+    eval_csv = os.path.expanduser(config.eval_csv)
     try:
         df = pd.read_csv(config.eval_csv)
         new_row = pd.Series(
