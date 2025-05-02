@@ -282,14 +282,14 @@ def eval_actor(config: EvalConfig):
     eval_csv = os.path.expanduser(config.eval_csv)
     try:
         df = pd.read_csv(config.eval_csv)
-        new_row = pd.Series(
+        new_row = pd.DataFrame(
             {
-                "dataset": config.dataset_id,
-                "model_id": config.model_id,
-                "mean_score": mean_score,
-                "std_score": std_score,
-                "normalized_mean_score": mean_n_s,
-                "normalized_std_score": std_n_s,
+                "dataset": [config.dataset_id],
+                "model_id": [config.model_id],
+                "mean_score": [mean_score],
+                "std_score": [std_score],
+                "normalized_mean_score": [mean_n_s],
+                "normalized_std_score": [std_n_s],
             }
         )
         df = pd.concat([df, new_row], ignore_index=True)
