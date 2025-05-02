@@ -34,6 +34,7 @@ LOG_STD_MAX = 2.0
 
 @dataclass
 class EvalConfig:
+    model_id: str = "0f6ecda0"
     eval_csv: str = "~/CORL/task_reward_iql_results/pen_results.csv"
     actor_path: str = (
         "~/CORL/human_pen_models/iql-D4RL/pen/human-v2-0f6ecda0/best_model.pt"
@@ -286,6 +287,7 @@ def eval_actor(config: EvalConfig):
         new_row = pd.Series(
             {
                 "dataset": config.dataset_id,
+                "model_id": config.model_id,
                 "mean_score": mean_score,
                 "std_score": std_score,
                 "normalized_mean_score": mean_n_s,
@@ -297,6 +299,7 @@ def eval_actor(config: EvalConfig):
         df = pd.DataFrame(
             {
                 "dataset": config.dataset_id,
+                "model_id": config.model_id,
                 "mean_score": mean_score,
                 "std_score": std_score,
                 "normalized_mean_score": mean_n_s,
