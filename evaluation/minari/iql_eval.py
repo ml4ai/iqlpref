@@ -254,15 +254,11 @@ def eval_actor(config: EvalConfig):
 
     actor_path = os.path.expanduser(config.actor_path)
     if DEVICE == "cuda":
-        actor.load_state_dict(
-            torch.load(actor_path, weights_only=False)["actor"]
-        )
+        actor.load_state_dict(torch.load(actor_path, weights_only=False)["actor"])
         actor.to(DEVICE)
     else:
         actor.load_state_dict(
-            torch.load(actor_path, map_location=DEVICE, weights_only=False)[
-                "actor"
-            ]
+            torch.load(actor_path, map_location=DEVICE, weights_only=False)["actor"]
         )
     actor.eval()
     normalized_scores = None
@@ -300,12 +296,12 @@ def eval_actor(config: EvalConfig):
     except FileNotFoundError:
         df = pd.DataFrame(
             {
-                "dataset": config.dataset_id,
-                "model_id": config.model_id,
-                "mean_score": mean_score,
-                "std_score": std_score,
-                "normalized_mean_score": mean_n_s,
-                "normalized_std_score": std_n_s,
+                "dataset": [config.dataset_id],
+                "model_id": [config.model_id],
+                "mean_score": [mean_score],
+                "std_score": [std_score],
+                "normalized_mean_score": [mean_n_s],
+                "normalized_std_score": [std_n_s],
             }
         )
     df.to_csv(config.eval_csv, index=False)
