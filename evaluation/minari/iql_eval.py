@@ -292,7 +292,7 @@ def eval_actor(config: EvalConfig):
                 "normalized_std_score": std_n_s,
             }
         )
-        df = df.append(new_row, ignore_index=True)
+        df = pd.concat([df, new_row], ignore_index=True)
     except FileNotFoundError:
         df = pd.DataFrame(
             {
