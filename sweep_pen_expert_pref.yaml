@@ -1,5 +1,5 @@
 project: CORL
-program: algorithms/minari/iql.py
+program: algorithms/custom_offline/iql.py
 method: grid
 parameters:
   # specify all configs to run for the choosen algorithm
