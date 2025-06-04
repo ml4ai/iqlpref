@@ -620,11 +620,12 @@ def train(config: TrainConfig):
         reward_model = load_PT(
             reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available()
         )
+        reward_model = nnx.jit(reward_model, static_argnums=4)
     else:
         reward_model = load_QMLP(
             reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available()
         )
-    reward_model = nnx.jit(reward_model, static_argnums=4)
+        reward_model = nnx.jit(reward_model)
     checkpointer.close()
 
     qdataset = qlearning_dataset(dataset, reward_model, config.query_length)
