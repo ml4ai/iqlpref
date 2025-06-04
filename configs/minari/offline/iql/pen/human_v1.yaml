@@ -4,7 +4,7 @@ batch_size: 256
 beta: 3.0
 buffer_size: 1000000
 checkpoints_path: null
-dataset_id: pen-human-v1
+dataset_id: D4RL/pen/human-v2
 eval_episodes: 10
 eval_every: 5000
 eval_seed: 0
