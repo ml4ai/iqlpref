@@ -213,7 +213,7 @@ def qlearning_dataset(
             obs.append(episode.observations[:-1].astype(np.float32))
             next_obs.append(episode.observations[1:].astype(np.float32))
             rewards.append(
-                r_model(episode.observations[:-1], episode.actions, training=False)
+                r_model(episode.observations[:-1], episode.actions)
             )
             actions.append(episode.actions.astype(np.float32))
             dones.append(episode.terminations)
