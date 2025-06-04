@@ -50,7 +50,7 @@ class TrainConfig:
     actor_lr: float = 3e-4  # Actor learning rate
     actor_dropout: Optional[float] = None  # Adroit uses dropout for policy network
     # training params
-    dataset_id: str = "pen-human-v1"  # Minari remote dataset name
+    dataset_id: str = "D4RL/pen/human-v2"  # Minari remote dataset name
     update_steps: int = int(1e6)  # Total training networks updates
     buffer_size: int = 2_000_000  # Replay buffer size
     batch_size: int = 256  # Batch size for all networks
