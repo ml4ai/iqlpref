@@ -290,6 +290,7 @@ def eval_actor(config: EvalConfig):
                 "std_score": [std_score],
                 "normalized_mean_score": [mean_n_s],
                 "normalized_std_score": [std_n_s],
+                "num_episodes": [config.eval_episodes]
             }
         )
         df = pd.concat([df, new_row], ignore_index=True)
@@ -302,6 +303,7 @@ def eval_actor(config: EvalConfig):
                 "std_score": [std_score],
                 "normalized_mean_score": [mean_n_s],
                 "normalized_std_score": [std_n_s],
+                "num_episodes": [config.eval_episodes]
             }
         )
     df.to_csv(config.eval_csv, index=False)
