@@ -4,7 +4,7 @@ batch_size: 256
 beta: 3.0
 buffer_size: 1000000
 checkpoints_path: null
-reward_model_path: ~/CORL/pen_labels/mr_pen/best_model.ckpt
+reward_model_path: ~/IQL-Pref/pen_labels/mr_pen/best_model.ckpt
 query_length: 1
 dataset_id: D4RL/pen/cloned-v2
 eval_episodes: 10
@@ -17,7 +17,7 @@ iql_tau: 0.8
 name: iql-p
 normalize_reward: false
 normalize_state: true
-project: CORL
+project: IQL-pref
 qf_lr: 0.0003
 tau: 0.005
 train_seed: 0

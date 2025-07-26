@@ -36,7 +36,7 @@ LOG_STD_MAX = 2.0
 @dataclass
 class TrainConfig:
     # wandb params
-    project: str = "CORL"
+    project: str = "IQL-pref"
     group: str = "IQL-Minari"
     name: str = "iql"
     # model params

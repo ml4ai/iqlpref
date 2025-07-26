@@ -1,4 +1,4 @@
-project: CORL
+project: IQL-pref
 program: algorithms/custom_offline/iql.py
 method: grid
 parameters:

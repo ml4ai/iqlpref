@@ -15,7 +15,7 @@ iql_tau: 0.8
 name: iql
 normalize_reward: false
 normalize_state: true
-project: CORL
+project: IQL-pref
 qf_lr: 0.0003
 tau: 0.005
 train_seed: 0

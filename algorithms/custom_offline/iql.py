@@ -43,7 +43,7 @@ LOG_STD_MAX = 2.0
 @dataclass
 class TrainConfig:
     # wandb params
-    project: str = "CORL"
+    project: str = "IQL-pref"
     group: str = "IQL-Minari-pref"
     name: str = "iql-p"
     # model params
@@ -58,7 +58,7 @@ class TrainConfig:
     actor_dropout: Optional[float] = None  # Adroit uses dropout for policy network
     # training params
     dataset_id: str = "D4RL/pen/human-v2"  # Minari remote dataset name
-    reward_model_path: str = "~/CORL/pen_labels/mr_pen/best_model.ckpt"
+    reward_model_path: str = "~/IQL-Pref/pen_labels/mr_pen/best_model.ckpt"
     query_length: int = 1
     update_steps: int = int(1e6)  # Total training networks updates
     buffer_size: int = 2_000_000  # Replay buffer size
