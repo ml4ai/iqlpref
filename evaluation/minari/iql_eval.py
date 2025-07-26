@@ -35,9 +35,9 @@ LOG_STD_MAX = 2.0
 @dataclass
 class EvalConfig:
     model_id: str = "0f6ecda0"
-    eval_csv: str = "~/CORL/task_reward_iql_results/pen_results.csv"
+    eval_csv: str = "~/iqlpref/task_reward_iql_results/pen_results.csv"
     actor_path: str = (
-        "~/CORL/human_pen_models/iql-D4RL/pen/human-v2-0f6ecda0/best_model.pt"
+        "~/iqlpref/human_pen_models/iql-D4RL/pen/human-v2-0f6ecda0/best_model.pt"
     )
     iql_deterministic: bool = False  # Use deterministic actor
     actor_dropout: Optional[float] = 0.1  # Adroit uses dropout for policy network

@@ -30,7 +30,7 @@ from tqdm.auto import trange
 sys.path.insert(0, os.path.abspath("../"))
 
 import h5py
-from CORL.reward_models.pref_transformer import load_PT
+from iqlpref.reward_models.pref_transformer import load_PT
 
 TensorBatch = List[torch.Tensor]
 
@@ -59,10 +59,10 @@ class TrainConfig:
     # training params
     dataset_id: str = "bbway1"
     dataset_path: str = (
-        "~/IQL-Pref/t0012/reward_data_1/bbway1_t0012.hdf5"  # Minari remote dataset name
+        "~/iqlpref/t0012/reward_data_1/bbway1_t0012.hdf5"  # Minari remote dataset name
     )
-    reward_model_path: str = "~/IQL-Pref/t0012/pt_rewards_1/best_model.ckpt"
-    move_stats_path: str = "~/IQL-Pref/t0012/cache/p_stats.npy"
+    reward_model_path: str = "~/iqlpref/t0012/pt_rewards_1/best_model.ckpt"
+    move_stats_path: str = "~/iqlpref/t0012/cache/p_stats.npy"
     update_steps: int = int(1e6)  # Total training networks updates
     batch_size: int = 256  # Batch size for all networks
     normalize_state: bool = False

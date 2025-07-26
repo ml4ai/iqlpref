@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import jax
 from flax import nnx
 import orbax.checkpoint as ocp
-from CORL.reward_models.utils import prng_to_raw, raw_to_prng
+from iqlpref.reward_models.utils import prng_to_raw, raw_to_prng
 
 
 class Identity(nnx.Module):

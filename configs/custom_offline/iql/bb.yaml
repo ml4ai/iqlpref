@@ -4,9 +4,9 @@ batch_size: 256
 beta: 3.0
 checkpoints_path: BB
 dataset_id: bbway1
-dataset_path: ~/IQL-Pref/t0012/reward_data_1/bbway1_t0012.hdf5
-reward_model_path: ~/IQL-Pref/t0012/pt_rewards_1/best_model.ckpt
-move_stats_path: ~/IQL-Pref/t0012/cache/p_stats.npy
+dataset_path: ~/iqlpref/t0012/reward_data_1/bbway1_t0012.hdf5
+reward_model_path: ~/iqlpref/t0012/pt_rewards_1/best_model.ckpt
+move_stats_path: ~/iqlpref/t0012/cache/p_stats.npy
 eval_episodes: 100
 eval_every: 5000
 eval_seed: 0

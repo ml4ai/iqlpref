@@ -29,8 +29,8 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm.auto import trange
 
 sys.path.insert(0, os.path.abspath("../"))
-from CORL.reward_models.pref_transformer import load_PT
-from CORL.reward_models.q_mlp import load_QMLP
+from iqlpref.reward_models.pref_transformer import load_PT
+from iqlpref.reward_models.q_mlp import load_QMLP
 
 TensorBatch = List[torch.Tensor]
 
@@ -58,7 +58,7 @@ class TrainConfig:
     actor_dropout: Optional[float] = None  # Adroit uses dropout for policy network
     # training params
     dataset_id: str = "D4RL/pen/human-v2"  # Minari remote dataset name
-    reward_model_path: str = "~/IQL-Pref/pen_labels/mr_pen/best_model.ckpt"
+    reward_model_path: str = "~/iqlpref/pen_labels/mr_pen/best_model.ckpt"
     query_length: int = 1
     update_steps: int = int(1e6)  # Total training networks updates
     buffer_size: int = 2_000_000  # Replay buffer size

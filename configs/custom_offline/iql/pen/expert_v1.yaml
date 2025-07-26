@@ -4,7 +4,7 @@ batch_size: 256
 beta: 3.0
 buffer_size: 1000000
 checkpoints_path: null
-reward_model_path: ~/IQL-Pref/pen_labels/mr_pen/best_model.ckpt
+reward_model_path: ~/iqlpref/pen_labels/mr_pen/best_model.ckpt
 query_length: 1
 dataset_id: D4RL/pen/expert-v2
 eval_episodes: 10

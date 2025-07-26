@@ -1,10 +1,10 @@
 import jax
 import jax.numpy as jnp
 import orbax.checkpoint as ocp
-import CORL.reward_models.ops as ops
+import iqlpref.reward_models.ops as ops
 from flax import nnx
 from jax import lax
-from CORL.reward_models.utils import prng_to_raw, raw_to_prng
+from iqlpref.reward_models.utils import prng_to_raw, raw_to_prng
 
 
 class GPT2MLP(nnx.Module):
