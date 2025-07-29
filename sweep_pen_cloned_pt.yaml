@@ -1,0 +1,23 @@
+project: IQL-pref
+program: algorithms/custom_offline/iql.py
+method: grid
+parameters:
+  # specify all configs to run for the choosen algorithm
+  config_path:
+    value: "configs/custom_offline/iql/pen/cloned_v1.yaml"
+  train_seed:
+    values: [0, 1, 2, 3]
+  dataset_id:
+    value: "D4RL/pen/cloned-v2"
+  checkpoints_path:
+    value: "cloned_pen_models_pt"
+  eval_episodes:
+    value: 100
+  reward_model_path: 
+    value: "~/iqlpref/pen_labels/pt_pen/best_model.ckpt"
+  query_length:
+    value: 100
+  name:
+    value: "iql-pt"
+  group:
+    value: "iql-pt-pen-cloned-v1-multiseed-v0"
