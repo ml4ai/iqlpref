@@ -1,0 +1,3 @@
+[submodule "gp_reward-priors"]
+	path = gp_reward-priors
+	url = https://github.com/ml4ai/gp-reward-priors.git
