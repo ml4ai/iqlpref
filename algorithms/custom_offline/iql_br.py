@@ -75,7 +75,7 @@ class TrainConfig:
     checkpoints_path: Optional[str] = None  # Save path
     # reward model params. These have to match the parameters used to train the reward model!
     reward_model_path: str = (
-        "~/iqlpref/gp_reward-priors/exp/reward_learning/pen/br-pen-f86cc2a5"
+        "./gp_reward-priors/exp/reward_learning/pen/br-pen-f86cc2a5"
     )
     width: int = 64
     depth: int = 3
@@ -655,7 +655,6 @@ def train(config: TrainConfig):
         use_gpu = 1
     bayes_net = PrefNet(net, likelihood, prior, config.saved_dir, n_gpu=use_gpu)
     bayes_net.sampled_weights = list(bayes_net._load_all_sampled_weights())
-    print(len(bayes_net.sampled_weights))
     if config.reward_type == 3:
         assert config.map_data is not None
         X, y = util.load_pref_data(config.map_data, 1.0)
