@@ -239,8 +239,8 @@ def qlearning_dataset(
                 np.concatenate([episode.observations[:-1], episode.actions], axis=-1),
                 True,
             )
-            r_preds = posterior_sampler(r_preds, 1)
             print(r_preds.shape)
+            r_preds = posterior_sampler(r_preds, 1)
             obs.append(episode.observations[:-1].astype(np.float32))
             next_obs.append(episode.observations[1:].astype(np.float32))
             rewards.append(r_preds)
