@@ -202,6 +202,7 @@ def qlearning_dataset(
                 np.concatenate([episode.observations[:-1], episode.actions], axis=-1),
                 True,
             )
+            r_preds = r_preds.squeeze().T
             r_preds = posterior_sampler(r_preds, n_samples).mean(1).squeeze()
             obs.append(episode.observations[:-1].astype(np.float32))
             next_obs.append(episode.observations[1:].astype(np.float32))
@@ -215,6 +216,7 @@ def qlearning_dataset(
                 np.concatenate([episode.observations[:-1], episode.actions], axis=-1),
                 True,
             )
+            r_preds = r_preds.squeeze().T
             r_preds = np.median(posterior_sampler(r_preds, n_samples), axis=1).squeeze()
             obs.append(episode.observations[:-1].astype(np.float32))
             next_obs.append(episode.observations[1:].astype(np.float32))
@@ -227,7 +229,7 @@ def qlearning_dataset(
                 np.concatenate([episode.observations[:-1], episode.actions], axis=-1),
                 use_map=True,
             )
-            r_preds.squeeze()
+            r_preds = r_preds.squeeze()
             obs.append(episode.observations[:-1].astype(np.float32))
             next_obs.append(episode.observations[1:].astype(np.float32))
             rewards.append(r_preds)
@@ -239,7 +241,7 @@ def qlearning_dataset(
                 np.concatenate([episode.observations[:-1], episode.actions], axis=-1),
                 True,
             )
-            print(r_preds.shape)
+            r_preds = r_preds.squeeze().T
             r_preds = posterior_sampler(r_preds, 1)
             obs.append(episode.observations[:-1].astype(np.float32))
             next_obs.append(episode.observations[1:].astype(np.float32))
