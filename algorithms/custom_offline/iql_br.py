@@ -184,7 +184,7 @@ def posterior_sampler(preds, n_samps):
     samples = []
     for row in preds:
         samples.append(np.random.choice(row, n_samps))
-    if n_samples == 1:
+    if n_samps == 1:
         return np.asarray(samples)
     return np.stack(samples)
 
