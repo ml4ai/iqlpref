@@ -653,9 +653,9 @@ def train(config: TrainConfig):
     use_gpu = 0
     if DEVICE == "cuda":
         use_gpu = 1
-    print(config.saved_dir)
     bayes_net = PrefNet(net, likelihood, prior, config.saved_dir, n_gpu=use_gpu)
     bayes_net.sampled_weights = list(bayes_net._load_all_sampled_weights())
+    print(len(bayes_net.sampled_weights))
     if config.reward_type == 3:
         assert config.map_data is not None
         X, y = util.load_pref_data(config.map_data, 1.0)
