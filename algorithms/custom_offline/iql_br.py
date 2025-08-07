@@ -97,11 +97,11 @@ class TrainConfig:
         if self.checkpoints_path is not None:
             self.checkpoints_path = os.path.join(self.checkpoints_path, self.name)
         if self.prior_dir is None:
-            self.saved_dir = os.path.join(reward_model_path, "sampling_std")
+            self.saved_dir = os.path.join(self.reward_model_path, "sampling_std")
         else:
-            self.saved_dir = os.path.join(reward_model_path, "sampling_optim")
+            self.saved_dir = os.path.join(self.reward_model_path, "sampling_optim")
             self.ckpt_path = os.path.join(
-                reward_model_path, "ckpts", "it-{}.ckpt".format(mapper_num_iters)
+                self.reward_model_path, "ckpts", "it-{}.ckpt".format(mapper_num_iters)
             )
 
 
