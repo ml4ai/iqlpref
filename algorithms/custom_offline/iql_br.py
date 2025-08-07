@@ -3,7 +3,7 @@
 
 # Implementation TODOs:
 # 1. iql_deterministic is true only for 2 datasets. Can we remote it?
-# 2. MLP class introduced bugs in the past. We should remove it.
+# 2. IQLMLP class introduced bugs in the past. We should remove it.
 # 3. Refactor IQL updating code to be more consistent in style
 import contextlib
 import copy
@@ -329,7 +329,7 @@ class Squeeze(nn.Module):
         return x.squeeze(dim=self.dim)
 
 
-class MLP(nn.Module):
+class IQLMLP(nn.Module):
     def __init__(
         self,
         dims,
@@ -341,7 +341,7 @@ class MLP(nn.Module):
         super().__init__()
         n_dims = len(dims)
         if n_dims < 2:
-            raise ValueError("MLP requires at least two dims (input and output)")
+            raise ValueError("IQLMLP requires at least two dims (input and output)")
 
         layers = []
         for i in range(n_dims - 2):
@@ -375,7 +375,7 @@ class GaussianPolicy(nn.Module):
         dropout: Optional[float] = None,
     ):
         super().__init__()
-        self.net = MLP(
+        self.net = IQLMLP(
             [state_dim, *([hidden_dim] * n_hidden), act_dim],
             output_activation_fn=nn.Tanh,
             dropout=dropout,
@@ -410,7 +410,7 @@ class DeterministicPolicy(nn.Module):
         dropout: Optional[float] = None,
     ):
         super().__init__()
-        self.net = MLP(
+        self.net = IQLMLP(
             [state_dim, *([hidden_dim] * n_hidden), act_dim],
             output_activation_fn=nn.Tanh,
             dropout=dropout,
@@ -439,8 +439,8 @@ class TwinQ(nn.Module):
     ):
         super().__init__()
         dims = [state_dim + action_dim, *([hidden_dim] * n_hidden), 1]
-        self.q1 = MLP(dims, squeeze_output=True)
-        self.q2 = MLP(dims, squeeze_output=True)
+        self.q1 = IQLMLP(dims, squeeze_output=True)
+        self.q2 = IQLMLP(dims, squeeze_output=True)
 
     def both(
         self, state: torch.Tensor, action: torch.Tensor
@@ -456,7 +456,7 @@ class ValueFunction(nn.Module):
     def __init__(self, state_dim: int, hidden_dim: int = 256, n_hidden: int = 2):
         super().__init__()
         dims = [state_dim, *([hidden_dim] * n_hidden), 1]
-        self.v = MLP(dims, squeeze_output=True)
+        self.v = IQLMLP(dims, squeeze_output=True)
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         return self.v(state)
