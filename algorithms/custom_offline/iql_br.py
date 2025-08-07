@@ -87,24 +87,20 @@ class TrainConfig:
     n_samples: Optional[int] = (
         None  # used for computing posterior predictive mean or median
     )
-    prior_dir: Optional[str] = (
-        None  # if none, then defaults to N(0,1) for all parameter priors
-    )
+    use_optim_prior: bool = False # if false, then defaults to N(0,1) for all parameter priors
     map_data: Optional[str] = None
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.dataset_id}-{str(uuid.uuid4())[:8]}"
         if self.checkpoints_path is not None:
             self.checkpoints_path = os.path.join(self.checkpoints_path, self.name)
-        if self.prior_dir is None:
-            self.saved_dir = os.path.join(self.reward_model_path, "sampling_std")
-        else:
+        if self.use_optim_prior:
             self.saved_dir = os.path.join(self.reward_model_path, "sampling_optim")
             self.ckpt_path = os.path.join(
-                self.reward_model_path, "ckpts", "it-{}.ckpt".format(mapper_num_iters)
+                self.reward_model_path, "ckpts", "it-{}.ckpt".format(self.mapper_num_iters)
             )
-
-
+        else:
+            self.saved_dir = os.path.join(self.reward_model_path, "sampling_std")
 def set_seed(seed: int, deterministic_torch: bool = False):
     os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
@@ -644,10 +640,10 @@ def train(config: TrainConfig):
     action_dim = eval_env.action_space.shape[0]
     max_action = float(eval_env.action_space.high[0])
 
-    if config.prior_dir is None:
-        prior = FixedGaussianPrior(std=1.0)
+    if config.use_optim_prior:
+        prior = OptimGaussianPrior(config.ckpt_path)
     else:
-        prior = OptimGaussianPrior(config.prior_dir)
+        prior = FixedGaussianPrior(std=1.0)
 
     net = MLP(
         state_dim + action_dim, 1, [config.width] * config.depth, config.transfer_fn
