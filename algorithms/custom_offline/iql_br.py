@@ -242,7 +242,7 @@ def qlearning_dataset(
                 True,
             )
             r_preds = r_preds.squeeze().T
-            r_preds = posterior_sampler(r_preds, 1)
+            r_preds = posterior_sampler(r_preds, 1).squeeze()
             obs.append(episode.observations[:-1].astype(np.float32))
             next_obs.append(episode.observations[1:].astype(np.float32))
             rewards.append(r_preds)
