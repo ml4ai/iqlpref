@@ -239,7 +239,6 @@ def qlearning_dataset(
                 np.concatenate([episode.observations[:-1], episode.actions], axis=-1),
                 True,
             )
-            print(r_preds.shape)
             r_preds = posterior_sampler(r_preds, 1)
             obs.append(episode.observations[:-1].astype(np.float32))
             next_obs.append(episode.observations[1:].astype(np.float32))
@@ -654,6 +653,7 @@ def train(config: TrainConfig):
     use_gpu = 0
     if DEVICE == "cuda":
         use_gpu = 1
+    print(config.saved_dir)
     bayes_net = PrefNet(net, likelihood, prior, config.saved_dir, n_gpu=use_gpu)
     bayes_net.sampled_weights = list(bayes_net._load_all_sampled_weights())
     if config.reward_type == 3:
