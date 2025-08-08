@@ -4,7 +4,7 @@ method: grid
 parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
-    value: "configs/custom_offline/iql_br/pen/expert_v1.yaml"
+    value: "configs/custom_offline/iql_br/expert_v1.yaml"
   train_seed:
     values: [0, 1, 2, 3]
   dataset_id:
