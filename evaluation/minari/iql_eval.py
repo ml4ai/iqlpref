@@ -17,6 +17,7 @@ import gymnasium as gym
 import minari
 import numpy as np
 import pyrallis
+import wandb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -226,6 +227,7 @@ def evaluate(
 
 @pyrallis.wrap()
 def eval_actor(config: EvalConfig):
+    wandb.init(mode='offline')
     minari.download_dataset(config.dataset_id)
     dataset = minari.load_dataset(config.dataset_id)
 
