@@ -35,7 +35,9 @@ LOG_STD_MAX = 2.0
 
 @dataclass
 class EvalConfig:
-    model_id: str = "0f6ecda0"
+    project: str = "IQL-eval"
+    group: str = "IQL-eval"
+    name: str = "eval"
     eval_csv: str = "~/iqlpref/task_reward_iql_results/pen_results.csv"
     actor_path: str = (
         "~/iqlpref/human_pen_models/iql-D4RL/pen/human-v2-0f6ecda0/best_model.pt"
@@ -47,6 +49,9 @@ class EvalConfig:
     normalize_state: bool = True  # Normalize states
     eval_episodes: int = 1000  # How many episodes run during evaluation
     eval_seed: int = 10
+
+    def __post_init__(self):
+        self.name = f"{self.name}-{self.dataset_id}-{str(uuid.uuid4())[:8]}"
 
 
 def compute_mean_std(states: np.ndarray, eps: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -227,7 +232,14 @@ def evaluate(
 
 @pyrallis.wrap()
 def eval_actor(config: EvalConfig):
-    wandb.init(mode='offline')
+    wandb.init(
+        config=asdict(config),
+        project=config.project,
+        group=config.group,
+        name=config.name,
+        id=str(uuid.uuid4()),
+        save_code=True,
+    )
     minari.download_dataset(config.dataset_id)
     dataset = minari.load_dataset(config.dataset_id)
 
@@ -255,6 +267,9 @@ def eval_actor(config: EvalConfig):
         ).to(DEVICE)
 
     actor_path = os.path.expanduser(config.actor_path)
+    actor_path_split = actor_path.split("/")
+    model_id = actor_path_split[-2].split("-")[-1]
+    checkpoint_id = actor_path_split[-1].split(".")[0].split("_")[-1]
     if DEVICE == "cuda":
         actor.load_state_dict(torch.load(actor_path, weights_only=False)["actor"])
         actor.to(DEVICE)
@@ -287,12 +302,13 @@ def eval_actor(config: EvalConfig):
         new_row = pd.DataFrame(
             {
                 "dataset": [config.dataset_id],
-                "model_id": [config.model_id],
+                "model_id": [model_id],
+                "checkpoint_id": [checkpoint_id],
                 "mean_score": [mean_score],
                 "std_score": [std_score],
                 "normalized_mean_score": [mean_n_s],
                 "normalized_std_score": [std_n_s],
-                "num_episodes": [config.eval_episodes]
+                "num_episodes": [config.eval_episodes],
             }
         )
         df = pd.concat([df, new_row], ignore_index=True)
@@ -300,12 +316,13 @@ def eval_actor(config: EvalConfig):
         df = pd.DataFrame(
             {
                 "dataset": [config.dataset_id],
-                "model_id": [config.model_id],
+                "model_id": [model_id],
+                "checkpoint_id": [checkpoint_id],
                 "mean_score": [mean_score],
                 "std_score": [std_score],
                 "normalized_mean_score": [mean_n_s],
                 "normalized_std_score": [std_n_s],
-                "num_episodes": [config.eval_episodes]
+                "num_episodes": [config.eval_episodes],
             }
         )
     df.to_csv(config.eval_csv, index=False)
