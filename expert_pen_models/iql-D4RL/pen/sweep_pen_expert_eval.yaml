@@ -6,7 +6,7 @@ parameters:
   eval_csv:
     value: "~/iqlpref/expert_pen_models/iql-D4RL/pen/pen_expert_eval.csv"
   dataset_id: 
-    value: "D4RL/pen/cloned-v2"
+    value: "D4RL/pen/expert-v2"
   eval_episodes:
     value: 2000
   actor_path:
