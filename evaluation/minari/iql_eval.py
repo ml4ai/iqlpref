@@ -295,6 +295,9 @@ def eval_actor(config: EvalConfig):
     if normalized_scores is not None:
         mean_n_s = normalized_scores.mean()
         std_n_s = normalized_scores.std(ddof=1)
+        wandb.log({"mean_normalized_score": mean_n_s, "std_normalized_score": std_n_s})
+    else:
+        wandb.log({"mean_score": mean_score, "std_score": std_score})
 
     eval_csv = os.path.expanduser(config.eval_csv)
     try:
