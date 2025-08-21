@@ -4,9 +4,9 @@ method: grid
 parameters:
   # specify all configs to run for the choosen algorithm
   eval_csv:
-    value: "~/iqlpref/expert_pen_models_br/iql-br-D4RL/pen/FG_0/pen_expert_eval_fg_0.csv"
+    value: "~/iqlpref/human_pen_models_br/iql-br-D4RL/pen/FG_0/pen_human_eval_fg_0.csv"
   dataset_id: 
-    value: "D4RL/pen/expert-v2"
+    value: "D4RL/pen/human-v2"
   eval_episodes:
     value: 2000
   actor_path:
