@@ -139,7 +139,7 @@ dmypy.json
 
 # custom
 .DS_Store
-.csv
+*.csv
 .tsv
 .pth
 .json
