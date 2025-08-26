@@ -20,4 +20,4 @@ parameters:
   map_data:
     value: "gp_reward-priors/data/adroit_pen/AdroitHandPen-v1_pref_b.hdf5"
   use_optim_prior:
-    values: true
+    value: true
