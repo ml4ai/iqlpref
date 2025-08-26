@@ -751,24 +751,24 @@ def train(config: TrainConfig):
                 )
                 wandb.log({"normalized_score": normalized_score}, step=step)
 
-            if normalized_score is not None:
-                if normalized_score > best_score:
-                    best_score = normalized_score
-                    best_step = step
-                    if config.checkpoints_path is not None:
-                        torch.save(
-                            trainer.state_dict(),
-                            os.path.join(config.checkpoints_path, f"best_model.pt"),
-                        )
-            else:
-                if mean_eval > best_score:
-                    best_score = mean_eval
-                    best_step = step
-                    if config.checkpoints_path is not None:
-                        torch.save(
-                            trainer.state_dict(),
-                            os.path.join(config.checkpoints_path, f"best_model.pt"),
-                        )
+            # if normalized_score is not None:
+            #     if normalized_score > best_score:
+            #         best_score = normalized_score
+            #         best_step = step
+            #         if config.checkpoints_path is not None:
+            #             torch.save(
+            #                 trainer.state_dict(),
+            #                 os.path.join(config.checkpoints_path, f"best_model.pt"),
+            #             )
+            # else:
+            if mean_eval > best_score:
+                best_score = mean_eval
+                best_step = step
+                if config.checkpoints_path is not None:
+                    torch.save(
+                        trainer.state_dict(),
+                        os.path.join(config.checkpoints_path, f"best_model.pt"),
+                    )
             wandb.log({"best_score_so_far": best_score}, step=step)
             wandb.log({"best_step_so_far": best_step}, step=step)
             if config.checkpoints_path is not None:
