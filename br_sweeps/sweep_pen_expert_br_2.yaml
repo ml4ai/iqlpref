@@ -12,7 +12,7 @@ parameters:
   checkpoints_path:
     value: "expert_pen_models_br_2"
   eval_episodes:
-    value: 2000
+    value: 5
   reward_type:
     value: 2
   n_samples:
