@@ -4,7 +4,7 @@ batch_size: 256
 beta: 3.0
 buffer_size: 1000000
 checkpoints_path: null
-reward_model_path: ./gp_reward-priors/exp/reward_learning/pen/br-pen-3c72ddaf
+reward_model_path: ./gp_reward-priors/exp/reward_learning/pen/br-pen-fa51adb0
 dataset_id: D4RL/pen/expert-v2
 eval_episodes: 10
 eval_every: 5000
