@@ -10,11 +10,11 @@ parameters:
   dataset_id:
     value: "D4RL/pen/cloned-v2"
   checkpoints_path:
-    value: "cloned_pen_models_br"
+    value: "cloned_pen_models_br_0"
   eval_episodes:
     value: 2000
   reward_type:
-    values: [0, 1, 2, 3]
+    value: 0
   n_samples:
     value: 10000
   map_data:
