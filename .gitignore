@@ -144,5 +144,6 @@ dmypy.json
 .pth
 .json
 .yaml
+*.pt
 wandb
 #assets/
