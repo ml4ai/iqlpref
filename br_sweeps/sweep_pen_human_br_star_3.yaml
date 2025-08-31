@@ -10,11 +10,11 @@ parameters:
   dataset_id:
     value: "D4RL/pen/human-v2"
   checkpoints_path:
-    value: "human_pen_models_br_star_0"
+    value: "human_pen_models_br_star_3"
   eval_episodes:
     value: 5
   reward_type:
-    value: 0
+    value: 3
   n_samples:
     value: 10000
   map_data:
