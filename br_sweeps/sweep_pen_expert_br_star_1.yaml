@@ -10,11 +10,11 @@ parameters:
   dataset_id:
     value: "D4RL/pen/expert-v2"
   checkpoints_path:
-    value: "expert_pen_models_br_star_0"
+    value: "expert_pen_models_br_star_1"
   eval_episodes:
     value: 5
   reward_type:
-    value: 0
+    value: 1
   n_samples:
     value: 10000
   map_data:
