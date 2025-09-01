@@ -1,10 +1,10 @@
-project: IQL-eval
-program: evaluation/minari/iql_eval.py
+project: IQL-eval-median
+program: evaluation/minari/iql_eval_median.py
 method: grid
 parameters:
   # specify all configs to run for the choosen algorithm
   eval_csv:
-    value: "~/iqlpref/expert_pen_models_br/iql-br-D4RL/pen/FG_2/pen_expert_eval_fg_2.csv"
+    value: "~/iqlpref/expert_pen_models_br/iql-br-D4RL/pen/FG_2/pen_expert_eval_fg_2_median.csv"
   dataset_id: 
     value: "D4RL/pen/expert-v2"
   eval_episodes:
