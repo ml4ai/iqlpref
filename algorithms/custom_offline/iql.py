@@ -617,12 +617,12 @@ def train(config: TrainConfig):
     checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
     if config.query_length > 1:
         reward_model = load_PT(
-            reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available()
+            reward_model_path, checkpointer, on_cpu=True
         )
         reward_model = nnx.jit(reward_model, static_argnums=4)
     else:
         reward_model = load_QMLP(
-            reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available()
+            reward_model_path, checkpointer, on_cpu=True
         )
         reward_model = nnx.jit(reward_model)
     checkpointer.close()
