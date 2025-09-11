@@ -27,8 +27,9 @@ from flax import nnx
 from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm.auto import trange
-import jax 
-jax.config.update('jax_platform_name', 'cpu')
+import jax
+
+jax.config.update("jax_platform_name", "cpu")
 sys.path.insert(0, os.path.abspath("../"))
 from iqlpref.reward_models.pref_transformer import load_PT
 from iqlpref.reward_models.q_mlp import load_QMLP
@@ -616,10 +617,10 @@ def train(config: TrainConfig):
 
     checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
     if config.query_length > 1:
-        reward_model = load_PT(reward_model_path, checkpointer, on_cpu=True)
+        reward_model = load_PT(reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available())
         reward_model = nnx.jit(reward_model, static_argnums=4)
     else:
-        reward_model = load_QMLP(reward_model_path, checkpointer, on_cpu=True)
+        reward_model = load_QMLP(reward_model_path, checkpointer, on_cpu=not torch.cuda.is_available())
         reward_model = nnx.jit(reward_model)
     checkpointer.close()
 
