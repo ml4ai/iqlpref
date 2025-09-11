@@ -5,8 +5,19 @@ parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
     value: "configs/custom_offline/iql/pen/expert_v1.yaml"
+  reward_model_path:
+    values: ["~/iqlpref/pen_labels/mr_pen/mr_reduce_0/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_10/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_20/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_30/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_40/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_50/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_60/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_70/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_80/best_model.ckpt",
+    "~/iqlpref/pen_labels/mr_pen/mr_reduce_90/best_model.ckpt"]
   train_seed:
-    values: [0, 1, 2, 3]
+    value: 0
   dataset_id:
     value: "D4RL/pen/expert-v2"
   checkpoints_path:
