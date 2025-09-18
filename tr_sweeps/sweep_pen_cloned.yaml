@@ -12,5 +12,5 @@ parameters:
   checkpoints_path:
     value: "cloned_pen_models"
   eval_episodes:
-    value: 100
+    value: 10
   
