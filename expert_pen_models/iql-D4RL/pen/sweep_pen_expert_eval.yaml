@@ -8,7 +8,7 @@ parameters:
   dataset_id: 
     value: "D4RL/pen/expert-v2"
   eval_episodes:
-    value: 2000
+    value: 5000
   actor_path:
     values: ['~/iqlpref/expert_pen_models/iql-D4RL/pen/expert-v2-b673c1d2/checkpoint_4999.pt',
  '~/iqlpref/expert_pen_models/iql-D4RL/pen/expert-v2-b673c1d2/checkpoint_9999.pt',
