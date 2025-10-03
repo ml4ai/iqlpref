@@ -249,12 +249,10 @@ def eval_actor(config: EvalConfig):
     model_id = actor_path_split[-2].split("-")[-1]
     checkpoint_id = actor_path_split[-1].split(".")[0].split("_")[-1]
     if DEVICE == "cuda":
-        actor.load_state_dict(torch.load(actor_path)["actor"])
+        actor.load_state_dict(torch.load(actor_path,weights_only=False)["actor"],strict=False)
         actor.to(DEVICE)
     else:
-        actor.load_state_dict(
-            torch.load(actor_path, map_location=DEVICE)["actor"]
-        )
+        actor.load_state_dict(torch.load(actor_path, map_location=DEVICE,weights_only=False)["actor"],strict=False)
     actor.eval()
     normalized_scores = None
     mean_n_s = None
