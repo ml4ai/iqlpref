@@ -77,27 +77,6 @@ def wrap_env(
     env = gym.wrappers.TransformObservation(env, normalize_state, env.observation_space)
     return env
 
-
-# WARN: this will load full dataset in memory (which is OK for D4RL datasets)
-def qlearning_dataset(dataset: minari.MinariDataset) -> Dict[str, np.ndarray]:
-    obs, next_obs, actions, rewards, dones = [], [], [], [], []
-
-    for episode in dataset:
-        obs.append(episode.observations[:-1].astype(np.float32))
-        next_obs.append(episode.observations[1:].astype(np.float32))
-        actions.append(episode.actions.astype(np.float32))
-        rewards.append(episode.rewards)
-        dones.append(episode.terminations)
-
-    return {
-        "observations": np.concatenate(obs),
-        "actions": np.concatenate(actions),
-        "next_observations": np.concatenate(next_obs),
-        "rewards": np.concatenate(rewards),
-        "terminals": np.concatenate(dones),
-    }
-
-
 class Squeeze(nn.Module):
     def __init__(self, dim=-1):
         super().__init__()
