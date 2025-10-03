@@ -51,7 +51,7 @@ class EvalConfig:
     eval_seed: int = 10
 
     def __post_init__(self):
-        self.name = f"{self.name}-{self.dataset_id}-{str(uuid.uuid4())[:8]}"
+        self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
 
 
 def compute_mean_std(states: np.ndarray, eps: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -76,6 +76,7 @@ def wrap_env(
 
     env = gym.wrappers.TransformObservation(env, normalize_state, env.observation_space)
     return env
+
 
 class Squeeze(nn.Module):
     def __init__(self, dim=-1):
