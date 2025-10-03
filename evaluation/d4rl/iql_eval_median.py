@@ -221,7 +221,7 @@ def eval_actor(config: EvalConfig):
         save_code=True,
     )
     eval_env = gym.make(config.env)
-    dataset = d4rl.qlearning_dataset(env)
+    dataset = d4rl.qlearning_dataset(eval_env)
 
     state_dim = eval_env.observation_space.shape[0]
     action_dim = eval_env.action_space.shape[0]
