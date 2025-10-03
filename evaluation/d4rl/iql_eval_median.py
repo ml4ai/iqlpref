@@ -74,7 +74,7 @@ def wrap_env(
         # epsilon should be already added in std.
         return (state - state_mean) / state_std
 
-    env = gym.wrappers.TransformObservation(env, normalize_state, env.observation_space)
+    env = gym.wrappers.TransformObservation(env, normalize_state)
     return env
 
 
