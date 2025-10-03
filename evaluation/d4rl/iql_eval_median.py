@@ -13,17 +13,17 @@ import uuid
 from dataclasses import asdict, dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import gym
 import d4rl
+import gym
 import numpy as np
+import pandas as pd
 import pyrallis
-import wandb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import wandb
 from torch.distributions import Normal
 from tqdm.auto import trange
-import pandas as pd
 
 TensorBatch = List[torch.Tensor]
 
@@ -193,20 +193,21 @@ class DeterministicPolicy(nn.Module):
 
 @torch.no_grad()
 def evaluate(
-    env: gym.Env, actor: nn.Module, num_episodes: int, seed: int, device: str
+    env: gym.Env, actor: nn.Module, device: str, n_episodes: int, seed: int
 ) -> np.ndarray:
+    env.seed(seed)
+    actor.eval()
     episode_rewards = []
-    for i in trange(num_episodes):
-        done = False
-        state, info = env.reset(seed=seed + i)
-
+    for _ in range(n_episodes):
+        state, done = env.reset(), False
         episode_reward = 0.0
         while not done:
             action = actor.act(state, device)
-            state, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
+            state, reward, done, _ = env.step(action)
             episode_reward += reward
         episode_rewards.append(episode_reward)
+
+    actor.train()
     return np.asarray(episode_rewards)
 
 
@@ -249,10 +250,15 @@ def eval_actor(config: EvalConfig):
     model_id = actor_path_split[-2].split("-")[-1]
     checkpoint_id = actor_path_split[-1].split(".")[0].split("_")[-1]
     if DEVICE == "cuda":
-        actor.load_state_dict(torch.load(actor_path,weights_only=False)["actor"],strict=False)
+        actor.load_state_dict(
+            torch.load(actor_path, weights_only=False)["actor"], strict=False
+        )
         actor.to(DEVICE)
     else:
-        actor.load_state_dict(torch.load(actor_path, map_location=DEVICE,weights_only=False)["actor"],strict=False)
+        actor.load_state_dict(
+            torch.load(actor_path, map_location=DEVICE, weights_only=False)["actor"],
+            strict=False,
+        )
     actor.eval()
     normalized_scores = None
     mean_n_s = None
@@ -260,10 +266,11 @@ def eval_actor(config: EvalConfig):
     eval_scores = evaluate(
         env=eval_env,
         actor=actor,
-        num_episodes=config.eval_episodes,
-        seed=config.eval_seed,
         device=DEVICE,
+        n_episodes=config.eval_episodes,
+        seed=config.eval_seed,
     )
+
     median_score = np.median(eval_scores)
 
     eval_csv = os.path.expanduser(config.eval_csv)
