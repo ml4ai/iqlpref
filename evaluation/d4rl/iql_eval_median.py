@@ -234,14 +234,15 @@ def eval_actor(config: EvalConfig):
 
     eval_env = wrap_env(eval_env, state_mean=state_mean, state_std=state_std)
 
-    if config.iql_deterministic:
-        actor = DeterministicPolicy(
+    actor = (
+        DeterministicPolicy(
             state_dim, action_dim, max_action, dropout=config.actor_dropout
-        ).to(DEVICE)
-    else:
-        actor = GaussianPolicy(
+        )
+        if config.iql_deterministic
+        else GaussianPolicy(
             state_dim, action_dim, max_action, dropout=config.actor_dropout
-        ).to(DEVICE)
+        )
+    ).to(DEVICE)
 
     actor_path = os.path.expanduser(config.actor_path)
     actor_path_split = actor_path.split("/")
