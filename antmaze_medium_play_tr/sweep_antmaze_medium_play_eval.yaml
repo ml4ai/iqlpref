@@ -1,11 +1,11 @@
 project: IQL-eval-median
-program: evaluation/minari/iql_eval_median.py
+program: evaluation/d4rl/iql_eval_median.py
 method: grid
 parameters:
   # specify all configs to run for the choosen algorithm
   eval_csv:
     value: "~/iqlpref/antmaze_medium_play_tr/antmaze_medium_play_eval_median.csv"
-  dataset_id: 
+  env: 
     value: "antmaze-medium-play-v2"
   eval_episodes:
     value: 5000
