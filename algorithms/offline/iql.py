@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import d4rl
 import gym
 import numpy as np
+import pandas as pd
 import pyrallis
 import torch
 import torch.nn as nn
@@ -30,7 +31,7 @@ LOG_STD_MAX = 2.0
 @dataclass
 class TrainConfig:
     # wandb project name
-    project: str = "CORL"
+    project: str = "IQL-pref"
     # wandb group name
     group: str = "IQL-D4RL"
     # wandb run name
@@ -78,6 +79,7 @@ class TrainConfig:
     seed: int = 0
     # training device
     device: str = "cuda"
+    eval_csv: str = "~/iqlpref/task_reward_iql_results/pen_results.csv"
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
@@ -140,7 +142,9 @@ class ReplayBuffer:
         self._actions = torch.zeros(
             (buffer_size, action_dim), dtype=torch.float32, device=device
         )
-        self._rewards = torch.zeros((buffer_size, 1), dtype=torch.float32, device=device)
+        self._rewards = torch.zeros(
+            (buffer_size, 1), dtype=torch.float32, device=device
+        )
         self._next_states = torch.zeros(
             (buffer_size, state_dim), dtype=torch.float32, device=device
         )
@@ -205,7 +209,7 @@ def wandb_init(config: dict) -> None:
         name=config["name"],
         id=str(uuid.uuid4()),
     )
-    #wandb.run.save()
+    # wandb.run.save()
 
 
 @torch.no_grad()
@@ -329,7 +333,9 @@ class GaussianPolicy(nn.Module):
         state = torch.tensor(state.reshape(1, -1), device=device, dtype=torch.float32)
         dist = self(state)
         action = dist.mean if not self.training else dist.sample()
-        action = torch.clamp(self.max_action * action, -self.max_action, self.max_action)
+        action = torch.clamp(
+            self.max_action * action, -self.max_action, self.max_action
+        )
         return action.cpu().data.numpy().flatten()
 
 
@@ -358,7 +364,9 @@ class DeterministicPolicy(nn.Module):
     def act(self, state: np.ndarray, device: str = "cpu"):
         state = torch.tensor(state.reshape(1, -1), device=device, dtype=torch.float32)
         return (
-            torch.clamp(self(state) * self.max_action, -self.max_action, self.max_action)
+            torch.clamp(
+                self(state) * self.max_action, -self.max_action, self.max_action
+            )
             .cpu()
             .data.numpy()
             .flatten()
@@ -643,13 +651,21 @@ def train(config: TrainConfig):
                 n_episodes=config.n_episodes,
                 seed=config.seed,
             )
-            eval_score = eval_scores.mean()
-            normalized_eval_score = env.get_normalized_score(eval_score) * 100.0
-            evaluations.append(normalized_eval_score)
+            mean_eval_score = eval_scores.mean()
+            std_eval_score = eval_scores.std(ddof=1)
+            median_eval_score = np.median(eval_scores)
+            normalized_mean_eval_score = (
+                env.get_normalized_score(mean_eval_score) * 100.0
+            )
+            normalized_std_eval_score = env.get_normalized_score(std_eval_score) * 100.0
+            normalized_median_eval_score = (
+                env.get_normalized_score(median_eval_score) * 100.0
+            )
+            evaluations.append(normalized_mean_eval_score)
             print("---------------------------------------")
             print(
                 f"Evaluation over {config.n_episodes} episodes: "
-                f"{eval_score:.3f} , D4RL score: {normalized_eval_score:.3f}"
+                f"{mean_eval_score:.3f} , D4RL score: {normalized_mean_eval_score:.3f}"
             )
             print("---------------------------------------")
             if config.checkpoints_path is not None:
@@ -658,8 +674,50 @@ def train(config: TrainConfig):
                     os.path.join(config.checkpoints_path, f"checkpoint_{t}.pt"),
                 )
             wandb.log(
-                {"d4rl_normalized_score": normalized_eval_score}, step=trainer.total_it
+                {
+                    "normalized_mean_score": normalized_mean_eval_score,
+                    "normalized_std_score": normalized_std_eval_score,
+                    "normalized_median_score": normalized_median_eval_score,
+                    "mean_score": mean_eval_score,
+                    "std_score": std_eval_score,
+                    "median_score": median_eval_score,
+                },
+                step=trainer.total_it,
             )
+            eval_csv = os.path.expanduser(config.eval_csv)
+            try:
+                df = pd.read_csv(config.eval_csv)
+                new_row = pd.DataFrame(
+                    {
+                        "dataset": [config.env],
+                        "model_id": [config.name],
+                        "checkpoint_id": [t],
+                        "normalized_mean_score": normalized_mean_eval_score,
+                        "normalized_std_score": normalized_std_eval_score,
+                        "normalized_median_score": normalized_median_eval_score,
+                        "mean_score": mean_eval_score,
+                        "std_score": std_eval_score,
+                        "median_score": median_eval_score,
+                        "num_episodes": [config.n_episodes],
+                    }
+                )
+                df = pd.concat([df, new_row], ignore_index=True)
+            except FileNotFoundError:
+                df = pd.DataFrame(
+                    {
+                        "dataset": [config.env],
+                        "model_id": [config.name],
+                        "checkpoint_id": [t],
+                        "normalized_mean_score": normalized_mean_eval_score,
+                        "normalized_std_score": normalized_std_eval_score,
+                        "normalized_median_score": normalized_median_eval_score,
+                        "mean_score": mean_eval_score,
+                        "std_score": std_eval_score,
+                        "median_score": median_eval_score,
+                        "num_episodes": [config.n_episodes],
+                    }
+                )
+            df.to_csv(config.eval_csv, index=False)
 
 
 if __name__ == "__main__":
