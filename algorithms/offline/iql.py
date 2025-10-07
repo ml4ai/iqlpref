@@ -686,7 +686,7 @@ def train(config: TrainConfig):
             )
             eval_csv = os.path.expanduser(config.eval_csv)
             try:
-                df = pd.read_csv(config.eval_csv)
+                df = pd.read_csv(eval_csv)
                 new_row = pd.DataFrame(
                     {
                         "dataset": [config.env],
@@ -717,7 +717,7 @@ def train(config: TrainConfig):
                         "num_episodes": [config.n_episodes],
                     }
                 )
-            df.to_csv(config.eval_csv, index=False)
+            df.to_csv(eval_csv, index=False)
 
 
 if __name__ == "__main__":
