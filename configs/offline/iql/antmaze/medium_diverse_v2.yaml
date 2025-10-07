@@ -21,4 +21,4 @@ project: IQL-pref
 seed: 0
 tau: 0.005
 vf_lr: 3e-4
-eval_csv: str = "antmaze_medium_diverse_tr/antmaze_medium_diverse_eval_median.csv"
+eval_csv: str = "../../antmaze_medium_diverse_tr/antmaze_medium_diverse_eval_median.csv"
