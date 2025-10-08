@@ -5,10 +5,6 @@ parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
     value: "configs/offline/iql/antmaze/large_play_v2.yaml"
-  train_seed:
-    values: [0, 1, 2, 3]
-  checkpoints_path:
-    value: "antmaze_large_play_tr"
-  eval_episodes:
-    value: 1
+  seed:
+    values: [0, 1, 2, 3, 4, 5, 6, 7]
   
