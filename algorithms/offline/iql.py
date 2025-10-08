@@ -11,7 +11,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import d4rl
 import gym
 import numpy as np
-import pandas as pd
 import pyrallis
 import torch
 import torch.nn as nn
@@ -79,7 +78,6 @@ class TrainConfig:
     seed: int = 0
     # training device
     device: str = "cuda"
-    eval_csv: str = "~/iqlpref/task_reward_iql_results/pen_results.csv"
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
@@ -652,14 +650,8 @@ def train(config: TrainConfig):
                 seed=config.seed,
             )
             mean_eval_score = eval_scores.mean()
-            std_eval_score = eval_scores.std(ddof=1)
-            median_eval_score = np.median(eval_scores)
             normalized_mean_eval_score = (
                 env.get_normalized_score(mean_eval_score) * 100.0
-            )
-            normalized_std_eval_score = env.get_normalized_score(std_eval_score) * 100.0
-            normalized_median_eval_score = (
-                env.get_normalized_score(median_eval_score) * 100.0
             )
             evaluations.append(normalized_mean_eval_score)
             print("---------------------------------------")
@@ -676,48 +668,10 @@ def train(config: TrainConfig):
             wandb.log(
                 {
                     "normalized_mean_score": normalized_mean_eval_score,
-                    "normalized_std_score": normalized_std_eval_score,
-                    "normalized_median_score": normalized_median_eval_score,
                     "mean_score": mean_eval_score,
-                    "std_score": std_eval_score,
-                    "median_score": median_eval_score,
                 },
                 step=trainer.total_it,
             )
-            eval_csv = os.path.expanduser(config.eval_csv)
-            try:
-                df = pd.read_csv(eval_csv)
-                new_row = pd.DataFrame(
-                    {
-                        "dataset": [config.env],
-                        "model_id": [config.name],
-                        "checkpoint_id": [t],
-                        "normalized_mean_score": normalized_mean_eval_score,
-                        "normalized_std_score": normalized_std_eval_score,
-                        "normalized_median_score": normalized_median_eval_score,
-                        "mean_score": mean_eval_score,
-                        "std_score": std_eval_score,
-                        "median_score": median_eval_score,
-                        "num_episodes": [config.n_episodes],
-                    }
-                )
-                df = pd.concat([df, new_row], ignore_index=True)
-            except FileNotFoundError:
-                df = pd.DataFrame(
-                    {
-                        "dataset": [config.env],
-                        "model_id": [config.name],
-                        "checkpoint_id": [t],
-                        "normalized_mean_score": normalized_mean_eval_score,
-                        "normalized_std_score": normalized_std_eval_score,
-                        "normalized_median_score": normalized_median_eval_score,
-                        "mean_score": mean_eval_score,
-                        "std_score": std_eval_score,
-                        "median_score": median_eval_score,
-                        "num_episodes": [config.n_episodes],
-                    }
-                )
-            df.to_csv(eval_csv, index=False)
 
 
 if __name__ == "__main__":
