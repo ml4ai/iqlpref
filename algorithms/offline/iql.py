@@ -636,7 +636,6 @@ def train(config: TrainConfig):
     wandb_init(asdict(config))
 
     evaluations = []
-    print(os.getcwd())
     for t in range(int(config.max_timesteps)):
         batch = replay_buffer.sample(config.batch_size)
         batch = [b.to(config.device) for b in batch]
