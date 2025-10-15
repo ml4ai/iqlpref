@@ -266,8 +266,7 @@ def modify_reward(dataset, env_name, min_max_normalize_rwd, max_episode_steps=10
             min_ret, max_ret = return_reward_range(dataset, max_episode_steps)
             dataset["rewards"] /= max_ret - min_ret
             dataset["rewards"] *= max_episode_steps
-        else:
-            dataset["rewards"] -= 1.0
+        dataset["rewards"] -= 1.0
 
 
 def asymmetric_l2_loss(u: torch.Tensor, tau: float) -> torch.Tensor:
