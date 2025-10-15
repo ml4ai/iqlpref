@@ -1,6 +1,7 @@
 # source: https://github.com/gwthomas/IQL-PyTorch
 # https://arxiv.org/pdf/2110.06169.pdf
 import copy
+import sys
 import os
 import random
 import uuid
@@ -740,18 +741,18 @@ def train(config: TrainConfig):
     action_dim = env.action_space.shape[0]
     if config.reward_model_path:
         reward_model_path = os.path.expanduser(config.reward_model_path)
-    
+
         checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
         if config.query_length > 1:
             reward_model = load_PT(reward_model_path, checkpointer, on_cpu=True)
             reward_model = nnx.jit(reward_model, static_argnums=4)
 
-            dataset = qlearning_dataset_pt(env,reward_model,config.query_length)
+            dataset = qlearning_dataset_pt(env, reward_model, config.query_length)
         else:
             reward_model = load_QMLP(reward_model_path, checkpointer, on_cpu=True)
             reward_model = nnx.jit(reward_model)
 
-            dataset = qlearning_dataset_mr(env,reward_model)
+            dataset = qlearning_dataset_mr(env, reward_model)
         checkpointer.close()
     else:
         dataset = d4rl.qlearning_dataset(env)
