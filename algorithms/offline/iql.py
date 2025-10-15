@@ -80,6 +80,7 @@ class TrainConfig:
     n_episodes: int = 10
     # path for checkpoints saving, optional
     checkpoints_path: Optional[str] = None
+    load_model: str = ""
     # file name for loading a reward model, optional
     reward_model_path: str = ""
     # required for when loading a reward model. If ==1 then MR, if >1 then PT
