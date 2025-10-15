@@ -264,6 +264,7 @@ def modify_reward(dataset, env_name, min_max_normalize_rwd, max_episode_steps=10
     elif "antmaze" in env_name:
         if min_max_normalize_rwd:
             min_ret, max_ret = return_reward_range(dataset, max_episode_steps)
+            dataset["rewards"] -= min_ret
             dataset["rewards"] /= max_ret - min_ret
             dataset["rewards"] *= max_episode_steps
         dataset["rewards"] -= 1.0
