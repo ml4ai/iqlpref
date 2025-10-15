@@ -256,13 +256,18 @@ def return_reward_range(dataset, max_episode_steps):
     return min(returns), max(returns)
 
 
-def modify_reward(dataset, env_name, max_episode_steps=1000):
+def modify_reward(dataset, env_name, min_max_normalize_rwd, max_episode_steps=1000):
     if any(s in env_name for s in ("halfcheetah", "hopper", "walker2d")):
         min_ret, max_ret = return_reward_range(dataset, max_episode_steps)
         dataset["rewards"] /= max_ret - min_ret
         dataset["rewards"] *= max_episode_steps
     elif "antmaze" in env_name:
-        dataset["rewards"] -= 1.0
+        if min_max_normalize_rwd:
+            min_ret, max_ret = return_reward_range(dataset, max_episode_steps)
+            dataset["rewards"] /= max_ret - min_ret
+            dataset["rewards"] *= max_episode_steps
+        else:
+            dataset["rewards"] -= 1.0
 
 
 def asymmetric_l2_loss(u: torch.Tensor, tau: float) -> torch.Tensor:
@@ -599,7 +604,9 @@ def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **k
         obs = dataset["observations"][i].astype(np.float32)
         new_obs = dataset["observations"][i + 1].astype(np.float32)
         action = dataset["actions"][i].astype(np.float32)
-        reward = r_model(dataset["observations"][i], dataset["actions"][i]).astype(np.float32)
+        reward = r_model(dataset["observations"][i], dataset["actions"][i]).astype(
+            np.float32
+        )
         done_bool = bool(dataset["terminals"][i])
 
         if use_timeouts:
@@ -681,7 +688,7 @@ def qlearning_dataset_pt(
             acts = dataset["actions"][: episode_step + 1].reshape(
                 1, -1, dataset["actions"].shape[1]
             )
-            ts = np.arange(episode_step + 1).reshape(1, -1)
+            ts = np.arange(query_length).reshape(1, -1)
             am = np.ones(episode_step + 1).reshape(1, -1)
         else:
             sts = dataset["observation"][
@@ -692,9 +699,7 @@ def qlearning_dataset_pt(
                 episode_step - (query_length - 1) : episode_step + 1
             ].reshape(1, -1, dataset["actions"].shape[1])
 
-            ts = np.arange(episode_step - (query_length - 1), episode_step + 1).reshape(
-                1, -1
-            )
+            ts = np.arange(query_length).reshape(1, -1)
             am = np.ones(query_length).reshape(1, -1)
         obs = dataset["observations"][i].astype(np.float32)
         new_obs = dataset["observations"][i + 1].astype(np.float32)
@@ -739,7 +744,9 @@ def train(config: TrainConfig):
 
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
+    min_max_normalize_rwd = False
     if config.reward_model_path:
+        min_max_normalize_rwd = True
         reward_model_path = os.path.expanduser(config.reward_model_path)
 
         checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
@@ -758,7 +765,7 @@ def train(config: TrainConfig):
         dataset = d4rl.qlearning_dataset(env)
 
     if config.normalize_reward:
-        modify_reward(dataset, config.env)
+        modify_reward(dataset, config.env, min_max_normalize_rwd)
 
     if config.normalize:
         state_mean, state_std = compute_mean_std(dataset["observations"], eps=1e-3)
