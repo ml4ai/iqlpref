@@ -595,12 +595,11 @@ def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **k
         use_timeouts = True
 
     episode_step = 0
-    rewards = r_model(dataset["observations"][:-1], dataset["actions"])
     for i in range(N - 1):
         obs = dataset["observations"][i].astype(np.float32)
         new_obs = dataset["observations"][i + 1].astype(np.float32)
         action = dataset["actions"][i].astype(np.float32)
-        reward = rewards[i].astype(np.float32)
+        reward = r_model(dataset["observations"][i], dataset["actions"][i]).astype(np.float32)
         done_bool = bool(dataset["terminals"][i])
 
         if use_timeouts:
