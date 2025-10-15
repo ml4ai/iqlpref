@@ -10,14 +10,21 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import d4rl
 import gym
+import jax
 import numpy as np
+import orbax.checkpoint as ocp
 import pyrallis
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import wandb
+from flax import nnx
 from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
+
+sys.path.insert(0, os.path.abspath("../"))
+from iqlpref.reward_models.pref_transformer import load_PT
+from iqlpref.reward_models.q_mlp import load_QMLP
 
 TensorBatch = List[torch.Tensor]
 
@@ -72,8 +79,10 @@ class TrainConfig:
     n_episodes: int = 10
     # path for checkpoints saving, optional
     checkpoints_path: Optional[str] = None
-    # file name for loading a model, optional
-    load_model: str = ""
+    # file name for loading a reward model, optional
+    reward_model_path: str = ""
+    # required for when loading a reward model. If ==1 then MR, if >1 then PT
+    query_length: int = 1
     # training random seed
     seed: int = 0
     # training device
@@ -543,14 +552,209 @@ class ImplicitQLearning:
         self.total_it = state_dict["total_it"]
 
 
+def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **kwargs):
+    """
+    Returns datasets formatted for use by standard Q-learning algorithms,
+    with observations, actions, next_observations, rewards, and a terminal
+    flag.
+
+    Args:
+        env: An OfflineEnv object.
+        r_model: reward model to use (Specifically a MLP)
+        dataset: An optional dataset to pass in for processing. If None,
+            the dataset will default to env.get_dataset()
+        terminate_on_end (bool): Set done=True on the last timestep
+            in a trajectory. Default is False, and will discard the
+            last timestep in each trajectory.
+        **kwargs: Arguments to pass to env.get_dataset().
+
+    Returns:
+        A dictionary containing keys:
+            observations: An N x dim_obs array of observations.
+            actions: An N x dim_action array of actions.
+            next_observations: An N x dim_obs array of next observations.
+            rewards: An N-dim float array of rewards.
+            terminals: An N-dim boolean array of "done" or episode termination flags.
+    """
+    if dataset is None:
+        dataset = env.get_dataset(**kwargs)
+
+    N = dataset["rewards"].shape[0]
+    obs_ = []
+    next_obs_ = []
+    action_ = []
+    reward_ = []
+    done_ = []
+
+    # The newer version of the dataset adds an explicit
+    # timeouts field. Keep old method for backwards compatability.
+    use_timeouts = False
+    if "timeouts" in dataset:
+        use_timeouts = True
+
+    episode_step = 0
+    rewards = r_model(dataset["observations"][:-1], dataset["actions"])
+    for i in range(N - 1):
+        obs = dataset["observations"][i].astype(np.float32)
+        new_obs = dataset["observations"][i + 1].astype(np.float32)
+        action = dataset["actions"][i].astype(np.float32)
+        reward = rewards[i].astype(np.float32)
+        done_bool = bool(dataset["terminals"][i])
+
+        if use_timeouts:
+            final_timestep = dataset["timeouts"][i]
+        else:
+            final_timestep = episode_step == env._max_episode_steps - 1
+        if (not terminate_on_end) and final_timestep:
+            # Skip this transition and don't apply terminals on the last step of an episode
+            episode_step = 0
+            continue
+        if done_bool or final_timestep:
+            episode_step = 0
+
+        obs_.append(obs)
+        next_obs_.append(new_obs)
+        action_.append(action)
+        reward_.append(reward)
+        done_.append(done_bool)
+        episode_step += 1
+
+    return {
+        "observations": np.array(obs_),
+        "actions": np.array(action_),
+        "next_observations": np.array(next_obs_),
+        "rewards": np.array(reward_),
+        "terminals": np.array(done_),
+    }
+
+
+def qlearning_dataset_pt(
+    env, r_model, query_length=100, dataset=None, terminate_on_end=False, **kwargs
+):
+    """
+    Returns datasets formatted for use by standard Q-learning algorithms,
+    with observations, actions, next_observations, rewards, and a terminal
+    flag.
+
+    Args:
+        env: An OfflineEnv object.
+        r_model: reward model to use (Specifically a PT)
+        query_length: context length for PT
+        dataset: An optional dataset to pass in for processing. If None,
+            the dataset will default to env.get_dataset()
+        terminate_on_end (bool): Set done=True on the last timestep
+            in a trajectory. Default is False, and will discard the
+            last timestep in each trajectory.
+        **kwargs: Arguments to pass to env.get_dataset().
+
+    Returns:
+        A dictionary containing keys:
+            observations: An N x dim_obs array of observations.
+            actions: An N x dim_action array of actions.
+            next_observations: An N x dim_obs array of next observations.
+            rewards: An N-dim float array of rewards.
+            terminals: An N-dim boolean array of "done" or episode termination flags.
+    """
+    if dataset is None:
+        dataset = env.get_dataset(**kwargs)
+
+    N = dataset["rewards"].shape[0]
+    obs_ = []
+    next_obs_ = []
+    action_ = []
+    reward_ = []
+    done_ = []
+
+    # The newer version of the dataset adds an explicit
+    # timeouts field. Keep old method for backwards compatability.
+    use_timeouts = False
+    if "timeouts" in dataset:
+        use_timeouts = True
+
+    episode_step = 0
+    for i in range(N - 1):
+        if episode_step < query_length:
+            sts = dataset["observations"][: episode_step + 1].reshape(
+                1, -1, dataset["observations"].shape[1]
+            )
+            acts = dataset["actions"][: episode_step + 1].reshape(
+                1, -1, dataset["actions"].shape[1]
+            )
+            ts = np.arange(episode_step + 1).reshape(1, -1)
+            am = np.ones(episode_step + 1).reshape(1, -1)
+        else:
+            sts = dataset["observation"][
+                episode_step - (query_length - 1) : episode_step + 1
+            ].reshape(1, -1, dataset["observations"].shape[1])
+
+            acts = dataset["actions"][
+                episode_step - (query_length - 1) : episode_step + 1
+            ].reshape(1, -1, dataset["actions"].shape[1])
+
+            ts = np.arange(episode_step - (query_length - 1), episode_step + 1).reshape(
+                1, -1
+            )
+            am = np.ones(query_length).reshape(1, -1)
+        obs = dataset["observations"][i].astype(np.float32)
+        new_obs = dataset["observations"][i + 1].astype(np.float32)
+        action = dataset["actions"][i].astype(np.float32)
+        reward = (
+            r_model(sts, acts, ts, am, training=False)[0]
+            .reshape(query_length)[-1]
+            .astype(np.float32)
+        )
+        done_bool = bool(dataset["terminals"][i])
+
+        if use_timeouts:
+            final_timestep = dataset["timeouts"][i]
+        else:
+            final_timestep = episode_step == env._max_episode_steps - 1
+        if (not terminate_on_end) and final_timestep:
+            # Skip this transition and don't apply terminals on the last step of an episode
+            episode_step = 0
+            continue
+        if done_bool or final_timestep:
+            episode_step = 0
+
+        obs_.append(obs)
+        next_obs_.append(new_obs)
+        action_.append(action)
+        reward_.append(reward)
+        done_.append(done_bool)
+        episode_step += 1
+
+    return {
+        "observations": np.array(obs_),
+        "actions": np.array(action_),
+        "next_observations": np.array(next_obs_),
+        "rewards": np.array(reward_),
+        "terminals": np.array(done_),
+    }
+
+
 @pyrallis.wrap()
 def train(config: TrainConfig):
     env = gym.make(config.env)
 
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
+    if config.reward_model_path:
+        reward_model_path = os.path.expanduser(config.reward_model_path)
+    
+        checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
+        if config.query_length > 1:
+            reward_model = load_PT(reward_model_path, checkpointer, on_cpu=True)
+            reward_model = nnx.jit(reward_model, static_argnums=4)
 
-    dataset = d4rl.qlearning_dataset(env)
+            dataset = qlearning_dataset_pt(env,reward_model,config.query_length)
+        else:
+            reward_model = load_QMLP(reward_model_path, checkpointer, on_cpu=True)
+            reward_model = nnx.jit(reward_model)
+
+            dataset = qlearning_dataset_mr(env,reward_model)
+        checkpointer.close()
+    else:
+        dataset = d4rl.qlearning_dataset(env)
 
     if config.normalize_reward:
         modify_reward(dataset, config.env)
