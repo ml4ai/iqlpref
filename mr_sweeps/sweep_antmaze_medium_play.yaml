@@ -6,7 +6,7 @@ parameters:
   config_path:
     value: "configs/offline/iql/antmaze/medium_play_v2.yaml"
   reward_model_path:
-    value: "antmaze_models/antmaze_mr/antmaze-medium-play-v2/reduce_0_mr/best_model.ckpt"
+    value: "~/iqlpref/antmaze_models/antmaze_mr/antmaze-medium-play-v2/reduce_0_mr/best_model.ckpt"
   query_length:
     value: 1
   seed:
