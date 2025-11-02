@@ -690,6 +690,11 @@ def qlearning_dataset_pt(
             )
             ts = np.arange(episode_step + 1).reshape(1, -1)
             am = np.ones(episode_step + 1).reshape(1, -1)
+            reward = (
+                r_model(sts, acts, ts, am, training=False)[0]["value"]
+                .reshape(episode_step + 1)[-1]
+                .astype(np.float32)
+            )
         else:
             sts = dataset["observation"][
                 episode_step - (query_length - 1) : episode_step + 1
@@ -701,14 +706,14 @@ def qlearning_dataset_pt(
 
             ts = np.arange(query_length).reshape(1, -1)
             am = np.ones(query_length).reshape(1, -1)
+            reward = (
+                r_model(sts, acts, ts, am, training=False)[0]["value"]
+                .reshape(query_length)[-1]
+                .astype(np.float32)
+            )
         obs = dataset["observations"][i].astype(np.float32)
         new_obs = dataset["observations"][i + 1].astype(np.float32)
         action = dataset["actions"][i].astype(np.float32)
-        reward = (
-            r_model(sts, acts, ts, am, training=False)[0]["value"]
-            .reshape(query_length)[-1]
-            .astype(np.float32)
-        )
         done_bool = bool(dataset["terminals"][i])
 
         if use_timeouts:
