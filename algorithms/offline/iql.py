@@ -251,6 +251,7 @@ def return_reward_range(dataset, max_episode_steps):
             returns.append(ep_ret)
             lengths.append(ep_len)
             ep_ret, ep_len = 0.0, 0
+    print(ep_len)
     lengths.append(ep_len)  # but still keep track of number of steps
     assert sum(lengths) == len(dataset["rewards"])
     return min(returns), max(returns)
@@ -721,7 +722,6 @@ def qlearning_dataset_pt(
         else:
             final_timestep = episode_step == env._max_episode_steps - 1
         if (not terminate_on_end) and final_timestep:
-            print(episode_step)
             # Skip this transition and don't apply terminals on the last step of an episode
             episode_step = 0
             continue
