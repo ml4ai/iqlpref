@@ -681,7 +681,7 @@ def qlearning_dataset_pt(
 
     episode_step = 0
     for i in range(N - 1):
-        if episode_step < query_length:
+        if episode_step <= query_length:
             sts = dataset["observations"][: episode_step + 1].reshape(
                 1, -1, dataset["observations"].shape[1]
             )
@@ -697,11 +697,11 @@ def qlearning_dataset_pt(
             )
         else:
             sts = dataset["observations"][
-                episode_step - (query_length - 1) : episode_step + 1
+                episode_step - query_length : episode_step + 1
             ].reshape(1, -1, dataset["observations"].shape[1])
 
             acts = dataset["actions"][
-                episode_step - (query_length - 1) : episode_step + 1
+                episode_step - query_length : episode_step + 1
             ].reshape(1, -1, dataset["actions"].shape[1])
 
             ts = np.arange(query_length).reshape(1, -1)
