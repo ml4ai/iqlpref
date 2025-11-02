@@ -696,7 +696,7 @@ def qlearning_dataset_pt(
                 .astype(np.float32)
             )
         else:
-            sts = dataset["observation"][
+            sts = dataset["observations"][
                 episode_step - (query_length - 1) : episode_step + 1
             ].reshape(1, -1, dataset["observations"].shape[1])
 
