@@ -688,7 +688,7 @@ def qlearning_dataset_pt(
             acts = dataset["actions"][: episode_step + 1].reshape(
                 1, -1, dataset["actions"].shape[1]
             )
-            ts = np.arange(query_length).reshape(1, -1)
+            ts = np.arange(episode_step + 1).reshape(1, -1)
             am = np.ones(episode_step + 1).reshape(1, -1)
         else:
             sts = dataset["observation"][
@@ -705,7 +705,7 @@ def qlearning_dataset_pt(
         new_obs = dataset["observations"][i + 1].astype(np.float32)
         action = dataset["actions"][i].astype(np.float32)
         reward = (
-            r_model(sts, acts, ts, am, training=False)[0]
+            r_model(sts, acts, ts, am, training=False)[0]["value"]
             .reshape(query_length)[-1]
             .astype(np.float32)
         )
