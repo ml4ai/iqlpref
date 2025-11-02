@@ -681,7 +681,6 @@ def qlearning_dataset_pt(
 
     episode_step = 0
     for i in range(N - 1):
-        print(episode_step)
         if episode_step < query_length:
             sts = dataset["observations"][: episode_step + 1].reshape(
                 1, -1, dataset["observations"].shape[1]
@@ -722,6 +721,7 @@ def qlearning_dataset_pt(
         else:
             final_timestep = episode_step == env._max_episode_steps - 1
         if (not terminate_on_end) and final_timestep:
+            print(episode_step)
             # Skip this transition and don't apply terminals on the last step of an episode
             episode_step = 0
             continue
