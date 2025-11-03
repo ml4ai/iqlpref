@@ -248,11 +248,11 @@ def return_reward_range(dataset, max_episode_steps):
         ep_ret += float(r)
         ep_len += 1
         if d or ep_len == max_episode_steps:
-            print(ep_len)
             returns.append(ep_ret)
             lengths.append(ep_len)
             ep_ret, ep_len = 0.0, 0
     lengths.append(ep_len)  # but still keep track of number of steps
+    print(lengths)
     assert sum(lengths) == len(dataset["rewards"])
     return min(returns), max(returns)
 
