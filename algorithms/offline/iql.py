@@ -244,28 +244,31 @@ def eval_actor(
 def return_reward_range(dataset, max_episode_steps):
     returns, lengths = [], []
     ep_ret, ep_len = 0.0, 0
-    for r, d in zip(dataset["rewards"], dataset["terminals"]):
+    i = 0
+    trj_lens = np.zeros(dataset["rewards"].shape[0])
+    for j, r, d in enumerate(zip(dataset["rewards"], dataset["terminals"])):
         ep_ret += float(r)
         ep_len += 1
+        trj_lens[i:j+1] = ep_len
         if d or ep_len == max_episode_steps:
-            print(ep_len)
+            i = j + 1
             returns.append(ep_ret)
             lengths.append(ep_len)
             ep_ret, ep_len = 0.0, 0
     lengths.append(ep_len)  # but still keep track of number of steps
     assert sum(lengths) == len(dataset["rewards"])
-    return min(returns), max(returns)
+    return min(returns), max(returns), trj_lens
 
 
 def modify_reward(dataset, env_name, min_max_normalize_rwd, max_episode_steps=1000):
     if any(s in env_name for s in ("halfcheetah", "hopper", "walker2d")):
-        min_ret, max_ret = return_reward_range(dataset, max_episode_steps)
+        min_ret, max_ret,_ = return_reward_range(dataset, max_episode_steps)
         dataset["rewards"] /= max_ret - min_ret
         dataset["rewards"] *= max_episode_steps
     elif "antmaze" in env_name:
         if min_max_normalize_rwd:
-            min_ret, max_ret = return_reward_range(dataset, max_episode_steps)
-            dataset["rewards"] -= min_ret
+            min_ret, max_ret, trj_lens = return_reward_range(dataset, max_episode_steps)
+            dataset["rewards"] -= (min_ret / trj_lens)
             dataset["rewards"] /= max_ret - min_ret
             dataset["rewards"] *= max_episode_steps
         dataset["rewards"] -= 1.0
