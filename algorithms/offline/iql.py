@@ -268,10 +268,11 @@ def modify_reward(dataset, env_name, min_max_normalize_rwd, max_episode_steps=10
     elif "antmaze" in env_name:
         if min_max_normalize_rwd:
             min_ret, max_ret, trj_lens = return_reward_range(dataset, max_episode_steps)
-            dataset["rewards"] -= min_ret / trj_lens
+            # dataset["rewards"] -= min_ret / trj_lens
+            dataset["rewards"] -= min_ret
             dataset["rewards"] /= max_ret - min_ret
             dataset["rewards"] *= max_episode_steps
-        dataset["rewards"] -= 1.0
+        # dataset["rewards"] -= 1.0
 
 
 def asymmetric_l2_loss(u: torch.Tensor, tau: float) -> torch.Tensor:
