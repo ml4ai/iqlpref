@@ -64,8 +64,8 @@ class TrainConfig:
     batch_size: int = 256
     # whether to normalize states
     normalize: bool = True
-    # whether to normalize reward (like in IQL)
-    normalize_reward: bool = False
+    # whether to normalize reward (like in IQL) (0 is none, other integers lead to different types of normalizations)
+    normalize_reward: int = 0
     # V-critic function learning rate
     vf_lr: float = 3e-4
     # Q-critic learning rate
@@ -260,19 +260,46 @@ def return_reward_range(dataset, max_episode_steps):
     return min(returns), max(returns), trj_lens
 
 
-def modify_reward(dataset, env_name, min_max_normalize_rwd, max_episode_steps=1000):
+def modify_reward(dataset, env_name, normalize_reward, max_episode_steps=1000):
     if any(s in env_name for s in ("halfcheetah", "hopper", "walker2d")):
         min_ret, max_ret, _ = return_reward_range(dataset, max_episode_steps)
         dataset["rewards"] /= max_ret - min_ret
         dataset["rewards"] *= max_episode_steps
     elif "antmaze" in env_name:
-        if min_max_normalize_rwd:
-            min_ret, max_ret, trj_lens = return_reward_range(dataset, max_episode_steps)
-            # dataset["rewards"] -= min_ret / trj_lens
+        if normalize_reward == 1:
+            dataset["rewards"] -= 1.0
+        elif normalize_reward == 2:
+            min_ret, max_ret, _ = return_reward_range(dataset, max_episode_steps)
+            dataset["rewards"] /= max_ret - min_ret
+            dataset["rewards"] *= max_episode_steps
+        elif normalize_reward == 3:
+            min_ret, max_ret, _ = return_reward_range(dataset, max_episode_steps)
+            dataset["rewards"] /= max_ret - min_ret
+            dataset["rewards"] *= max_episode_steps
+            dataset["rewards"] -= 1.0
+        elif normalize_reward == 4:
+            min_ret, max_ret, _ = return_reward_range(dataset, max_episode_steps)
             dataset["rewards"] -= min_ret
             dataset["rewards"] /= max_ret - min_ret
             dataset["rewards"] *= max_episode_steps
-        # dataset["rewards"] -= 1.0
+        elif normalize_reward == 5:
+            min_ret, max_ret, _ = return_reward_range(dataset, max_episode_steps)
+            dataset["rewards"] -= min_ret
+            dataset["rewards"] /= max_ret - min_ret
+            dataset["rewards"] *= max_episode_steps
+            dataset["rewards"] -= 1.0
+        elif normalize_reward == 6:
+            min_ret, max_ret, trj_lens = return_reward_range(dataset, max_episode_steps)
+            dataset["rewards"] -= min_ret / trj_lens
+            dataset["rewards"] /= max_ret - min_ret
+            dataset["rewards"] *= max_episode_steps
+        else:
+            min_ret, max_ret, trj_lens = return_reward_range(dataset, max_episode_steps)
+            dataset["rewards"] -= min_ret / trj_lens
+            dataset["rewards"] /= max_ret - min_ret
+            dataset["rewards"] *= max_episode_steps
+            dataset["rewards"] -= 1.0
+
 
 
 def asymmetric_l2_loss(u: torch.Tensor, tau: float) -> torch.Tensor:
@@ -754,9 +781,7 @@ def train(config: TrainConfig):
 
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    min_max_normalize_rwd = False
     if config.reward_model_path:
-        min_max_normalize_rwd = True
         reward_model_path = os.path.expanduser(config.reward_model_path)
 
         checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
@@ -775,7 +800,7 @@ def train(config: TrainConfig):
         dataset = d4rl.qlearning_dataset(env)
 
     if config.normalize_reward:
-        modify_reward(dataset, config.env, min_max_normalize_rwd)
+        modify_reward(dataset, config.env, config.normalize_reward)
 
     if config.normalize:
         state_mean, state_std = compute_mean_std(dataset["observations"], eps=1e-3)
