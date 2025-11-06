@@ -5,8 +5,8 @@ parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
     value: "configs/offline/iql/antmaze/medium_play_v2.yaml"
-  seed:
-    values: [0, 1, 2, 3, 4, 5, 6, 7]
+  # seed:
+  #   values: [0, 1, 2, 3, 4, 5, 6, 7]
   normalize_reward:
-    values: [0, 1, 2, 3]
+    values: [1, 2, 3]
   
