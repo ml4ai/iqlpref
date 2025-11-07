@@ -9,5 +9,7 @@ parameters:
     value: "~/iqlpref/antmaze_models/antmaze_mr/antmaze-large-diverse-v2/reduce_0_mr/best_model.ckpt"
   query_length:
     value: 1
-  seed:
-    values: [0, 1, 2, 3, 4, 5, 6, 7]
+  # seed:
+  #   values: [0, 1, 2, 3, 4, 5, 6, 7]
+  normalize_reward:
+    values: [0, 1, 2, 3, 4, 5, 6, 7] 
