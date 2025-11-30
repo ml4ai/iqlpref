@@ -335,7 +335,7 @@ class Squeeze(nn.Module):
         return x.squeeze(dim=self.dim)
 
 
-class MLP(nn.Module):
+class IQMLP(nn.Module):
     def __init__(
         self,
         dims,
@@ -347,7 +347,7 @@ class MLP(nn.Module):
         super().__init__()
         n_dims = len(dims)
         if n_dims < 2:
-            raise ValueError("MLP requires at least two dims (input and output)")
+            raise ValueError("IQMLP requires at least two dims (input and output)")
 
         layers = []
         for i in range(n_dims - 2):
@@ -381,7 +381,7 @@ class GaussianPolicy(nn.Module):
         dropout: Optional[float] = None,
     ):
         super().__init__()
-        self.net = MLP(
+        self.net = IQMLP(
             [state_dim, *([hidden_dim] * n_hidden), act_dim],
             output_activation_fn=nn.Tanh,
             dropout=dropout,
@@ -416,7 +416,7 @@ class DeterministicPolicy(nn.Module):
         dropout: Optional[float] = None,
     ):
         super().__init__()
-        self.net = MLP(
+        self.net = IQMLP(
             [state_dim, *([hidden_dim] * n_hidden), act_dim],
             output_activation_fn=nn.Tanh,
             dropout=dropout,
@@ -445,8 +445,8 @@ class TwinQ(nn.Module):
     ):
         super().__init__()
         dims = [state_dim + action_dim, *([hidden_dim] * n_hidden), 1]
-        self.q1 = MLP(dims, squeeze_output=True)
-        self.q2 = MLP(dims, squeeze_output=True)
+        self.q1 = IQMLP(dims, squeeze_output=True)
+        self.q2 = IQMLP(dims, squeeze_output=True)
 
     def both(
         self, state: torch.Tensor, action: torch.Tensor
@@ -462,7 +462,7 @@ class ValueFunction(nn.Module):
     def __init__(self, state_dim: int, hidden_dim: int = 256, n_hidden: int = 2):
         super().__init__()
         dims = [state_dim, *([hidden_dim] * n_hidden), 1]
-        self.v = MLP(dims, squeeze_output=True)
+        self.v = IQMLP(dims, squeeze_output=True)
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         return self.v(state)
@@ -710,7 +710,7 @@ def train(config: TrainConfig):
     if DEVICE == "cuda":
         use_gpu = 1
     bayes_net = PrefNet(net, likelihood, prior, config.saved_dir, n_gpu=use_gpu)
-    w_dir = os.path.join(config.saved_dir, "sampled_weights","sampled_weights_0000003")
+    w_dir = os.path.join(config.saved_dir, "sampled_weights", "sampled_weights_0000003")
     bayes_net.sampled_weights = bayes_net._load_sampled_weights(w_dir)
     assert config.map_data is not None
     X, y = util.load_pref_data(config.map_data, 1.0)
