@@ -656,11 +656,13 @@ def qlearning_dataset_br(env, r_model, dataset=None, terminate_on_end=False, **k
         obs = dataset["observations"][i].astype(np.float32)
         new_obs = dataset["observations"][i + 1].astype(np.float32)
         action = dataset["actions"][i].astype(np.float32)
-        _, _, reward = r_model.predict(
-            np.concatenate([dataset["observations"][i], dataset["actions"][i]], axis=-1),
-            use_map=True,
-        )
-        reward = reward.astype(np.float32)
+        reward = r_model.predict(
+            np.concatenate(
+                [dataset["observations"][i], dataset["actions"][i]], axis=-1
+            ),
+            map_only=True,
+        ).astype(np.float32)
+        
         done_bool = bool(dataset["terminals"][i])
 
         if use_timeouts:
