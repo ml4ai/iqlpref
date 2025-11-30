@@ -707,7 +707,7 @@ def train(config: TrainConfig):
     )
     likelihood = LikCE()
     use_gpu = 0
-    if DEVICE == "cuda":
+    if config.device == "cuda":
         use_gpu = 1
     bayes_net = PrefNet(net, likelihood, prior, config.saved_dir, n_gpu=use_gpu)
     w_dir = os.path.join(config.saved_dir, "sampled_weights", "sampled_weights_0000003")
