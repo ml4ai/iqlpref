@@ -662,7 +662,7 @@ def qlearning_dataset_br(env, r_model, dataset=None, terminate_on_end=False, **k
             ),
             map_only=True,
         ).astype(np.float32)
-        
+        print(reward.shape)
         done_bool = bool(dataset["terminals"][i])
 
         if use_timeouts:
