@@ -657,7 +657,7 @@ def qlearning_dataset_br(env, r_model, dataset=None, terminate_on_end=False, **k
         new_obs = dataset["observations"][i + 1].astype(np.float32)
         action = dataset["actions"][i].astype(np.float32)
         _, _, reward = r_model.predict(
-            np.concatenate(dataset["observations"][i], dataset["actions"][i], axis=-1),
+            np.concatenate([dataset["observations"][i], dataset["actions"][i]], axis=-1),
             use_map=True,
         )
         reward = reward.astype(np.float32)
