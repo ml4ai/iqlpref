@@ -97,8 +97,8 @@ class TrainConfig:
     seed: int = 0
     # training device
     device: str = "cuda"
-    use_optim_prior: bool = (
-        False  # if false, then defaults to N(0,1) for all parameter priors
+    prior_dir: Optional[str] = (
+        None  # if None, then defaults to N(0,1) for all parameter priors
     )
     map_data: str = "gp_reward-priors/data/antmaze/antmaze-medium-play-v2_pref.hdf5"
 
@@ -106,10 +106,10 @@ class TrainConfig:
         self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
         if self.checkpoints_path is not None:
             self.checkpoints_path = os.path.join(self.checkpoints_path, self.name)
-        if self.use_optim_prior:
+        if self.prior_dir:
             self.saved_dir = os.path.join(self.reward_model_path, "sampling_optim")
             self.ckpt_path = os.path.join(
-                self.reward_model_path,
+                self.prior_dir,
                 "ckpts",
                 "it-{}.ckpt".format(self.mapper_num_iters),
             )
@@ -663,7 +663,8 @@ def qlearning_dataset_br(env, r_model, dataset=None, terminate_on_end=False, **k
                 ),
                 map_only=True,
             )
-            .astype(np.float32).squeeze()
+            .astype(np.float32)
+            .squeeze()
         )
         done_bool = bool(dataset["terminals"][i])
 
@@ -701,7 +702,7 @@ def train(config: TrainConfig):
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
 
-    if config.use_optim_prior:
+    if config.prior_dir:
         prior = OptimGaussianPrior(config.ckpt_path)
     else:
         prior = FixedGaussianPrior(std=1.0)

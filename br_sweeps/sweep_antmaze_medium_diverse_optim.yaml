@@ -5,8 +5,8 @@ parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
     value: "configs/offline/iql/antmaze/medium_diverse_v2.yaml"
-  use_optim_prior:
-    value: true
+  prior_dir:
+    value: "./gp_reward-priors/exp/reward_learning/antmaze_tuning/br-antmaze_medium_diverse-64-4"
   reward_model_path:
     value: "./gp_reward-priors/exp/reward_learning/antmaze_medium_diverse_optim/br-antmaze_medium_diverse-eecb704f-0.0"
   width:
