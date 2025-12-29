@@ -1,0 +1,19 @@
+project: IQL-pref
+program: algorithms/offline/iql_br.py
+method: grid
+parameters:
+  # specify all configs to run for the choosen algorithm
+  config_path:
+    value: "configs/offline/iql/antmaze/large_diverse_v2.yaml"
+  reward_model_path:
+    value: "./gp_reward-priors/exp/reward_learning/antmaze_large_diverse_optim/br-antmaze_large_diverse-44d0ad92-0.0"
+  width:
+    value: 256
+  depth:
+    value: 2
+  map_data:
+    value: "gp_reward-priors/data/antmaze/antmaze-large-diverse-v2_pref.hdf5"
+  seed:
+    value: 0
+  normalize_reward:
+    values: [0, 1, 2, 3, 4, 5, 6, 7]
