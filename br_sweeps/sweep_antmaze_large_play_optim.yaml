@@ -5,6 +5,8 @@ parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
     value: "configs/offline/iql/antmaze/large_play_v2.yaml"
+  use_optim_prior:
+    value: true
   reward_model_path:
     value: "./gp_reward-priors/exp/reward_learning/antmaze_large_play_optim/br-antmaze_large_play-91f0ef5a-0.0"
   width:
