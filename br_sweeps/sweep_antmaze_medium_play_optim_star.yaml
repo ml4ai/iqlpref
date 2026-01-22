@@ -16,6 +16,6 @@ parameters:
   map_data:
     value: "gp_reward-priors/data/antmaze/antmaze-medium-play-v2_pref.hdf5"
   seed:
-    value: 0
+    values: [0, 1, 2, 3, 4, 5, 6, 7]
   normalize_reward:
-    values: [0, 1, 2, 3, 4, 5, 6, 7] 
+    value: 3
