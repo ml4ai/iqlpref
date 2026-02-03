@@ -7,7 +7,7 @@ parameters:
     value: "configs/offline/iql/antmaze/medium_diverse_v2.yaml"
   reward_model_path:
     values: ["~/iqlpref/antmaze_models/antmaze_mr/antmaze-medium-diverse-v2/reduce_50_mr/best_model.ckpt",
-             "~/iqlpref/antmaze_models/antmaze_mr/antmaze-medium-diverse-v2/reduce_70_mr/best_model.ckpt"
+             "~/iqlpref/antmaze_models/antmaze_mr/antmaze-medium-diverse-v2/reduce_70_mr/best_model.ckpt",
              "~/iqlpref/antmaze_models/antmaze_mr/antmaze-medium-diverse-v2/reduce_90_mr/best_model.ckpt"]
   query_length:
     value: 1
