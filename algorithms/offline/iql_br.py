@@ -101,6 +101,7 @@ class TrainConfig:
         None  # if None, then defaults to N(0,1) for all parameter priors
     )
     map_data: str = "gp_reward-priors/data/antmaze/antmaze-medium-play-v2_pref.hdf5"
+    weights_dir: str = "sampled_weights_0000003"
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
@@ -715,7 +716,7 @@ def train(config: TrainConfig):
     if config.device == "cuda":
         use_gpu = 1
     bayes_net = PrefNet(net, likelihood, prior, config.saved_dir, n_gpu=use_gpu)
-    w_dir = os.path.join(config.saved_dir, "sampled_weights", "sampled_weights_0000003")
+    w_dir = os.path.join(config.saved_dir, "sampled_weights", config.weights_dir)
     bayes_net.sampled_weights = bayes_net._load_sampled_weights(w_dir)
     assert config.map_data is not None
     X, y = util.load_pref_data(config.map_data, 1.0)
