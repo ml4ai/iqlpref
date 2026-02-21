@@ -6,7 +6,9 @@ parameters:
   config_path:
     value: "configs/offline/iql/antmaze/medium_play_v2.yaml"
   reward_model_path:
-    value: "./gp_reward-priors/exp/reward_learning/antmaze_medium_play_FG/br-D4RL_antmaze-medium-play-v2-62cd41ae-0.0"
+    values: ["~/iqlpref/antmaze_models/antmaze_br/FG/antmaze-medium-play-v2/reduce_50_br",
+             "~/iqlpref/antmaze_models/antmaze_br/FG/antmaze-medium-play-v2/reduce_70_br",
+             "~/iqlpref/antmaze_models/antmaze_br/FG/antmaze-medium-play-v2/reduce_90_br"]
   width:
     value: 256
   depth:

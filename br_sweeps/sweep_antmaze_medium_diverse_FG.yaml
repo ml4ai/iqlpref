@@ -6,7 +6,9 @@ parameters:
   config_path:
     value: "configs/offline/iql/antmaze/medium_diverse_v2.yaml"
   reward_model_path:
-    value: "./gp_reward-priors/exp/reward_learning/antmaze_medium_diverse_FG/br-D4RL_antmaze-medium-diverse-v2-d08b56fe-0.0"
+    values: ["~/iqlpref/antmaze_models/antmaze_br/FG/antmaze-medium-diverse-v2/reduce_50_br",
+             "~/iqlpref/antmaze_models/antmaze_br/FG/antmaze-medium-diverse-v2/reduce_70_br",
+             "~/iqlpref/antmaze_models/antmaze_br/FG/antmaze-medium-diverse-v2/reduce_90_br"]
   width:
     value: 64
   depth:

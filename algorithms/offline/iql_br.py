@@ -89,31 +89,21 @@ class TrainConfig:
     reward_model_path: str = (
         "./gp_reward-priors/exp/reward_learning/antmaze_medium_play_FG/br-D4RL_antmaze-medium-play-v2-62cd41ae-0.0"
     )
+    optim_prior: bool = False
     width: int = 256
     depth: int = 2
     transfer_fn: str = "relu"
-    mapper_num_iters: int = 1000
     # training random seed
     seed: int = 0
     # training device
     device: str = "cuda"
-    prior_dir: Optional[str] = (
-        None  # if None, then defaults to N(0,1) for all parameter priors
-    )
-    map_data: str = "gp_reward-priors/data/antmaze/antmaze-medium-play-v2_pref.hdf5"
-    weights_dir: str = "sampled_weights_0000003"
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
         if self.checkpoints_path is not None:
             self.checkpoints_path = os.path.join(self.checkpoints_path, self.name)
-        if self.prior_dir:
+        if self.optim_prior:
             self.saved_dir = os.path.join(self.reward_model_path, "sampling_optim")
-            self.ckpt_path = os.path.join(
-                self.prior_dir,
-                "ckpts",
-                "it-{}.ckpt".format(self.mapper_num_iters),
-            )
         else:
             self.saved_dir = os.path.join(self.reward_model_path, "sampling_std")
 
@@ -703,10 +693,7 @@ def train(config: TrainConfig):
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
 
-    if config.prior_dir:
-        prior = OptimGaussianPrior(config.ckpt_path)
-    else:
-        prior = FixedGaussianPrior(std=1.0)
+    prior = FixedGaussianPrior(std=1.0)
 
     net = MLP(
         state_dim + action_dim, 1, [config.width] * config.depth, config.transfer_fn
@@ -716,11 +703,8 @@ def train(config: TrainConfig):
     if config.device == "cuda":
         use_gpu = 1
     bayes_net = PrefNet(net, likelihood, prior, config.saved_dir, n_gpu=use_gpu)
-    w_dir = os.path.join(config.saved_dir, "sampled_weights", config.weights_dir)
-    bayes_net.sampled_weights = bayes_net._load_sampled_weights(w_dir)
-    assert config.map_data is not None
-    X, y = util.load_pref_data(config.map_data, 1.0)
-    bayes_net.find_map(X, y)
+    bayes_net.load_map(os.path.join(config.saved_dir, "sampled_weights", "map_estimate"))
+    
     dataset = qlearning_dataset_br(env, bayes_net)
 
     if config.normalize_reward:
