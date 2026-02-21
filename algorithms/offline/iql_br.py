@@ -100,6 +100,7 @@ class TrainConfig:
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.env}-{str(uuid.uuid4())[:8]}"
+        self.reward_model_path = os.path.expanduser(self.reward_model_path)
         if self.checkpoints_path is not None:
             self.checkpoints_path = os.path.join(self.checkpoints_path, self.name)
         if self.optim_prior:
@@ -703,8 +704,10 @@ def train(config: TrainConfig):
     if config.device == "cuda":
         use_gpu = 1
     bayes_net = PrefNet(net, likelihood, prior, config.saved_dir, n_gpu=use_gpu)
-    bayes_net.load_map(os.path.join(config.saved_dir, "sampled_weights", "map_estimate"))
-    
+    bayes_net.load_map(
+        os.path.join(config.saved_dir, "sampled_weights", "map_estimate")
+    )
+
     dataset = qlearning_dataset_br(env, bayes_net)
 
     if config.normalize_reward:
