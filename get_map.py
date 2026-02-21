@@ -16,7 +16,7 @@ depth = 2  # Number of hidden layers
 transfer_fn = "relu"  # Activation function
 
 X_train, y_train, _, _ = util.load_pref_data(
-    "./gp_reward-priors/data/antmaze/antmaze-medium-diverse-v2_pref.hdf5", 0.3
+    "./gp_reward-priors/data/antmaze/antmaze-medium-diverse-v2_pref.hdf5", 0.1
 )
 
 # Initialize the prior
@@ -28,7 +28,7 @@ likelihood = LikCE()
 
 # Initialize the sampler
 saved_dir = os.path.join(
-    "./antmaze_models/antmaze_br/FG/antmaze-medium-diverse-v2/reduce_70_br",
+    "./antmaze_models/antmaze_br/FG/antmaze-medium-diverse-v2/reduce_90_br",
     "sampling_std",
 )
 util.ensure_dir(saved_dir)
