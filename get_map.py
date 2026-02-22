@@ -9,14 +9,14 @@ from optbnn.bnn.priors import FixedGaussianPrior
 from optbnn.sgmcmc_bayes_net.pref_net import PrefNet
 from optbnn.utils import util
 
-util.set_seed(0)
+util.set_seed(5)
 # Initialize BNN Priors
 width = 256  # Number of units in each hidden layer
 depth = 2  # Number of hidden layers
 transfer_fn = "relu"  # Activation function
 
 X_train, y_train, _, _ = util.load_pref_data(
-    "./gp_reward-priors/data/antmaze/antmaze-large-play-v2_pref.hdf5", 0.5
+    "./gp_reward-priors/data/antmaze/antmaze-large-play-v2_pref.hdf5", 0.3
 )
 
 # Initialize the prior
@@ -28,7 +28,7 @@ likelihood = LikCE()
 
 # Initialize the sampler
 saved_dir = os.path.join(
-    "./antmaze_models/antmaze_br/FG/antmaze-large-play-v2/reduce_50_br",
+    "./antmaze_models/antmaze_br/FG/antmaze-large-play-v2/reduce_70_br",
     "sampling_std",
 )
 util.ensure_dir(saved_dir)
