@@ -11,15 +11,15 @@ from optbnn.utils import util
 
 util.set_seed(6)
 # Initialize BNN Priors
-width = 128  # Number of units in each hidden layer
-depth = 2  # Number of hidden layers
+width = 64  # Number of units in each hidden layer
+depth = 4  # Number of hidden layers
 transfer_fn = "relu"  # Activation function
 
 X_train, y_train, _, _ = util.load_pref_data(
-    "./gp_reward-priors/data/antmaze/antmaze-medium-diverse-v2_pref.hdf5", 0.1
+    "./gp_reward-priors/data/antmaze/antmaze-large-play-v2_pref.hdf5", 0.5
 )
 
-prior_dir = "./gp_reward-priors/exp/reward_learning/antmaze_tuning_star/br-antmaze_medium_diverse-128-2/ckpts/it-1000.ckpt"
+prior_dir = "./gp_reward-priors/exp/reward_learning/antmaze_tuning_star/br-antmaze_large_play-64-4/ckpts/it-1000.ckpt"
 
 # Initialize the prior
 prior = OptimGaussianPrior(prior_dir)
@@ -30,7 +30,7 @@ likelihood = LikCE()
 
 # Initialize the sampler
 saved_dir = os.path.join(
-    "./antmaze_models/antmaze_br/optim_star/antmaze-medium-diverse-v2/reduce_90_br",
+    "./antmaze_models/antmaze_br/optim_star/antmaze-large-play-v2/reduce_50_br",
     "sampling_optim",
 )
 util.ensure_dir(saved_dir)
