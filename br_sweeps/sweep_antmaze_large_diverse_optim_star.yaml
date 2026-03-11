@@ -6,9 +6,9 @@ parameters:
   config_path:
     value: "configs/offline/iql/antmaze/large_diverse_v2.yaml"
   reward_model_path:
-    values: ["~/iqlpref/antmaze_models/antmaze_br/optim_star/antmaze-large-play-v2/reduce_50_br",
-             "~/iqlpref/antmaze_models/antmaze_br/optim_star/antmaze-large-play-v2/reduce_70_br",
-             "~/iqlpref/antmaze_models/antmaze_br/optim_star/antmaze-large-play-v2/reduce_90_br"]
+    values: ["~/iqlpref/antmaze_models/antmaze_br/optim_star/antmaze-large-diverse-v2/reduce_50_br",
+             "~/iqlpref/antmaze_models/antmaze_br/optim_star/antmaze-large-diverse-v2/reduce_70_br",
+             "~/iqlpref/antmaze_models/antmaze_br/optim_star/antmaze-large-diverse-v2/reduce_90_br"]
   width:
     value: 64
   depth:
