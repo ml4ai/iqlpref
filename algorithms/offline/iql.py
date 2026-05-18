@@ -892,6 +892,7 @@ def train(config: TrainConfig):
                 actor,
                 device=config.device,
                 n_episodes=config.n_episodes,
+                discount=config.discount,
                 seed=config.seed,
             )
             mean_eval_score = eval_scores.mean()
