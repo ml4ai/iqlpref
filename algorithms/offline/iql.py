@@ -1,9 +1,9 @@
 # source: https://github.com/gwthomas/IQL-PyTorch
 # https://arxiv.org/pdf/2110.06169.pdf
 import copy
-import sys
 import os
 import random
+import sys
 import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -151,9 +151,7 @@ class ReplayBuffer:
         self._actions = torch.zeros(
             (buffer_size, action_dim), dtype=torch.float32, device=device
         )
-        self._rewards = torch.zeros(
-            (buffer_size, 1), dtype=torch.float32, device=device
-        )
+        self._rewards = torch.zeros((buffer_size, 1), dtype=torch.float32, device=device)
         self._next_states = torch.zeros(
             (buffer_size, state_dim), dtype=torch.float32, device=device
         )
@@ -223,7 +221,12 @@ def wandb_init(config: dict) -> None:
 
 @torch.no_grad()
 def eval_actor(
-    env: gym.Env, actor: nn.Module, device: str, n_episodes: int, seed: int
+    env: gym.Env,
+    actor: nn.Module,
+    device: str,
+    n_episodes: int,
+    discount: float,
+    seed: int,
 ) -> np.ndarray:
     env.seed(seed)
     actor.eval()
@@ -231,10 +234,12 @@ def eval_actor(
     for _ in range(n_episodes):
         state, done = env.reset(), False
         episode_reward = 0.0
+        step = 0
         while not done:
             action = actor.act(state, device)
             state, reward, done, _ = env.step(action)
-            episode_reward += reward
+            episode_reward += reward * (discount**step)
+            step += 1
         episode_rewards.append(episode_reward)
 
     actor.train()
@@ -299,7 +304,6 @@ def modify_reward(dataset, env_name, normalize_reward, max_episode_steps=1000):
             dataset["rewards"] /= max_ret - min_ret
             dataset["rewards"] *= max_episode_steps
             dataset["rewards"] -= 1.0
-
 
 
 def asymmetric_l2_loss(u: torch.Tensor, tau: float) -> torch.Tensor:
@@ -379,9 +383,7 @@ class GaussianPolicy(nn.Module):
         state = torch.tensor(state.reshape(1, -1), device=device, dtype=torch.float32)
         dist = self(state)
         action = dist.mean if not self.training else dist.sample()
-        action = torch.clamp(
-            self.max_action * action, -self.max_action, self.max_action
-        )
+        action = torch.clamp(self.max_action * action, -self.max_action, self.max_action)
         return action.cpu().data.numpy().flatten()
 
 
@@ -410,9 +412,7 @@ class DeterministicPolicy(nn.Module):
     def act(self, state: np.ndarray, device: str = "cpu"):
         state = torch.tensor(state.reshape(1, -1), device=device, dtype=torch.float32)
         return (
-            torch.clamp(
-                self(state) * self.max_action, -self.max_action, self.max_action
-            )
+            torch.clamp(self(state) * self.max_action, -self.max_action, self.max_action)
             .cpu()
             .data.numpy()
             .flatten()
@@ -880,7 +880,6 @@ def train(config: TrainConfig):
 
     wandb_init(asdict(config))
 
-    evaluations = []
     for t in range(int(config.max_timesteps)):
         batch = replay_buffer.sample(config.batch_size)
         batch = [b.to(config.device) for b in batch]
@@ -888,7 +887,6 @@ def train(config: TrainConfig):
         wandb.log(log_dict, step=trainer.total_it)
         # Evaluate episode
         if (t + 1) % config.eval_freq == 0:
-            print(f"Time steps: {t + 1}")
             eval_scores = eval_actor(
                 env,
                 actor,
@@ -897,16 +895,6 @@ def train(config: TrainConfig):
                 seed=config.seed,
             )
             mean_eval_score = eval_scores.mean()
-            normalized_mean_eval_score = (
-                env.get_normalized_score(mean_eval_score) * 100.0
-            )
-            evaluations.append(normalized_mean_eval_score)
-            print("---------------------------------------")
-            print(
-                f"Evaluation over {config.n_episodes} episodes: "
-                f"{mean_eval_score:.3f} , D4RL score: {normalized_mean_eval_score:.3f}"
-            )
-            print("---------------------------------------")
             if config.checkpoints_path is not None:
                 torch.save(
                     trainer.state_dict(),
@@ -914,7 +902,6 @@ def train(config: TrainConfig):
                 )
             wandb.log(
                 {
-                    "normalized_mean_score": normalized_mean_eval_score,
                     "mean_score": mean_eval_score,
                 },
                 step=trainer.total_it,
