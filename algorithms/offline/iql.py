@@ -72,6 +72,8 @@ class TrainConfig:
     actor_lr: float = 3e-4
     #  where to use dropout for policy network, optional
     actor_dropout: Optional[float] = None
+    # how often to push metrics to wandb (steps)
+    log_freq: int = 250
     # evaluation frequency, will evaluate every eval_freq training steps
     eval_freq: int = int(5e3)
     # number of episodes to run during evaluation
@@ -218,7 +220,7 @@ def wandb_init(config: dict) -> None:
     # wandb.run.save()
 
 
-@torch.no_grad()
+@torch.inference_mode()
 def eval_actor(
     env: gym.Env,
     actor: nn.Module,
@@ -377,7 +379,7 @@ class GaussianPolicy(nn.Module):
         std = torch.exp(self.log_std.clamp(LOG_STD_MIN, LOG_STD_MAX))
         return Normal(mean, std)
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def act(self, state: np.ndarray, device: str = "cpu"):
         state = torch.tensor(state.reshape(1, -1), device=device, dtype=torch.float32)
         dist = self(state)
@@ -407,7 +409,7 @@ class DeterministicPolicy(nn.Module):
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         return self.net(obs)
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def act(self, state: np.ndarray, device: str = "cpu"):
         state = torch.tensor(state.reshape(1, -1), device=device, dtype=torch.float32)
         return (
@@ -618,7 +620,7 @@ def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **k
     # One batched forward pass for all N-1 transitions.
     device = next(r_model.parameters()).device
     obs_act = np.concatenate([obs_all[:-1], act_all[:-1]], axis=1)
-    with torch.no_grad():
+    with torch.inference_mode():
         all_rewards = r_model(
             torch.from_numpy(obs_act).to(device)
         ).squeeze(-1).cpu().numpy()
@@ -668,7 +670,7 @@ def qlearning_dataset_pt(
     all_rewards = np.zeros(N - 1, dtype=np.float32)
     ts_template = np.arange(query_length, dtype=np.int64)
 
-    with torch.no_grad():
+    with torch.inference_mode():
         for cs in range(0, N - 1, CHUNK):
             ce = min(cs + CHUNK, N - 1)
             B = ce - cs
@@ -884,11 +886,19 @@ def train(config: TrainConfig):
 
     wandb_init(asdict(config))
 
+    log_buffer: Dict[str, float] = {}
     for t in range(int(config.max_timesteps)):
         # Replay buffer already lives on config.device — no .to() needed.
         batch = replay_buffer.sample(config.batch_size)
         log_dict = trainer.train(batch)
-        wandb.log(log_dict, step=trainer.total_it)
+        for k, v in log_dict.items():
+            log_buffer[k] = log_buffer.get(k, 0.0) + v
+        if (t + 1) % config.log_freq == 0:
+            wandb.log(
+                {k: v / config.log_freq for k, v in log_buffer.items()},
+                step=trainer.total_it,
+            )
+            log_buffer = {}
         # Evaluate episode
         if (t + 1) % config.eval_freq == 0:
             eval_scores = eval_actor(
