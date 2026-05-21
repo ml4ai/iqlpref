@@ -6,6 +6,7 @@ import random
 import sys
 import uuid
 from dataclasses import asdict, dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -220,31 +221,74 @@ def wandb_init(config: dict) -> None:
     # wandb.run.save()
 
 
+def _make_eval_env(
+    env_name: str,
+    state_mean: Union[np.ndarray, float],
+    state_std: Union[np.ndarray, float],
+    seed: int,
+) -> gym.Env:
+    e = gym.make(env_name)
+    e = wrap_env(e, state_mean=state_mean, state_std=state_std)
+    e.seed(seed)
+    return e
+
+
 @torch.inference_mode()
 def eval_actor(
-    env: gym.Env,
+    env_name: str,
     actor: nn.Module,
+    max_action: float,
+    state_mean: Union[np.ndarray, float],
+    state_std: Union[np.ndarray, float],
     device: str,
     n_episodes: int,
     discount: float,
     seed: int,
+    n_envs: int = 25,
 ) -> np.ndarray:
-    env.seed(seed)
+    n_envs = min(n_envs, n_episodes)
+    env_fns = [
+        partial(_make_eval_env, env_name, state_mean, state_std, seed + i)
+        for i in range(n_envs)
+    ]
+    vec_env = gym.vector.AsyncVectorEnv(env_fns)
     actor.eval()
-    episode_rewards = []
-    for _ in range(n_episodes):
-        state, done = env.reset(), False
-        episode_reward = 0.0
-        step = 0
-        while not done:
-            action = actor.act(state, device)
-            state, reward, done, _ = env.step(action)
-            episode_reward += reward * (discount**step)
-            step += 1
-        episode_rewards.append(episode_reward)
+
+    obs = vec_env.reset()  # (n_envs, obs_dim)
+    ep_rewards = np.zeros(n_envs, dtype=np.float64)
+    ep_steps = np.zeros(n_envs, dtype=np.int64)
+    completed: List[float] = []
+
+    try:
+        while len(completed) < n_episodes:
+            states_t = torch.tensor(obs, dtype=torch.float32, device=device)
+            policy_out = actor(states_t)
+            if isinstance(policy_out, torch.distributions.Distribution):
+                actions = torch.clamp(
+                    max_action * policy_out.mean, -max_action, max_action
+                ).cpu().numpy()
+            else:
+                actions = torch.clamp(
+                    policy_out * max_action, -max_action, max_action
+                ).cpu().numpy()
+
+            obs, rewards, dones, _ = vec_env.step(actions)
+
+            ep_rewards += rewards * (discount ** ep_steps)
+            ep_steps += 1
+
+            for i in range(n_envs):
+                if dones[i]:
+                    completed.append(float(ep_rewards[i]))
+                    ep_rewards[i] = 0.0
+                    ep_steps[i] = 0
+                    if len(completed) >= n_episodes:
+                        break
+    finally:
+        vec_env.close()
 
     actor.train()
-    return np.asarray(episode_rewards)
+    return np.asarray(completed[:n_episodes])
 
 
 def return_reward_range(dataset, max_episode_steps):
@@ -902,8 +946,11 @@ def train(config: TrainConfig):
         # Evaluate episode
         if (t + 1) % config.eval_freq == 0:
             eval_scores = eval_actor(
-                env,
+                config.env,
                 actor,
+                max_action=max_action,
+                state_mean=state_mean,
+                state_std=state_std,
                 device=config.device,
                 n_episodes=config.n_episodes,
                 discount=config.discount,
