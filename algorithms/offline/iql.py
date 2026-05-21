@@ -95,8 +95,8 @@ class TrainConfig:
 
 
 def soft_update(target: nn.Module, source: nn.Module, tau: float):
-    for target_param, source_param in zip(target.parameters(), source.parameters()):
-        target_param.data.copy_((1 - tau) * target_param.data + tau * source_param.data)
+    for tp, sp in zip(target.parameters(), source.parameters()):
+        tp.data.lerp_(sp.data, tau)
 
 
 def compute_mean_std(states: np.ndarray, eps: float) -> Tuple[np.ndarray, np.ndarray]:
@@ -179,13 +179,14 @@ class ReplayBuffer:
         print(f"Dataset size: {n_transitions}")
 
     def sample(self, batch_size: int) -> TensorBatch:
-        indices = np.random.randint(0, min(self._size, self._pointer), size=batch_size)
-        states = self._states[indices]
-        actions = self._actions[indices]
-        rewards = self._rewards[indices]
-        next_states = self._next_states[indices]
-        dones = self._dones[indices]
-        return [states, actions, rewards, next_states, dones]
+        indices = torch.randint(0, min(self._size, self._pointer), (batch_size,), device=self._device)
+        return [
+            self._states[indices],
+            self._actions[indices],
+            self._rewards[indices],
+            self._next_states[indices],
+            self._dones[indices],
+        ]
 
     def add_transition(self):
         # Use this method to add new data into the replay buffer during fine-tuning.
@@ -489,7 +490,7 @@ class ImplicitQLearning:
         adv = target_q - v
         v_loss = asymmetric_l2_loss(adv, self.iql_tau)
         log_dict["value_loss"] = v_loss.item()
-        self.v_optimizer.zero_grad()
+        self.v_optimizer.zero_grad(set_to_none=True)
         v_loss.backward()
         self.v_optimizer.step()
         return adv
@@ -507,7 +508,7 @@ class ImplicitQLearning:
         qs = self.qf.both(observations, actions)
         q_loss = sum(F.mse_loss(q, targets) for q in qs) / len(qs)
         log_dict["q_loss"] = q_loss.item()
-        self.q_optimizer.zero_grad()
+        self.q_optimizer.zero_grad(set_to_none=True)
         q_loss.backward()
         self.q_optimizer.step()
 
@@ -533,7 +534,7 @@ class ImplicitQLearning:
             raise NotImplementedError
         policy_loss = torch.mean(exp_adv * bc_losses)
         log_dict["actor_loss"] = policy_loss.item()
-        self.actor_optimizer.zero_grad()
+        self.actor_optimizer.zero_grad(set_to_none=True)
         policy_loss.backward()
         self.actor_optimizer.step()
         self.actor_lr_schedule.step()
@@ -590,191 +591,127 @@ class ImplicitQLearning:
 
 
 def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **kwargs):
-    """
-    Returns datasets formatted for use by standard Q-learning algorithms,
-    with observations, actions, next_observations, rewards, and a terminal
-    flag.
-
-    Args:
-        env: An OfflineEnv object.
-        r_model: reward model to use (Specifically a MLP)
-        dataset: An optional dataset to pass in for processing. If None,
-            the dataset will default to env.get_dataset()
-        terminate_on_end (bool): Set done=True on the last timestep
-            in a trajectory. Default is False, and will discard the
-            last timestep in each trajectory.
-        **kwargs: Arguments to pass to env.get_dataset().
-
-    Returns:
-        A dictionary containing keys:
-            observations: An N x dim_obs array of observations.
-            actions: An N x dim_action array of actions.
-            next_observations: An N x dim_obs array of next observations.
-            rewards: An N-dim float array of rewards.
-            terminals: An N-dim boolean array of "done" or episode termination flags.
-    """
     if dataset is None:
         dataset = env.get_dataset(**kwargs)
 
     N = dataset["rewards"].shape[0]
-    obs_ = []
-    next_obs_ = []
-    action_ = []
-    reward_ = []
-    done_ = []
+    use_timeouts = "timeouts" in dataset
+    obs_all = dataset["observations"].astype(np.float32)
+    act_all = dataset["actions"].astype(np.float32)
 
-    # The newer version of the dataset adds an explicit
-    # timeouts field. Keep old method for backwards compatability.
-    use_timeouts = False
-    if "timeouts" in dataset:
-        use_timeouts = True
-
-    episode_step = 0
+    # Single pass to build the keep mask and track episode steps.
+    keep = np.ones(N - 1, dtype=bool)
+    ep = 0
     for i in range(N - 1):
-        obs = dataset["observations"][i].astype(np.float32)
-        new_obs = dataset["observations"][i + 1].astype(np.float32)
-        action = dataset["actions"][i].astype(np.float32)
-        obs_act = np.concatenate([dataset["observations"][i], dataset["actions"][i]])
-        x = torch.tensor(obs_act, dtype=torch.float32).unsqueeze(0)
-        with torch.no_grad():
-            reward = r_model(x).squeeze().cpu().numpy().astype(np.float32)
         done_bool = bool(dataset["terminals"][i])
-
-        if use_timeouts:
-            final_timestep = dataset["timeouts"][i]
-        else:
-            final_timestep = episode_step == env._max_episode_steps - 1
-        if (not terminate_on_end) and final_timestep:
-            # Skip this transition and don't apply terminals on the last step of an episode
-            episode_step = 0
+        final = bool(dataset["timeouts"][i]) if use_timeouts else ep == env._max_episode_steps - 1
+        if (not terminate_on_end) and final:
+            keep[i] = False
+            ep = 0
             continue
-        if done_bool or final_timestep:
-            episode_step = 0
+        if done_bool or final:
+            ep = 0
+        ep += 1
 
-        obs_.append(obs)
-        next_obs_.append(new_obs)
-        action_.append(action)
-        reward_.append(reward)
-        done_.append(done_bool)
-        episode_step += 1
+    # One batched forward pass for all N-1 transitions.
+    device = next(r_model.parameters()).device
+    obs_act = np.concatenate([obs_all[:-1], act_all[:-1]], axis=1)
+    with torch.no_grad():
+        all_rewards = r_model(
+            torch.from_numpy(obs_act).to(device)
+        ).squeeze(-1).cpu().numpy()
 
     return {
-        "observations": np.array(obs_),
-        "actions": np.array(action_),
-        "next_observations": np.array(next_obs_),
-        "rewards": np.array(reward_),
-        "terminals": np.array(done_),
+        "observations": obs_all[:-1][keep],
+        "actions": act_all[:-1][keep],
+        "next_observations": obs_all[1:][keep],
+        "rewards": all_rewards[keep],
+        "terminals": dataset["terminals"][:-1][keep],
     }
 
 
 def qlearning_dataset_pt(
     env, r_model, query_length=100, dataset=None, terminate_on_end=False, **kwargs
 ):
-    """
-    Returns datasets formatted for use by standard Q-learning algorithms,
-    with observations, actions, next_observations, rewards, and a terminal
-    flag.
-
-    Args:
-        env: An OfflineEnv object.
-        r_model: reward model to use (Specifically a PT)
-        query_length: context length for PT
-        dataset: An optional dataset to pass in for processing. If None,
-            the dataset will default to env.get_dataset()
-        terminate_on_end (bool): Set done=True on the last timestep
-            in a trajectory. Default is False, and will discard the
-            last timestep in each trajectory.
-        **kwargs: Arguments to pass to env.get_dataset().
-
-    Returns:
-        A dictionary containing keys:
-            observations: An N x dim_obs array of observations.
-            actions: An N x dim_action array of actions.
-            next_observations: An N x dim_obs array of next observations.
-            rewards: An N-dim float array of rewards.
-            terminals: An N-dim boolean array of "done" or episode termination flags.
-    """
     if dataset is None:
         dataset = env.get_dataset(**kwargs)
 
     N = dataset["rewards"].shape[0]
-    obs_ = []
-    next_obs_ = []
-    action_ = []
-    reward_ = []
-    done_ = []
+    use_timeouts = "timeouts" in dataset
+    obs_all = dataset["observations"].astype(np.float32)
+    act_all = dataset["actions"].astype(np.float32)
+    s_dim, a_dim = obs_all.shape[1], act_all.shape[1]
 
-    # The newer version of the dataset adds an explicit
-    # timeouts field. Keep old method for backwards compatability.
-    use_timeouts = False
-    if "timeouts" in dataset:
-        use_timeouts = True
-
-    episode_step = 0
+    # Single pass: keep mask + per-transition episode step (used as window index).
+    keep = np.ones(N - 1, dtype=bool)
+    ep_steps = np.zeros(N - 1, dtype=np.int64)
+    ep = 0
     for i in range(N - 1):
-        if episode_step < query_length:
-            sts = dataset["observations"][: episode_step + 1].reshape(
-                1, -1, dataset["observations"].shape[1]
-            )
-            acts = dataset["actions"][: episode_step + 1].reshape(
-                1, -1, dataset["actions"].shape[1]
-            )
-            ts = np.arange(episode_step + 1).reshape(1, -1)
-            am = np.ones(episode_step + 1).reshape(1, -1)
-            sts_t = torch.tensor(sts, dtype=torch.float32)
-            acts_t = torch.tensor(acts, dtype=torch.float32)
-            ts_t = torch.tensor(ts, dtype=torch.long)
-            am_t = torch.tensor(am, dtype=torch.float32)
-            with torch.no_grad():
-                result, _ = r_model(sts_t, acts_t, ts_t, am_t)
-            reward = result["value"].reshape(episode_step + 1)[-1].cpu().numpy().astype(np.float32)
-        else:
-            sts = dataset["observations"][
-                episode_step - (query_length - 1) : episode_step + 1
-            ].reshape(1, -1, dataset["observations"].shape[1])
-
-            acts = dataset["actions"][
-                episode_step - (query_length - 1) : episode_step + 1
-            ].reshape(1, -1, dataset["actions"].shape[1])
-
-            ts = np.arange(query_length).reshape(1, -1)
-            am = np.ones(query_length).reshape(1, -1)
-            sts_t = torch.tensor(sts, dtype=torch.float32)
-            acts_t = torch.tensor(acts, dtype=torch.float32)
-            ts_t = torch.tensor(ts, dtype=torch.long)
-            am_t = torch.tensor(am, dtype=torch.float32)
-            with torch.no_grad():
-                result, _ = r_model(sts_t, acts_t, ts_t, am_t)
-            reward = result["value"].reshape(query_length)[-1].cpu().numpy().astype(np.float32)
-        obs = dataset["observations"][i].astype(np.float32)
-        new_obs = dataset["observations"][i + 1].astype(np.float32)
-        action = dataset["actions"][i].astype(np.float32)
+        ep_steps[i] = ep
         done_bool = bool(dataset["terminals"][i])
-
-        if use_timeouts:
-            final_timestep = dataset["timeouts"][i]
-        else:
-            final_timestep = episode_step == env._max_episode_steps - 1
-        if (not terminate_on_end) and final_timestep:
-            # Skip this transition and don't apply terminals on the last step of an episode
-            episode_step = 0
+        final = bool(dataset["timeouts"][i]) if use_timeouts else ep == env._max_episode_steps - 1
+        if (not terminate_on_end) and final:
+            keep[i] = False
+            ep = 0
             continue
-        if done_bool or final_timestep:
-            episode_step = 0
+        if done_bool or final:
+            ep = 0
+        ep += 1
 
-        obs_.append(obs)
-        next_obs_.append(new_obs)
-        action_.append(action)
-        reward_.append(reward)
-        done_.append(done_bool)
-        episode_step += 1
+    # Chunked batched inference.  All windows are left-padded to query_length so
+    # we always read the reward from result["value"][:, 0, -1, 0] (last token).
+    # Padded positions receive attn_mask=0 which the transformer masks to -1e4.
+    device = next(r_model.parameters()).device
+    CHUNK = 256
+    all_rewards = np.zeros(N - 1, dtype=np.float32)
+    ts_template = np.arange(query_length, dtype=np.int64)
+
+    with torch.no_grad():
+        for cs in range(0, N - 1, CHUNK):
+            ce = min(cs + CHUNK, N - 1)
+            B = ce - cs
+            eps = ep_steps[cs:ce]
+
+            sts_c = np.zeros((B, query_length, s_dim), dtype=np.float32)
+            acts_c = np.zeros((B, query_length, a_dim), dtype=np.float32)
+            ts_c = np.zeros((B, query_length), dtype=np.int64)
+            am_c = np.zeros((B, query_length), dtype=np.float32)
+
+            # Full-length windows — vectorised with advanced indexing.
+            mask_full = eps >= query_length
+            if mask_full.any():
+                starts = eps[mask_full] - query_length + 1
+                row_idx = starts[:, None] + ts_template[None, :]  # [M, query_length]
+                sts_c[mask_full] = obs_all[row_idx]
+                acts_c[mask_full] = act_all[row_idx]
+                ts_c[mask_full] = ts_template
+                am_c[mask_full] = 1.0
+
+            # Short windows (only the first query_length steps of each episode).
+            for j in np.where(~mask_full)[0]:
+                ep_j = int(eps[j])
+                seq_len = ep_j + 1
+                pad = query_length - seq_len
+                sts_c[j, pad:] = obs_all[:seq_len]
+                acts_c[j, pad:] = act_all[:seq_len]
+                ts_c[j, pad:] = ts_template[:seq_len]
+                am_c[j, pad:] = 1.0
+
+            result, _ = r_model(
+                torch.from_numpy(sts_c).to(device),
+                torch.from_numpy(acts_c).to(device),
+                torch.from_numpy(ts_c).to(device),
+                torch.from_numpy(am_c).to(device),
+            )
+            # value shape: [B, 1, query_length, 1] — take last token.
+            all_rewards[cs:ce] = result["value"][:, 0, -1, 0].cpu().numpy()
 
     return {
-        "observations": np.array(obs_),
-        "actions": np.array(action_),
-        "next_observations": np.array(next_obs_),
-        "rewards": np.array(reward_),
-        "terminals": np.array(done_),
+        "observations": obs_all[:-1][keep],
+        "actions": act_all[:-1][keep],
+        "next_observations": obs_all[1:][keep],
+        "rewards": all_rewards[keep],
+        "terminals": dataset["terminals"][:-1][keep],
     }
 
 
@@ -832,18 +769,25 @@ def load_pt_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
 
 @pyrallis.wrap()
 def train(config: TrainConfig):
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
+
     env = gym.make(config.env)
 
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     if config.reward_model_path:
         reward_model_path = os.path.expanduser(config.reward_model_path)
+        # Run reward inference on the training device, then free GPU memory.
         if config.query_length > 1:
-            reward_model = load_pt_reward_model(reward_model_path)
+            reward_model = load_pt_reward_model(reward_model_path, device=config.device)
             dataset = qlearning_dataset_pt(env, reward_model, config.query_length)
         else:
-            reward_model = load_mlp_reward_model(reward_model_path)
+            reward_model = load_mlp_reward_model(reward_model_path, device=config.device)
             dataset = qlearning_dataset_mr(env, reward_model)
+        del reward_model
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     else:
         dataset = d4rl.qlearning_dataset(env)
 
@@ -893,9 +837,11 @@ def train(config: TrainConfig):
             state_dim, action_dim, max_action, dropout=config.actor_dropout
         )
     ).to(config.device)
-    v_optimizer = torch.optim.Adam(v_network.parameters(), lr=config.vf_lr)
-    q_optimizer = torch.optim.Adam(q_network.parameters(), lr=config.qf_lr)
-    actor_optimizer = torch.optim.Adam(actor.parameters(), lr=config.actor_lr)
+    use_fused = config.device.startswith("cuda") and torch.cuda.is_available()
+    adam_kwargs = {"fused": True} if use_fused else {}
+    v_optimizer = torch.optim.Adam(v_network.parameters(), lr=config.vf_lr, **adam_kwargs)
+    q_optimizer = torch.optim.Adam(q_network.parameters(), lr=config.qf_lr, **adam_kwargs)
+    actor_optimizer = torch.optim.Adam(actor.parameters(), lr=config.actor_lr, **adam_kwargs)
 
     kwargs = {
         "max_action": max_action,
@@ -923,14 +869,22 @@ def train(config: TrainConfig):
 
     if config.load_model != "":
         policy_file = Path(config.load_model)
-        trainer.load_state_dict(torch.load(policy_file))
+        trainer.load_state_dict(torch.load(policy_file, weights_only=False))
+        actor = trainer.actor
+
+    # Compile networks for faster execution (PyTorch 2.0+).
+    if hasattr(torch, "compile"):
+        trainer.qf = torch.compile(trainer.qf)
+        trainer.q_target = torch.compile(trainer.q_target)
+        trainer.vf = torch.compile(trainer.vf)
+        trainer.actor = torch.compile(trainer.actor)
         actor = trainer.actor
 
     wandb_init(asdict(config))
 
     for t in range(int(config.max_timesteps)):
+        # Replay buffer already lives on config.device — no .to() needed.
         batch = replay_buffer.sample(config.batch_size)
-        batch = [b.to(config.device) for b in batch]
         log_dict = trainer.train(batch)
         wandb.log(log_dict, step=trainer.total_it)
         # Evaluate episode
