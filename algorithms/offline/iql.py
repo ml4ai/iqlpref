@@ -11,21 +11,19 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import d4rl
 import gym
-import jax
 import numpy as np
-import orbax.checkpoint as ocp
 import pyrallis
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import wandb
-from flax import nnx
+import yaml
 from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-sys.path.insert(0, os.path.abspath("../"))
-from iqlpref.reward_models.pref_transformer import load_PT
-from iqlpref.reward_models.q_mlp import load_QMLP
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../gp_reward-priors"))
+from optbnn.bnn.nets.mlp import MLP as RewardMLP
+from optbnn.bnn.nets.pref_trans import PT as RewardPT
 
 TensorBatch = List[torch.Tensor]
 
@@ -636,9 +634,10 @@ def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **k
         obs = dataset["observations"][i].astype(np.float32)
         new_obs = dataset["observations"][i + 1].astype(np.float32)
         action = dataset["actions"][i].astype(np.float32)
-        reward = r_model(dataset["observations"][i], dataset["actions"][i]).astype(
-            np.float32
-        )
+        obs_act = np.concatenate([dataset["observations"][i], dataset["actions"][i]])
+        x = torch.tensor(obs_act, dtype=torch.float32).unsqueeze(0)
+        with torch.no_grad():
+            reward = r_model(x).squeeze().cpu().numpy().astype(np.float32)
         done_bool = bool(dataset["terminals"][i])
 
         if use_timeouts:
@@ -722,11 +721,13 @@ def qlearning_dataset_pt(
             )
             ts = np.arange(episode_step + 1).reshape(1, -1)
             am = np.ones(episode_step + 1).reshape(1, -1)
-            reward = (
-                r_model(sts, acts, ts, am, training=False)[0]["value"]
-                .reshape(episode_step + 1)[-1]
-                .astype(np.float32)
-            )
+            sts_t = torch.tensor(sts, dtype=torch.float32)
+            acts_t = torch.tensor(acts, dtype=torch.float32)
+            ts_t = torch.tensor(ts, dtype=torch.long)
+            am_t = torch.tensor(am, dtype=torch.float32)
+            with torch.no_grad():
+                result, _ = r_model(sts_t, acts_t, ts_t, am_t)
+            reward = result["value"].reshape(episode_step + 1)[-1].cpu().numpy().astype(np.float32)
         else:
             sts = dataset["observations"][
                 episode_step - (query_length - 1) : episode_step + 1
@@ -738,11 +739,13 @@ def qlearning_dataset_pt(
 
             ts = np.arange(query_length).reshape(1, -1)
             am = np.ones(query_length).reshape(1, -1)
-            reward = (
-                r_model(sts, acts, ts, am, training=False)[0]["value"]
-                .reshape(query_length)[-1]
-                .astype(np.float32)
-            )
+            sts_t = torch.tensor(sts, dtype=torch.float32)
+            acts_t = torch.tensor(acts, dtype=torch.float32)
+            ts_t = torch.tensor(ts, dtype=torch.long)
+            am_t = torch.tensor(am, dtype=torch.float32)
+            with torch.no_grad():
+                result, _ = r_model(sts_t, acts_t, ts_t, am_t)
+            reward = result["value"].reshape(query_length)[-1].cpu().numpy().astype(np.float32)
         obs = dataset["observations"][i].astype(np.float32)
         new_obs = dataset["observations"][i + 1].astype(np.float32)
         action = dataset["actions"][i].astype(np.float32)
@@ -775,6 +778,58 @@ def qlearning_dataset_pt(
     }
 
 
+def load_mlp_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
+    with open(os.path.join(model_dir, "config.yaml")) as f:
+        cfg = yaml.safe_load(f)
+    ckpt = torch.load(os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False)
+    state = ckpt["net"]
+    input_dim = state["layers.0.W"].shape[0]
+    hidden_dims = [state["layers.0.W"].shape[1]]
+    i = 1
+    while f"layers.linear_{i}.W" in state:
+        hidden_dims.append(state[f"layers.linear_{i}.W"].shape[1])
+        i += 1
+    model = RewardMLP(input_dim, 1, hidden_dims, cfg.get("activations", "relu")).to(device)
+    model.load_state_dict(state)
+    model.eval()
+    return model
+
+
+def load_pt_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
+    with open(os.path.join(model_dir, "config.yaml")) as f:
+        cfg = yaml.safe_load(f)
+    ckpt = torch.load(os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False)
+    state = ckpt["net"]
+    state_dim = state["state_linear.weight"].shape[1]
+    action_dim = state["action_linear.weight"].shape[1]
+    embd_dim = state["state_linear.weight"].shape[0]
+    max_episode_steps = state["timestep_embed.weight"].shape[0] - 1
+    pref_attn_embd_dim = (state["pref_linear.weight"].shape[0] - 1) // 2
+    num_layers = 0
+    while f"gpt.layers.{num_layers}.layer_norm_0.weight" in state:
+        num_layers += 1
+    max_pos = state["gpt.layers.0.attention.causal_bias"].shape[2]
+    intermediate_dim = cfg.get("intermediate_dim") or (4 * embd_dim)
+    model = RewardPT(
+        state_dim=state_dim,
+        action_dim=action_dim,
+        max_episode_steps=max_episode_steps,
+        embd_dim=embd_dim,
+        pref_attn_embd_dim=pref_attn_embd_dim,
+        num_heads=cfg.get("num_heads", 4),
+        attn_dropout=cfg.get("attn_dropout", 0.1),
+        resid_dropout=cfg.get("resid_dropout", 0.1),
+        intermediate_dim=intermediate_dim,
+        num_layers=num_layers,
+        embd_dropout=cfg.get("embd_dropout", 0.1),
+        max_pos=max_pos,
+        eps=cfg.get("model_eps", 1e-5),
+    ).to(device)
+    model.load_state_dict(state)
+    model.eval()
+    return model
+
+
 @pyrallis.wrap()
 def train(config: TrainConfig):
     env = gym.make(config.env)
@@ -783,19 +838,12 @@ def train(config: TrainConfig):
     action_dim = env.action_space.shape[0]
     if config.reward_model_path:
         reward_model_path = os.path.expanduser(config.reward_model_path)
-
-        checkpointer = ocp.Checkpointer(ocp.CompositeCheckpointHandler())
         if config.query_length > 1:
-            reward_model = load_PT(reward_model_path, checkpointer, on_cpu=True)
-            reward_model = nnx.jit(reward_model, static_argnums=4)
-
+            reward_model = load_pt_reward_model(reward_model_path)
             dataset = qlearning_dataset_pt(env, reward_model, config.query_length)
         else:
-            reward_model = load_QMLP(reward_model_path, checkpointer, on_cpu=True)
-            reward_model = nnx.jit(reward_model)
-
+            reward_model = load_mlp_reward_model(reward_model_path)
             dataset = qlearning_dataset_mr(env, reward_model)
-        checkpointer.close()
     else:
         dataset = d4rl.qlearning_dataset(env)
 
