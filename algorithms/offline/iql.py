@@ -480,6 +480,7 @@ class ImplicitQLearning:
 
         self.total_it = 0
         self.device = device
+        self._device_type = device.split(":")[0]
 
     def _update_v(self, observations, actions, log_dict) -> torch.Tensor:
         # Update value function
@@ -550,16 +551,17 @@ class ImplicitQLearning:
         ) = batch
         log_dict = {}
 
-        with torch.no_grad():
-            next_v = self.vf(next_observations)
-        # Update value function
-        adv = self._update_v(observations, actions, log_dict)
-        rewards = rewards.squeeze(dim=-1)
-        dones = dones.squeeze(dim=-1)
-        # Update Q function
-        self._update_q(next_v, observations, actions, rewards, dones, log_dict)
-        # Update actor
-        self._update_policy(adv, observations, actions, log_dict)
+        with torch.amp.autocast(self._device_type, dtype=torch.bfloat16):
+            with torch.no_grad():
+                next_v = self.vf(next_observations)
+            # Update value function
+            adv = self._update_v(observations, actions, log_dict)
+            rewards = rewards.squeeze(dim=-1)
+            dones = dones.squeeze(dim=-1)
+            # Update Q function
+            self._update_q(next_v, observations, actions, rewards, dones, log_dict)
+            # Update actor
+            self._update_policy(adv, observations, actions, log_dict)
 
         return log_dict
 
