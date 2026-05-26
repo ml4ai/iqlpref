@@ -25,6 +25,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../gp_reward-priors"))
 from optbnn.bnn.nets.mlp import MLP as RewardMLP
 from optbnn.bnn.nets.pref_trans import PT as RewardPT
+import glob as _glob
 
 TensorBatch = List[torch.Tensor]
 
@@ -86,6 +87,12 @@ class TrainConfig:
     reward_model_path: str = ""
     # required for when loading a reward model. If ==1 then MR, if >1 then PT
     query_length: int = 1
+    # set True when reward_model_path points to a BNN (fSGHMC) posterior save dir
+    bnn_reward_model: bool = False
+    # risk-aversion coefficient β: r̃(s,a) = E_θ[r_θ] − β·Std_θ[r_θ]; 0 = posterior mean
+    bnn_beta: float = 1.0
+    # posterior samples to draw for the penalized reward (-1 = all available)
+    bnn_n_samples: int = -1
     # training random seed
     seed: int = 0
     # training device
@@ -678,6 +685,179 @@ def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **k
     }
 
 
+def qlearning_dataset_bnn(
+    env,
+    reward_model_dir: str,
+    beta: float = 1.0,
+    n_samples: int = -1,
+    device: str = "cpu",
+    dataset=None,
+    terminate_on_end: bool = False,
+    **kwargs,
+) -> Dict[str, np.ndarray]:
+    """Build a qlearning dataset using an uncertainty-penalized BNN reward.
+
+    r̃(s,a) = E_θ[r_θ(s,a)] − β · Std_θ[r_θ(s,a)]
+
+    Posterior weight samples are loaded from all chain subdirectories::
+
+        <reward_model_dir>/sampling_f/chain_*/sampled_weights/sampled_weights_0000000
+
+    The BNN architecture (input_dim, width, depth) is inferred automatically
+    from the first sample's weight shapes, so no config.yaml is required.
+
+    Mean and std are accumulated with Welford's online algorithm so peak GPU
+    memory stays at O(N) regardless of the number of posterior samples.
+
+    Args:
+        reward_model_dir: path to the BNN run directory (OUT_DIR/name from
+            run_bnn_training_f.py / run_bnn_full_training_f.py).
+        beta: risk-aversion coefficient.  0 recovers the posterior mean.
+        n_samples: total posterior samples to use across all chains.  -1 uses
+            all available samples (recommended).
+        device: torch device string for GPU inference.
+    """
+    if dataset is None:
+        dataset = env.get_dataset(**kwargs)
+
+    N = dataset["rewards"].shape[0]
+    use_timeouts = "timeouts" in dataset
+    obs_all = dataset["observations"].astype(np.float32)
+    act_all = dataset["actions"].astype(np.float32)
+
+    # Build keep mask (identical logic to qlearning_dataset_mr).
+    keep = np.ones(N - 1, dtype=bool)
+    ep = 0
+    for i in range(N - 1):
+        done_bool = bool(dataset["terminals"][i])
+        final = (
+            bool(dataset["timeouts"][i])
+            if use_timeouts
+            else ep == env._max_episode_steps - 1
+        )
+        if (not terminate_on_end) and final:
+            keep[i] = False
+            ep = 0
+            continue
+        if done_bool or final:
+            ep = 0
+        ep += 1
+
+    # ------------------------------------------------------------------ #
+    # Discover and load posterior weight samples from all chains.
+    # ------------------------------------------------------------------ #
+    sampling_dir = os.path.join(reward_model_dir, "sampling_f")
+    weight_files = sorted(
+        _glob.glob(
+            os.path.join(sampling_dir, "chain_*/sampled_weights/sampled_weights_0000000")
+        )
+    )
+    if not weight_files:
+        raise FileNotFoundError(
+            f"No BNN posterior weight files found under {sampling_dir}. "
+            "Expected structure: sampling_f/chain_*/sampled_weights/sampled_weights_0000000"
+        )
+
+    all_weights: List = []
+    for wf in weight_files:
+        ckpt = torch.load(wf, map_location="cpu", weights_only=False)
+        all_weights.extend(ckpt["sampled_weights"])
+
+    if not all_weights:
+        raise RuntimeError(
+            f"BNN checkpoint at {reward_model_dir} contained no sampled weights."
+        )
+
+    if n_samples > 0 and n_samples < len(all_weights):
+        rng = np.random.default_rng(seed=0)
+        idx = rng.choice(len(all_weights), size=n_samples, replace=False)
+        all_weights = [all_weights[i] for i in sorted(idx)]
+
+    n_total = len(all_weights)
+    print(
+        f"[BNN] Loaded {n_total} posterior samples from {len(weight_files)} chain(s)"
+    )
+
+    # ------------------------------------------------------------------ #
+    # Infer architecture from the first sample's parameter shapes.
+    #   weights[k] is a numpy array for the k-th net.parameters() entry.
+    #   ModuleList ordering: hidden layers (W, b) × depth, then output (W, b).
+    #   So: input_dim = w[0].shape[0], width = w[0].shape[1],
+    #       depth (hidden layers) = (len(w) - 2) // 2
+    # ------------------------------------------------------------------ #
+    w0 = all_weights[0]
+    input_dim = int(w0[0].shape[0])
+    width = int(w0[0].shape[1])
+    depth = (len(w0) - 2) // 2
+    print(
+        f"[BNN] Inferred architecture: input_dim={input_dim}, "
+        f"width={width}, depth={depth}"
+    )
+
+    net = RewardMLP(
+        input_dim=input_dim,
+        output_dim=1,
+        hidden_dims=[width] * depth,
+        activation_fn="relu",
+    ).to(device)
+    net.eval()
+
+    # ------------------------------------------------------------------ #
+    # One batched forward pass per posterior sample; Welford online mean/var.
+    # obs_act_t is pinned on the GPU for the duration of inference.
+    # ------------------------------------------------------------------ #
+    obs_act = np.concatenate([obs_all[:-1], act_all[:-1]], axis=1)  # (N-1, input_dim)
+    obs_act_t = torch.from_numpy(obs_act).to(device)
+
+    mean_r = np.zeros(N - 1, dtype=np.float64)
+    M2 = np.zeros(N - 1, dtype=np.float64)
+
+    CHUNK = 4096  # transitions per GPU batch — keeps activation memory bounded
+    with torch.inference_mode():
+        for k, weights in enumerate(all_weights):
+            # Load this posterior sample into the network.
+            for param, w in zip(net.parameters(), weights):
+                param.copy_(torch.from_numpy(np.asarray(w)).to(device))
+
+            # Chunked forward pass → shape (N-1,) float64 on CPU.
+            preds = np.empty(N - 1, dtype=np.float32)
+            for cs in range(0, N - 1, CHUNK):
+                ce = min(cs + CHUNK, N - 1)
+                preds[cs:ce] = (
+                    net(obs_act_t[cs:ce]).squeeze(-1).cpu().numpy()
+                )
+            preds64 = preds.astype(np.float64)
+
+            # Welford update: numerically stable single-pass mean + variance.
+            count = k + 1
+            delta = preds64 - mean_r
+            mean_r += delta / count
+            M2 += delta * (preds64 - mean_r)
+
+    # Sample std (ddof=1); falls back to zero std for a single sample.
+    std_r = np.sqrt(M2 / max(n_total - 1, 1))
+    penalized_r = (mean_r - beta * std_r).astype(np.float32)
+
+    print(
+        f"[BNN] Reward stats — mean: {mean_r.mean():.4f}, "
+        f"avg std: {std_r.mean():.4f}, "
+        f"avg penalized (β={beta}): {penalized_r.mean():.4f}"
+    )
+
+    # Free GPU memory held by the network and input tensor.
+    del net, obs_act_t
+    if device != "cpu" and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    return {
+        "observations": obs_all[:-1][keep],
+        "actions": act_all[:-1][keep],
+        "next_observations": obs_all[1:][keep],
+        "rewards": penalized_r[keep],
+        "terminals": dataset["terminals"][:-1][keep],
+    }
+
+
 def qlearning_dataset_pt(
     env, r_model, query_length=100, dataset=None, terminate_on_end=False, **kwargs
 ):
@@ -826,14 +1006,23 @@ def train(config: TrainConfig):
     action_dim = env.action_space.shape[0]
     if config.reward_model_path:
         reward_model_path = os.path.expanduser(config.reward_model_path)
-        # Run reward inference on the training device, then free GPU memory.
-        if config.query_length > 1:
+        if config.bnn_reward_model:
+            # BNN: loads/discards posterior samples internally; no persistent model.
+            dataset = qlearning_dataset_bnn(
+                env,
+                reward_model_path,
+                beta=config.bnn_beta,
+                n_samples=config.bnn_n_samples,
+                device=config.device,
+            )
+        elif config.query_length > 1:
             reward_model = load_pt_reward_model(reward_model_path, device=config.device)
             dataset = qlearning_dataset_pt(env, reward_model, config.query_length)
+            del reward_model
         else:
             reward_model = load_mlp_reward_model(reward_model_path, device=config.device)
             dataset = qlearning_dataset_mr(env, reward_model)
-        del reward_model
+            del reward_model
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     else:
