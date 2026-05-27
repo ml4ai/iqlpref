@@ -5,12 +5,11 @@ import os
 import random
 import sys
 import uuid
+import warnings
 from dataclasses import asdict, dataclass
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
-import warnings
 
 import d4rl
 import gym
@@ -24,10 +23,13 @@ import yaml
 from torch.distributions import Normal
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../gp_reward-priors"))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../gp_reward-priors")
+)
+import glob as _glob
+
 from optbnn.bnn.nets.mlp import MLP as RewardMLP
 from optbnn.bnn.nets.pref_trans import PT as RewardPT
-import glob as _glob
 
 TensorBatch = List[torch.Tensor]
 
@@ -193,7 +195,9 @@ class ReplayBuffer:
         print(f"Dataset size: {n_transitions}")
 
     def sample(self, batch_size: int) -> TensorBatch:
-        indices = torch.randint(0, min(self._size, self._pointer), (batch_size,), device=self._device)
+        indices = torch.randint(
+            0, min(self._size, self._pointer), (batch_size,), device=self._device
+        )
         return [
             self._states[indices],
             self._actions[indices],
@@ -275,17 +279,21 @@ def eval_actor(
             states_t = torch.tensor(obs, dtype=torch.float32, device=device)
             policy_out = actor(states_t)
             if isinstance(policy_out, torch.distributions.Distribution):
-                actions = torch.clamp(
-                    max_action * policy_out.mean, -max_action, max_action
-                ).cpu().numpy()
+                actions = (
+                    torch.clamp(max_action * policy_out.mean, -max_action, max_action)
+                    .cpu()
+                    .numpy()
+                )
             else:
-                actions = torch.clamp(
-                    policy_out * max_action, -max_action, max_action
-                ).cpu().numpy()
+                actions = (
+                    torch.clamp(policy_out * max_action, -max_action, max_action)
+                    .cpu()
+                    .numpy()
+                )
 
             obs, rewards, dones, _ = vec_env.step(actions)
 
-            ep_rewards += rewards * (discount ** ep_steps)
+            ep_rewards += rewards * (discount**ep_steps)
             ep_steps += 1
 
             for i in range(n_envs):
@@ -663,7 +671,11 @@ def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **k
     ep = 0
     for i in range(N - 1):
         done_bool = bool(dataset["terminals"][i])
-        final = bool(dataset["timeouts"][i]) if use_timeouts else ep == env._max_episode_steps - 1
+        final = (
+            bool(dataset["timeouts"][i])
+            if use_timeouts
+            else ep == env._max_episode_steps - 1
+        )
         if (not terminate_on_end) and final:
             keep[i] = False
             ep = 0
@@ -676,9 +688,9 @@ def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **k
     device = next(r_model.parameters()).device
     obs_act = np.concatenate([obs_all[:-1], act_all[:-1]], axis=1)
     with torch.inference_mode():
-        all_rewards = r_model(
-            torch.from_numpy(obs_act).to(device)
-        ).squeeze(-1).cpu().numpy()
+        all_rewards = (
+            r_model(torch.from_numpy(obs_act).to(device)).squeeze(-1).cpu().numpy()
+        )
 
     return {
         "observations": obs_all[:-1][keep],
@@ -714,7 +726,7 @@ def empirical_cvar(samples: np.ndarray, alpha: float) -> float:
     """
     if not (0.0 < alpha < 1.0):
         raise ValueError(f"alpha must be strictly in (0, 1), got {alpha!r}")
-    sorted_samples = np.sort(samples)          # ascending: worst (lowest) first
+    sorted_samples = np.sort(samples)  # ascending: worst (lowest) first
     n_tail = max(1, int(np.floor((1.0 - alpha) * len(samples))))
     return float(sorted_samples[:n_tail].mean())
 
@@ -933,9 +945,7 @@ def qlearning_dataset_bnn(
                 param.copy_(torch.from_numpy(np.asarray(w)).to(device))
             for cs in range(0, N - 1, CHUNK):
                 ce = min(cs + CHUNK, N - 1)
-                all_preds[k, cs:ce] = (
-                    net(obs_act_t[cs:ce]).squeeze(-1).cpu().numpy()
-                )
+                all_preds[k, cs:ce] = net(obs_act_t[cs:ce]).squeeze(-1).cpu().numpy()
 
     # Free GPU resources before the (potentially large) CPU operations below.
     del net, obs_act_t
@@ -950,7 +960,7 @@ def qlearning_dataset_bnn(
     # np.partition(all_preds, n_tail, axis=0) guarantees that for every column
     # the n_tail smallest values end up in rows 0:n_tail (order within that
     # block is arbitrary, which is fine — we only need their mean).
-    partitioned = np.partition(all_preds, n_tail, axis=0)   # (S, N-1)
+    partitioned = np.partition(all_preds, n_tail, axis=0)  # (S, N-1)
     penalized_r = partitioned[:n_tail].mean(axis=0).astype(np.float32)  # (N-1,)
 
     # ------------------------------------------------------------------ #
@@ -1005,7 +1015,11 @@ def qlearning_dataset_pt(
     for i in range(N - 1):
         ep_steps[i] = ep
         done_bool = bool(dataset["terminals"][i])
-        final = bool(dataset["timeouts"][i]) if use_timeouts else ep == env._max_episode_steps - 1
+        final = (
+            bool(dataset["timeouts"][i])
+            if use_timeouts
+            else ep == env._max_episode_steps - 1
+        )
         if (not terminate_on_end) and final:
             keep[i] = False
             ep = 0
@@ -1074,7 +1088,9 @@ def qlearning_dataset_pt(
 def load_mlp_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     with open(os.path.join(model_dir, "config.yaml")) as f:
         cfg = yaml.safe_load(f)
-    ckpt = torch.load(os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False)
+    ckpt = torch.load(
+        os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False
+    )
     state = ckpt["net"]
     input_dim = state["layers.0.W"].shape[0]
     hidden_dims = [state["layers.0.W"].shape[1]]
@@ -1082,7 +1098,9 @@ def load_mlp_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     while f"layers.linear_{i}.W" in state:
         hidden_dims.append(state[f"layers.linear_{i}.W"].shape[1])
         i += 1
-    model = RewardMLP(input_dim, 1, hidden_dims, cfg.get("activations", "relu")).to(device)
+    model = RewardMLP(input_dim, 1, hidden_dims, cfg.get("activations", "relu")).to(
+        device
+    )
     model.load_state_dict(state)
     model.eval()
     return model
@@ -1091,7 +1109,9 @@ def load_mlp_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
 def load_pt_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     with open(os.path.join(model_dir, "config.yaml")) as f:
         cfg = yaml.safe_load(f)
-    ckpt = torch.load(os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False)
+    ckpt = torch.load(
+        os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False
+    )
     state = ckpt["net"]
     state_dim = state["state_linear.weight"].shape[1]
     action_dim = state["action_linear.weight"].shape[1]
@@ -1204,9 +1224,15 @@ def train(config: TrainConfig):
     ).to(config.device)
     use_fused = config.device.startswith("cuda") and torch.cuda.is_available()
     adam_kwargs = {"fused": True} if use_fused else {}
-    v_optimizer = torch.optim.Adam(v_network.parameters(), lr=config.vf_lr, **adam_kwargs)
-    q_optimizer = torch.optim.Adam(q_network.parameters(), lr=config.qf_lr, **adam_kwargs)
-    actor_optimizer = torch.optim.Adam(actor.parameters(), lr=config.actor_lr, **adam_kwargs)
+    v_optimizer = torch.optim.Adam(
+        v_network.parameters(), lr=config.vf_lr, **adam_kwargs
+    )
+    q_optimizer = torch.optim.Adam(
+        q_network.parameters(), lr=config.qf_lr, **adam_kwargs
+    )
+    actor_optimizer = torch.optim.Adam(
+        actor.parameters(), lr=config.actor_lr, **adam_kwargs
+    )
 
     kwargs = {
         "max_action": max_action,
