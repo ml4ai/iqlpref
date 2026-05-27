@@ -10,6 +10,8 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import warnings
+
 import d4rl
 import gym
 import numpy as np
@@ -89,10 +91,12 @@ class TrainConfig:
     query_length: int = 1
     # set True when reward_model_path points to a BNN (fSGHMC) posterior save dir
     bnn_reward_model: bool = False
-    # risk-aversion coefficient β: r̃(s,a) = E_θ[r_θ] − β·Std_θ[r_θ]; 0 = posterior mean
-    bnn_beta: float = 1.0
-    # posterior samples to draw for the penalized reward (-1 = all available)
-    bnn_n_samples: int = -1
+    # CVaR risk level α ∈ (0,1): r̃(s,a) = mean of worst (1-α) fraction of posterior samples
+    # higher α = more conservative; α=0.95 averages the worst 5% (recommended starting point)
+    bnn_alpha: float = 0.95
+    # BNN posterior samples S used for CVaR; tail has (1-α)·S samples — target ≥ 30 tail samples
+    # e.g. α=0.95 needs S≥600 for 30 tail samples; default 500 is safe for α≤0.90
+    bnn_n_samples: int = 500
     # training random seed
     seed: int = 0
     # training device
@@ -685,19 +689,104 @@ def qlearning_dataset_mr(env, r_model, dataset=None, terminate_on_end=False, **k
     }
 
 
+def empirical_cvar(samples: np.ndarray, alpha: float) -> float:
+    """Compute CVaR_alpha from BNN posterior reward samples at a single (s, a).
+
+    CVaR_alpha is the expected reward in the worst (1-alpha) fraction of the
+    posterior predictive distribution.  It replaces the mean - beta*std penalty
+    as the pessimistic reward estimate used for IQL training.
+
+    Parameters
+    ----------
+    samples : np.ndarray, shape (S,)
+        Reward samples drawn from the BNN posterior.
+        Must NOT be pre-normalized; normalization is handled elsewhere in the
+        pipeline and must not be duplicated here.
+    alpha : float in (0, 1)
+        Risk level.  Higher alpha = more conservative (smaller tail).
+        E.g. alpha=0.95 averages the worst 5% of samples.
+        alpha=0 returns the full posterior mean (no conservatism).
+
+    Returns
+    -------
+    float
+        CVaR estimate used directly as r̃(s, a).
+    """
+    if not (0.0 < alpha < 1.0):
+        raise ValueError(f"alpha must be strictly in (0, 1), got {alpha!r}")
+    sorted_samples = np.sort(samples)          # ascending: worst (lowest) first
+    n_tail = max(1, int(np.floor((1.0 - alpha) * len(samples))))
+    return float(sorted_samples[:n_tail].mean())
+
+
+def cvar_stability_check(
+    all_preds: np.ndarray,
+    alpha: float,
+    n_checks: int = 50,
+) -> float:
+    """Check whether S is large enough for stable CVaR estimates.
+
+    Compares CVaR computed from the full S samples vs the first S//2 samples
+    at a random subset of transitions.  A mean relative difference > 0.05
+    indicates that S is too small for the chosen alpha.
+
+    Parameters
+    ----------
+    all_preds : np.ndarray, shape (S, N)
+        Full prediction matrix; rows are posterior samples, columns are
+        transitions.  Produced inside qlearning_dataset_bnn.
+    alpha : float
+        CVaR risk level (same value used for the main reward computation).
+    n_checks : int
+        Number of randomly-selected transitions to compare.
+
+    Returns
+    -------
+    float
+        Mean relative CVaR difference.  Target: < 0.05.
+    """
+    S, N = all_preds.shape
+    rng = np.random.default_rng(seed=42)
+    indices = rng.choice(N, size=min(n_checks, N), replace=False)
+    ratios = []
+    for i in indices:
+        cvar_full = empirical_cvar(all_preds[:, i], alpha)
+        cvar_half = empirical_cvar(all_preds[: S // 2, i], alpha)
+        if abs(cvar_full) > 1e-8:
+            ratios.append(abs(cvar_full - cvar_half) / abs(cvar_full))
+    if not ratios:
+        return float("nan")
+    mean_ratio = float(np.mean(ratios))
+    status = "OK" if mean_ratio < 0.05 else "WARN"
+    print(
+        f"[CVaR stability] mean relative diff = {mean_ratio:.3f} "
+        f"(target < 0.05) [{status}]"
+    )
+    if mean_ratio > 0.05:
+        min_s = int(np.ceil(30.0 / (1.0 - alpha)))
+        warnings.warn(
+            f"CVaR stability check: mean relative difference {mean_ratio:.3f} > 0.05. "
+            f"Increase bnn_n_samples (current S={S}). "
+            f"Recommended minimum for alpha={alpha}: S >= {min_s}.",
+            RuntimeWarning,
+        )
+    return mean_ratio
+
+
 def qlearning_dataset_bnn(
     env,
     reward_model_dir: str,
-    beta: float = 1.0,
-    n_samples: int = -1,
+    alpha: float = 0.95,
+    n_samples: int = 500,
     device: str = "cpu",
     dataset=None,
     terminate_on_end: bool = False,
     **kwargs,
 ) -> Dict[str, np.ndarray]:
-    """Build a qlearning dataset using an uncertainty-penalized BNN reward.
+    """Build a qlearning dataset using empirical CVaR rewards from a BNN posterior.
 
-    r̃(s,a) = E_θ[r_θ(s,a)] − β · Std_θ[r_θ(s,a)]
+    r̃(s,a) = CVaR_alpha over the BNN posterior predictive distribution:
+        sort S reward samples ascending, return the mean of the worst (1-alpha)·S.
 
     Posterior weight samples are loaded from all chain subdirectories::
 
@@ -706,17 +795,23 @@ def qlearning_dataset_bnn(
     The BNN architecture (input_dim, width, depth) is inferred automatically
     from the first sample's weight shapes, so no config.yaml is required.
 
-    Mean and std are accumulated with Welford's online algorithm so peak GPU
-    memory stays at O(N) regardless of the number of posterior samples.
+    All S forward passes are stored in a (S, N-1) float32 array so that the
+    CVaR can be computed with a single vectorized partial-sort.  For S=500 and
+    N=1 million transitions this requires ~2 GB of CPU RAM.
 
     Args:
         reward_model_dir: path to the BNN run directory (OUT_DIR/name from
             run_bnn_training_f.py / run_bnn_full_training_f.py).
-        beta: risk-aversion coefficient.  0 recovers the posterior mean.
-        n_samples: total posterior samples to use across all chains.  -1 uses
-            all available samples (recommended).
+        alpha: CVaR risk level in (0, 1).  Higher = more conservative.
+            alpha=0.95 averages the worst 5% of posterior reward samples.
+        n_samples: number of posterior weight samples S to use.  If fewer are
+            available the maximum available count is used with a warning.
+            Recommended minimum: ceil(30 / (1 - alpha)); e.g. 600 for alpha=0.95.
         device: torch device string for GPU inference.
     """
+    if not (0.0 < alpha < 1.0):
+        raise ValueError(f"bnn_alpha must be in (0, 1), got {alpha!r}")
+
     if dataset is None:
         dataset = env.get_dataset(**kwargs)
 
@@ -768,14 +863,34 @@ def qlearning_dataset_bnn(
             f"BNN checkpoint at {reward_model_dir} contained no sampled weights."
         )
 
-    if n_samples > 0 and n_samples < len(all_weights):
+    available = len(all_weights)
+    if n_samples > 0 and n_samples > available:
+        warnings.warn(
+            f"bnn_n_samples={n_samples} requested but only {available} posterior "
+            f"samples are available. Using all {available} samples. "
+            f"Add more chains / increase num_samples in the BNN training config.",
+            RuntimeWarning,
+        )
+    if n_samples > 0 and n_samples < available:
         rng = np.random.default_rng(seed=0)
-        idx = rng.choice(len(all_weights), size=n_samples, replace=False)
+        idx = rng.choice(available, size=n_samples, replace=False)
         all_weights = [all_weights[i] for i in sorted(idx)]
 
     n_total = len(all_weights)
+
+    # Warn if the CVaR tail is very thin (< 5 samples).
+    n_tail = max(1, int(np.floor((1.0 - alpha) * n_total)))
+    min_recommended = int(np.ceil(30.0 / (1.0 - alpha)))
+    if n_tail < 5:
+        warnings.warn(
+            f"CVaR tail has only {n_tail} sample(s) with alpha={alpha} and "
+            f"S={n_total}. CVaR estimates will be very noisy. "
+            f"Recommended minimum: bnn_n_samples >= {min_recommended}.",
+            RuntimeWarning,
+        )
     print(
-        f"[BNN] Loaded {n_total} posterior samples from {len(weight_files)} chain(s)"
+        f"[BNN/CVaR] S={n_total} samples from {len(weight_files)} chain(s), "
+        f"alpha={alpha}, n_tail={n_tail}"
     )
 
     # ------------------------------------------------------------------ #
@@ -790,7 +905,7 @@ def qlearning_dataset_bnn(
     width = int(w0[0].shape[1])
     depth = (len(w0) - 2) // 2
     print(
-        f"[BNN] Inferred architecture: input_dim={input_dim}, "
+        f"[BNN/CVaR] Inferred architecture: input_dim={input_dim}, "
         f"width={width}, depth={depth}"
     )
 
@@ -803,51 +918,64 @@ def qlearning_dataset_bnn(
     net.eval()
 
     # ------------------------------------------------------------------ #
-    # One batched forward pass per posterior sample; Welford online mean/var.
-    # obs_act_t is pinned on the GPU for the duration of inference.
+    # Build the full (S, N-1) prediction matrix.
+    # Each row is one posterior weight sample's predictions over all transitions.
+    # obs_act_t lives on the GPU for the duration of inference.
     # ------------------------------------------------------------------ #
     obs_act = np.concatenate([obs_all[:-1], act_all[:-1]], axis=1)  # (N-1, input_dim)
     obs_act_t = torch.from_numpy(obs_act).to(device)
+    all_preds = np.empty((n_total, N - 1), dtype=np.float32)  # (S, N-1)
 
-    mean_r = np.zeros(N - 1, dtype=np.float64)
-    M2 = np.zeros(N - 1, dtype=np.float64)
-
-    CHUNK = 4096  # transitions per GPU batch — keeps activation memory bounded
+    CHUNK = 4096  # transitions per GPU batch — bounds activation memory
     with torch.inference_mode():
         for k, weights in enumerate(all_weights):
-            # Load this posterior sample into the network.
             for param, w in zip(net.parameters(), weights):
                 param.copy_(torch.from_numpy(np.asarray(w)).to(device))
-
-            # Chunked forward pass → shape (N-1,) float64 on CPU.
-            preds = np.empty(N - 1, dtype=np.float32)
             for cs in range(0, N - 1, CHUNK):
                 ce = min(cs + CHUNK, N - 1)
-                preds[cs:ce] = (
+                all_preds[k, cs:ce] = (
                     net(obs_act_t[cs:ce]).squeeze(-1).cpu().numpy()
                 )
-            preds64 = preds.astype(np.float64)
 
-            # Welford update: numerically stable single-pass mean + variance.
-            count = k + 1
-            delta = preds64 - mean_r
-            mean_r += delta / count
-            M2 += delta * (preds64 - mean_r)
-
-    # Sample std (ddof=1); falls back to zero std for a single sample.
-    std_r = np.sqrt(M2 / max(n_total - 1, 1))
-    penalized_r = (mean_r - beta * std_r).astype(np.float32)
-
-    print(
-        f"[BNN] Reward stats — mean: {mean_r.mean():.4f}, "
-        f"avg std: {std_r.mean():.4f}, "
-        f"avg penalized (β={beta}): {penalized_r.mean():.4f}"
-    )
-
-    # Free GPU memory held by the network and input tensor.
+    # Free GPU resources before the (potentially large) CPU operations below.
     del net, obs_act_t
     if device != "cpu" and torch.cuda.is_available():
         torch.cuda.empty_cache()
+
+    # ------------------------------------------------------------------ #
+    # Vectorized CVaR: for each transition, partial-sort its S reward samples
+    # ascending and average the bottom n_tail (the worst (1-alpha) fraction).
+    # np.partition is O(S) per column vs O(S log S) for a full sort.
+    # ------------------------------------------------------------------ #
+    # np.partition(all_preds, n_tail, axis=0) guarantees that for every column
+    # the n_tail smallest values end up in rows 0:n_tail (order within that
+    # block is arbitrary, which is fine — we only need their mean).
+    partitioned = np.partition(all_preds, n_tail, axis=0)   # (S, N-1)
+    penalized_r = partitioned[:n_tail].mean(axis=0).astype(np.float32)  # (N-1,)
+
+    # ------------------------------------------------------------------ #
+    # Diagnostics
+    # ------------------------------------------------------------------ #
+    cvar_stability_check(all_preds, alpha)
+
+    posterior_mean = all_preds.mean(axis=0)
+    print(
+        f"[BNN/CVaR] Posterior mean reward: "
+        f"{posterior_mean.mean():.4f} ± {posterior_mean.std():.4f}"
+    )
+    print(
+        f"[BNN/CVaR] CVaR reward (alpha={alpha}): "
+        f"{penalized_r.mean():.4f} ± {penalized_r.std():.4f}"
+    )
+    if penalized_r.std() < 1e-6:
+        warnings.warn(
+            "CVaR rewards have near-zero std — the penalty may have collapsed all "
+            "rewards to the same value. Consider a smaller alpha or larger "
+            "bnn_n_samples.",
+            RuntimeWarning,
+        )
+
+    del all_preds, partitioned
 
     return {
         "observations": obs_all[:-1][keep],
@@ -1011,7 +1139,7 @@ def train(config: TrainConfig):
             dataset = qlearning_dataset_bnn(
                 env,
                 reward_model_path,
-                beta=config.bnn_beta,
+                alpha=config.bnn_alpha,
                 n_samples=config.bnn_n_samples,
                 device=config.device,
             )
