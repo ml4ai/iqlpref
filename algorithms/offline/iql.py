@@ -257,10 +257,22 @@ def eval_actor(
     state_std: Union[np.ndarray, float],
     device: str,
     n_episodes: int,
-    discount: float,
     seed: int,
     n_envs: int = 25,
-) -> np.ndarray:
+) -> Tuple[np.ndarray, List[int]]:
+    """Evaluate the actor over ``n_episodes`` parallel episodes.
+
+    Returns
+    -------
+    scores : np.ndarray, shape (n_episodes,)
+        Undiscounted episode returns.
+    steps_to_goal : List[int]
+        For goal-conditioned envs (antmaze), the number of environment steps
+        taken in each *successful* episode (one where the goal was reached, i.e.
+        a reward of 1 was received).  Empty for non-antmaze envs or when no
+        episode reached the goal.
+    """
+    is_antmaze = "antmaze" in env_name.lower()
     n_envs = min(n_envs, n_episodes)
     env_fns = [
         partial(_make_eval_env, env_name, state_mean, state_std, seed + i)
@@ -273,6 +285,7 @@ def eval_actor(
     ep_rewards = np.zeros(n_envs, dtype=np.float64)
     ep_steps = np.zeros(n_envs, dtype=np.int64)
     completed: List[float] = []
+    steps_to_goal: List[int] = []
 
     try:
         while len(completed) < n_episodes:
@@ -293,11 +306,15 @@ def eval_actor(
 
             obs, rewards, dones, _ = vec_env.step(actions)
 
-            ep_rewards += rewards * (discount**ep_steps)
+            ep_rewards += rewards
             ep_steps += 1
 
             for i in range(n_envs):
                 if dones[i]:
+                    # Antmaze: a goal-reaching episode receives a sparse reward
+                    # of 1 (and 0 otherwise), so a positive return means success.
+                    if is_antmaze and ep_rewards[i] > 0.5:
+                        steps_to_goal.append(int(ep_steps[i]))
                     completed.append(float(ep_rewards[i]))
                     ep_rewards[i] = 0.0
                     ep_steps[i] = 0
@@ -307,7 +324,7 @@ def eval_actor(
         vec_env.close()
 
     actor.train()
-    return np.asarray(completed[:n_episodes])
+    return np.asarray(completed[:n_episodes]), steps_to_goal
 
 
 def return_reward_range(dataset, max_episode_steps):
@@ -1288,7 +1305,7 @@ def train(config: TrainConfig):
             log_buffer = {}
         # Evaluate episode
         if (t + 1) % config.eval_freq == 0:
-            eval_scores = eval_actor(
+            eval_scores, steps_to_goal = eval_actor(
                 config.env,
                 actor,
                 max_action=max_action,
@@ -1296,7 +1313,6 @@ def train(config: TrainConfig):
                 state_std=state_std,
                 device=config.device,
                 n_episodes=config.n_episodes,
-                discount=config.discount,
                 seed=config.seed,
             )
             mean_eval_score = eval_scores.mean()
@@ -1305,12 +1321,14 @@ def train(config: TrainConfig):
                     trainer.state_dict(),
                     os.path.join(config.checkpoints_path, f"checkpoint_{t}.pt"),
                 )
-            wandb.log(
-                {
-                    "mean_score": mean_eval_score,
-                },
-                step=trainer.total_it,
-            )
+            eval_log: Dict[str, float] = {"mean_score": mean_eval_score}
+            # Goal-conditioned envs (antmaze): report avg steps-to-goal over the
+            # successful episodes; -1 signals that none reached the goal.
+            if "antmaze" in config.env.lower():
+                eval_log["avg_steps_to_goal"] = (
+                    float(np.mean(steps_to_goal)) if steps_to_goal else -1.0
+                )
+            wandb.log(eval_log, step=trainer.total_it)
 
 
 if __name__ == "__main__":
