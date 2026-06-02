@@ -6,10 +6,10 @@ parameters:
   config_path:
     value: "configs/offline/iql/antmaze/medium_play_v2.yaml"
   reward_model_path:
-    value: "~/iqlpref/gp_reward-priors/exp/reward_learning/antmaze_medium_play_mr_n/mr_n-0.0-D4RL_antmaze-medium-play-v2-23c63900"
+    value: "~/iqlpref/gp_reward-priors/exp/reward_learning/antmaze_medium_play_mr/mr-D4RL_antmaze-medium-play-v2-best"
   query_length:
     value: 1
   # seed:
-  #   values: [0, 1, 2, 3, 4, 5, 6, 7] 
+  #   values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] 
   normalize_reward:
     values: [0, 1, 2, 3, 4, 5, 6, 7]
