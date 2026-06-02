@@ -1102,13 +1102,27 @@ def qlearning_dataset_pt(
     }
 
 
+def _strip_compile_prefix(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove the ``_orig_mod.`` prefix that ``torch.compile`` adds to keys.
+
+    Reward models trained with ``compile_model=True`` are wrapped by
+    ``torch.compile``, which stores every parameter under ``_orig_mod.<name>``.
+    Stripping it lets checkpoints saved with or without compile load the same
+    way.  A no-op for uncompiled checkpoints.
+    """
+    prefix = "_orig_mod."
+    return {
+        (k[len(prefix):] if k.startswith(prefix) else k): v for k, v in state.items()
+    }
+
+
 def load_mlp_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     with open(os.path.join(model_dir, "config.yaml")) as f:
         cfg = yaml.safe_load(f)
     ckpt = torch.load(
         os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False
     )
-    state = ckpt["net"]
+    state = _strip_compile_prefix(ckpt["net"])
     input_dim = state["layers.0.W"].shape[0]
     hidden_dims = [state["layers.0.W"].shape[1]]
     i = 1
@@ -1129,7 +1143,7 @@ def load_pt_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     ckpt = torch.load(
         os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False
     )
-    state = ckpt["net"]
+    state = _strip_compile_prefix(ckpt["net"])
     state_dim = state["state_linear.weight"].shape[1]
     action_dim = state["action_linear.weight"].shape[1]
     embd_dim = state["state_linear.weight"].shape[0]
