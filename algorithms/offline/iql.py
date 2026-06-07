@@ -1112,7 +1112,7 @@ def _strip_compile_prefix(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     prefix = "_orig_mod."
     return {
-        (k[len(prefix):] if k.startswith(prefix) else k): v for k, v in state.items()
+        (k[len(prefix) :] if k.startswith(prefix) else k): v for k, v in state.items()
     }
 
 
