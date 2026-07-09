@@ -1,33 +1,69 @@
 #!/usr/bin/env bash
-# Launch all 4 bnn_sweeps as W&B grid sweeps across 6 GPUs.
+# Launch bnn_sweeps as W&B grid sweeps across a set of GPUs.
 #
-# Run from the REPO ROOT (paths below are relative):
-#     ./bnn_sweeps/launch.sh
+# Run from the REPO ROOT.
 #
-# Bottleneck is CPU, not GPU: each run trains a tiny IQL MLP on 1 GPU but each
-# eval (every eval_freq=5000 steps, 100 episodes) uses n_envs=25 CPU workers.
-# 255 cores / 25 = ~10 concurrent runs max. AGENTS_PER_SWEEP=2 -> 8 concurrent
-# (200 cores, comfortable). Bump toward 10 only if CPU headroom looks fine.
+# Usage:
+#   ./bnn_sweeps/launch.sh [SWEEP] [GPU_LIST] [AGENTS_PER_GPU]
+#
+#   SWEEP           "all" (the 4 bnn sweeps) or a single sweep: full path,
+#                   basename with/without .yaml. Default: all
+#   GPU_LIST        space-separated GPU ids (quote it).      Default: "0 1 2 3 4 5"
+#   AGENTS_PER_GPU  wandb agents to launch on each GPU.      Default: 1
+#
+# Concurrency = (#GPUs) * AGENTS_PER_GPU. Each concurrent run's eval uses
+# n_envs=25 CPU workers, so the script warns if concurrency*25 exceeds
+# TOTAL_CORES (default 255). Agent slots are round-robined across the sweeps.
+#
+# Examples:
+#   ./bnn_sweeps/launch.sh                                   # all 4, 6 GPUs, 1/GPU (6 concurrent)
+#   ./bnn_sweeps/launch.sh sweep_antmaze_medium_play "0 1" 2 # one sweep, 2 GPUs, 2/GPU (4 concurrent)
 set -euo pipefail
 
-# --- must run from repo root so the relative sweep paths resolve ---
 if [[ ! -d bnn_sweeps || ! -f algorithms/offline/iql.py ]]; then
   echo "ERROR: run this from the iqlpref repo root:  ./bnn_sweeps/launch.sh" >&2
   exit 1
 fi
 
-AGENTS_PER_SWEEP=2          # 2 -> 8 concurrent (200 CPU cores). Set 3 on two sweeps for 10.
-NGPU=6
+SWEEP_ARG="${1:-all}"
+GPU_LIST="${2:-0 1 2 3 4 5}"
+AGENTS_PER_GPU="${3:-1}"
+TOTAL_CORES="${TOTAL_CORES:-255}"
+CPU_PER_RUN=25
 LOGDIR="bnn_sweeps/logs"; mkdir -p "$LOGDIR"
 
-SWEEP_YAMLS=(
-  bnn_sweeps/sweep_antmaze_medium_play.yaml
-  bnn_sweeps/sweep_antmaze_medium_diverse.yaml
-  bnn_sweeps/sweep_antmaze_large_play.yaml
-  bnn_sweeps/sweep_antmaze_large_diverse.yaml
-)
+# --- resolve sweep yaml(s) ---
+SWEEP_YAMLS=()
+if [[ "$SWEEP_ARG" == "all" ]]; then
+  SWEEP_YAMLS=(
+    bnn_sweeps/sweep_antmaze_medium_play.yaml
+    bnn_sweeps/sweep_antmaze_medium_diverse.yaml
+    bnn_sweeps/sweep_antmaze_large_play.yaml
+    bnn_sweeps/sweep_antmaze_large_diverse.yaml
+  )
+else
+  y="$SWEEP_ARG"
+  [[ "$y" == *.yaml ]] || y="${y}.yaml"
+  [[ "$y" == */* ]] || y="bnn_sweeps/${y}"
+  if [[ ! -f "$y" ]]; then
+    echo "ERROR: sweep yaml not found: $y" >&2
+    exit 1
+  fi
+  SWEEP_YAMLS=("$y")
+fi
 
-# --- create the 4 sweeps, capture their IDs (entity/project/id) ---
+# --- concurrency / CPU check ---
+read -ra GPUS <<< "$GPU_LIST"
+CONCURRENCY=$(( ${#GPUS[@]} * AGENTS_PER_GPU ))
+CORES_USED=$(( CONCURRENCY * CPU_PER_RUN ))
+echo "Sweeps:      ${#SWEEP_YAMLS[@]}   GPUs: ${GPUS[*]}   agents/GPU: $AGENTS_PER_GPU"
+echo "Concurrency: $CONCURRENCY runs  ->  ~$CORES_USED / $TOTAL_CORES CPU cores at eval"
+if (( CORES_USED > TOTAL_CORES )); then
+  echo "WARNING: $CONCURRENCY concurrent evals need $CORES_USED cores (> $TOTAL_CORES);" >&2
+  echo "         CPUs will be oversubscribed when evals sync. Lower AGENTS_PER_GPU or #GPUs." >&2
+fi
+
+# --- create the sweeps, capture their ids (entity/project/id) ---
 SWEEP_IDS=()
 for y in "${SWEEP_YAMLS[@]}"; do
   id=$(wandb sweep "$y" 2>&1 | tee /dev/stderr \
@@ -41,12 +77,12 @@ done
 
 echo "Created sweeps:"; printf '  %s\n' "${SWEEP_IDS[@]}"
 
-# --- launch the agent pool, round-robin GPU assignment ---
+# --- launch agents: AGENTS_PER_GPU per GPU, round-robin sweeps across slots ---
 slot=0
-for id in "${SWEEP_IDS[@]}"; do
-  for ((a=0; a<AGENTS_PER_SWEEP; a++)); do
-    gpu=$(( slot % NGPU ))
-    logf="$LOGDIR/agent_${id//\//_}_${a}.log"
+for gpu in "${GPUS[@]}"; do
+  for ((a=0; a<AGENTS_PER_GPU; a++)); do
+    id="${SWEEP_IDS[$(( slot % ${#SWEEP_IDS[@]} ))]}"
+    logf="$LOGDIR/agent_${id##*/}_g${gpu}_a${a}.log"
     echo "GPU $gpu  <-  $id  ($logf)"
     CUDA_VISIBLE_DEVICES=$gpu nohup wandb agent "$id" > "$logf" 2>&1 &
     slot=$(( slot + 1 ))
