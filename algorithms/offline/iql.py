@@ -93,8 +93,9 @@ class TrainConfig:
     query_length: int = 1
     # set True when reward_model_path points to a BNN (fSGHMC) posterior save dir
     bnn_reward_model: bool = False
-    # CVaR risk level α ∈ (0,1): r̃(s,a) = mean of worst (1-α) fraction of posterior samples
+    # CVaR risk level α ∈ [0,1): r̃(s,a) = mean of worst (1-α) fraction of posterior samples
     # higher α = more conservative; α=0.95 averages the worst 5% (recommended starting point)
+    # α=0.0 disables conservatism entirely and returns the plain posterior mean reward
     bnn_alpha: float = 0.95
     # BNN posterior samples S used for CVaR; tail has (1-α)·S samples — target ≥ 30 tail samples
     # e.g. α=0.95 needs S≥600 for 30 tail samples; default 500 is safe for α≤0.90
@@ -731,18 +732,19 @@ def empirical_cvar(samples: np.ndarray, alpha: float) -> float:
         Reward samples drawn from the BNN posterior.
         Must NOT be pre-normalized; normalization is handled elsewhere in the
         pipeline and must not be duplicated here.
-    alpha : float in (0, 1)
+    alpha : float in [0, 1)
         Risk level.  Higher alpha = more conservative (smaller tail).
         E.g. alpha=0.95 averages the worst 5% of samples.
-        alpha=0 returns the full posterior mean (no conservatism).
+        alpha=0 returns the full posterior mean (no conservatism): the tail is
+        the entire sample, so mean of worst 100% == mean.
 
     Returns
     -------
     float
         CVaR estimate used directly as r̃(s, a).
     """
-    if not (0.0 < alpha < 1.0):
-        raise ValueError(f"alpha must be strictly in (0, 1), got {alpha!r}")
+    if not (0.0 <= alpha < 1.0):
+        raise ValueError(f"alpha must be in [0, 1), got {alpha!r}")
     sorted_samples = np.sort(samples)  # ascending: worst (lowest) first
     n_tail = max(1, int(np.floor((1.0 - alpha) * len(samples))))
     return float(sorted_samples[:n_tail].mean())
@@ -774,6 +776,11 @@ def cvar_stability_check(
     float
         Mean relative CVaR difference.  Target: < 0.05.
     """
+    if alpha == 0.0:
+        # alpha=0 is the plain posterior mean, not a tail estimate — the
+        # CVaR-tail stability notion does not apply, so skip the check.
+        print("[CVaR stability] alpha=0 (posterior mean); stability check skipped")
+        return 0.0
     S, N = all_preds.shape
     rng = np.random.default_rng(seed=42)
     indices = rng.choice(N, size=min(n_checks, N), replace=False)
@@ -831,15 +838,16 @@ def qlearning_dataset_bnn(
     Args:
         reward_model_dir: path to the BNN run directory (OUT_DIR/name from
             run_bnn_training_f.py / run_bnn_full_training_f.py).
-        alpha: CVaR risk level in (0, 1).  Higher = more conservative.
+        alpha: CVaR risk level in [0, 1).  Higher = more conservative.
             alpha=0.95 averages the worst 5% of posterior reward samples.
+            alpha=0.0 returns the plain posterior mean reward (no conservatism).
         n_samples: number of posterior weight samples S to use.  If fewer are
             available the maximum available count is used with a warning.
             Recommended minimum: ceil(30 / (1 - alpha)); e.g. 600 for alpha=0.95.
         device: torch device string for GPU inference.
     """
-    if not (0.0 < alpha < 1.0):
-        raise ValueError(f"bnn_alpha must be in (0, 1), got {alpha!r}")
+    if not (0.0 <= alpha < 1.0):
+        raise ValueError(f"bnn_alpha must be in [0, 1), got {alpha!r}")
 
     if dataset is None:
         dataset = env.get_dataset(**kwargs)
@@ -977,7 +985,11 @@ def qlearning_dataset_bnn(
     # np.partition(all_preds, n_tail, axis=0) guarantees that for every column
     # the n_tail smallest values end up in rows 0:n_tail (order within that
     # block is arbitrary, which is fine — we only need their mean).
-    partitioned = np.partition(all_preds, n_tail, axis=0)  # (S, N-1)
+    # kth must be a valid row index in [0, S-1].  When alpha=0, n_tail == S
+    # (the full posterior mean), so clamp the pivot to S-1; taking the first
+    # n_tail == S rows still averages every sample, giving the plain mean.
+    kth = min(n_tail, all_preds.shape[0] - 1)
+    partitioned = np.partition(all_preds, kth, axis=0)  # (S, N-1)
     penalized_r = partitioned[:n_tail].mean(axis=0).astype(np.float32)  # (N-1,)
 
     # ------------------------------------------------------------------ #
@@ -990,8 +1002,9 @@ def qlearning_dataset_bnn(
         f"[BNN/CVaR] Posterior mean reward: "
         f"{posterior_mean.mean():.4f} ± {posterior_mean.std():.4f}"
     )
+    reward_label = "posterior mean reward" if alpha == 0.0 else f"CVaR reward (alpha={alpha})"
     print(
-        f"[BNN/CVaR] CVaR reward (alpha={alpha}): "
+        f"[BNN/CVaR] {reward_label}: "
         f"{penalized_r.mean():.4f} ± {penalized_r.std():.4f}"
     )
     if penalized_r.std() < 1e-6:
