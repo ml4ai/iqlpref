@@ -3,6 +3,7 @@
 import copy
 import os
 import random
+import re
 import sys
 import uuid
 import warnings
@@ -100,6 +101,18 @@ class TrainConfig:
     # BNN posterior samples S used for CVaR; tail has (1-α)·S samples — target ≥ 30 tail samples
     # e.g. α=0.95 needs S≥600 for 30 tail samples; default 500 is safe for α≤0.90
     bnn_n_samples: int = 500
+    # set True when reward_model_path points to an MR run dir holding a snapshot
+    # ensemble (the per-epoch checkpoint_*.pt files written by run_mr_training.py)
+    mr_ensemble: bool = False
+    # CVaR risk level α ∈ [0,1) over the snapshot ensemble, as for bnn_alpha.
+    # Ensembles are small (S ≈ epochs), so the tail is coarse: with S=10, any
+    # α ≥ 0.9 selects a single snapshot, i.e. the worst-case member.
+    # α=0.0 averages every snapshot (plain ensemble mean).
+    mr_alpha: float = 0.95
+    # skip checkpoint_{epoch}.pt with epoch < mr_burn_in; 0 keeps every snapshot.
+    # checkpoint_0.pt is saved before any gradient step, so a burn-in of at least
+    # 1 is usually wanted — undertrained snapshots otherwise dominate the CVaR tail.
+    mr_burn_in: int = 0
     # training random seed
     seed: int = 0
     # training device
@@ -754,6 +767,7 @@ def cvar_stability_check(
     all_preds: np.ndarray,
     alpha: float,
     n_checks: int = 50,
+    remedy: str = "Increase bnn_n_samples",
 ) -> float:
     """Check whether S is large enough for stable CVaR estimates.
 
@@ -770,6 +784,10 @@ def cvar_stability_check(
         CVaR risk level (same value used for the main reward computation).
     n_checks : int
         Number of randomly-selected transitions to compare.
+    remedy : str
+        How the caller can enlarge S, quoted in the warning.  Differs per
+        ensemble source: the BNN can draw more posterior samples, whereas an MR
+        snapshot ensemble is capped by the number of training eval epochs.
 
     Returns
     -------
@@ -802,7 +820,7 @@ def cvar_stability_check(
         min_s = int(np.ceil(30.0 / (1.0 - alpha)))
         warnings.warn(
             f"CVaR stability check: mean relative difference {mean_ratio:.3f} > 0.05. "
-            f"Increase bnn_n_samples (current S={S}). "
+            f"{remedy} (current S={S}). "
             f"Recommended minimum for alpha={alpha}: S >= {min_s}.",
             RuntimeWarning,
         )
@@ -1026,6 +1044,182 @@ def qlearning_dataset_bnn(
     }
 
 
+def _discover_mr_snapshots(reward_model_dir: str, burn_in: int = 0) -> List[str]:
+    """Collect the snapshot-ensemble members of an MR run directory.
+
+    ``run_mr_training.py`` writes one ``checkpoint_{epoch}.pt`` per eval epoch
+    plus a ``best_model.pt`` that duplicates whichever epoch scored best;
+    ``best_model.pt`` is excluded so that snapshot is not counted twice.
+
+    Returns the checkpoint paths ordered by epoch, keeping only epochs >= burn_in.
+    """
+    paths = _glob.glob(os.path.join(reward_model_dir, "checkpoint_*.pt"))
+    epoch_re = re.compile(r"checkpoint_(\d+)\.pt$")
+    found: List[Tuple[int, str]] = []
+    for p in paths:
+        m = epoch_re.search(os.path.basename(p))
+        if m is not None:
+            found.append((int(m.group(1)), p))
+    if not found:
+        raise FileNotFoundError(
+            f"No MR snapshots found in {reward_model_dir}. "
+            "Expected per-epoch checkpoint_{epoch}.pt files written by "
+            "run_mr_training.py with checkpoints_path set."
+        )
+
+    kept = sorted((e, p) for e, p in found if e >= burn_in)
+    if not kept:
+        max_epoch = max(e for e, _ in found)
+        raise ValueError(
+            f"mr_burn_in={burn_in} discarded all {len(found)} snapshot(s) in "
+            f"{reward_model_dir} (highest epoch present: {max_epoch})."
+        )
+    if len(kept) < len(found):
+        print(
+            f"[MR/CVaR] Burn-in {burn_in}: dropped {len(found) - len(kept)} "
+            f"snapshot(s) below epoch {burn_in}"
+        )
+    return [p for _, p in kept]
+
+
+def qlearning_dataset_mr_ensemble(
+    env,
+    reward_model_dir: str,
+    alpha: float = 0.95,
+    burn_in: int = 0,
+    device: str = "cpu",
+    dataset=None,
+    terminate_on_end: bool = False,
+    **kwargs,
+) -> Dict[str, np.ndarray]:
+    """Build a qlearning dataset using CVaR rewards from an MR snapshot ensemble.
+
+    The MR analogue of ``qlearning_dataset_bnn``: where that treats fSGHMC
+    posterior weight samples as the reward distribution at each (s, a), this
+    treats the per-epoch snapshots of a single MR training run as the ensemble.
+
+        r̃(s,a) = mean of the worst (1-alpha) fraction of the S snapshot predictions
+
+    Ensembles here are far smaller than a BNN posterior (S ≈ number of eval
+    epochs, often ~10), so the tail is coarse: alpha=0.9 with S=10 leaves a
+    single snapshot, making r̃ the per-transition worst-case member rather than a
+    tail average.  alpha=0.0 returns the plain ensemble mean.
+
+    Args:
+        reward_model_dir: MR run directory holding config.yaml and the
+            checkpoint_{epoch}.pt snapshots.
+        alpha: CVaR risk level in [0, 1). Higher = more conservative.
+        burn_in: skip snapshots from epochs below this (checkpoint_0.pt predates
+            any gradient step).
+        device: torch device string for inference.
+    """
+    if not (0.0 <= alpha < 1.0):
+        raise ValueError(f"mr_alpha must be in [0, 1), got {alpha!r}")
+
+    if dataset is None:
+        dataset = env.get_dataset(**kwargs)
+
+    N = dataset["rewards"].shape[0]
+    use_timeouts = "timeouts" in dataset
+    obs_all = dataset["observations"].astype(np.float32)
+    act_all = dataset["actions"].astype(np.float32)
+
+    # Build keep mask (identical logic to qlearning_dataset_mr).
+    keep = np.ones(N - 1, dtype=bool)
+    ep = 0
+    for i in range(N - 1):
+        done_bool = bool(dataset["terminals"][i])
+        final = (
+            bool(dataset["timeouts"][i])
+            if use_timeouts
+            else ep == env._max_episode_steps - 1
+        )
+        if (not terminate_on_end) and final:
+            keep[i] = False
+            ep = 0
+            continue
+        if done_bool or final:
+            ep = 0
+        ep += 1
+
+    ckpt_paths = _discover_mr_snapshots(reward_model_dir, burn_in)
+    n_total = len(ckpt_paths)
+
+    n_tail = max(1, int(np.floor((1.0 - alpha) * n_total)))
+    if n_tail < 5 and alpha > 0.0:
+        warnings.warn(
+            f"CVaR tail has only {n_tail} snapshot(s) with alpha={alpha} and "
+            f"S={n_total}. The reward is close to a per-transition worst-case "
+            f"over the ensemble rather than a tail average. Lower mr_alpha or "
+            f"train the reward model with more eval epochs for a finer tail.",
+            RuntimeWarning,
+        )
+    print(f"[MR/CVaR] S={n_total} snapshot(s), alpha={alpha}, n_tail={n_tail}")
+
+    activations = _mr_activations(reward_model_dir)
+    obs_act = np.concatenate([obs_all[:-1], act_all[:-1]], axis=1)  # (N-1, input_dim)
+    obs_act_t = torch.from_numpy(obs_act).to(device)
+    all_preds = np.empty((n_total, N - 1), dtype=np.float32)  # (S, N-1)
+
+    net: Optional[nn.Module] = None
+    CHUNK = 4096  # transitions per GPU batch — bounds activation memory
+    with torch.inference_mode():
+        for k, ckpt_path in enumerate(ckpt_paths):
+            ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+            state = _strip_compile_prefix(ckpt["net"])
+            # All snapshots of a run share one architecture — build it once.
+            if net is None:
+                net = _build_mlp_reward_model(state, activations, device)
+                print(f"[MR/CVaR] Loaded architecture from {os.path.basename(ckpt_path)}")
+            net.load_state_dict(state)
+            net.eval()
+            for cs in range(0, N - 1, CHUNK):
+                ce = min(cs + CHUNK, N - 1)
+                all_preds[k, cs:ce] = net(obs_act_t[cs:ce]).squeeze(-1).cpu().numpy()
+
+    del net, obs_act_t
+    if device != "cpu" and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    # Vectorized CVaR — see qlearning_dataset_bnn for the partition rationale.
+    kth = min(n_tail, all_preds.shape[0] - 1)
+    partitioned = np.partition(all_preds, kth, axis=0)  # (S, N-1)
+    penalized_r = partitioned[:n_tail].mean(axis=0).astype(np.float32)  # (N-1,)
+
+    cvar_stability_check(
+        all_preds,
+        alpha,
+        remedy="Lower mr_alpha, or retrain the reward model with more eval epochs "
+        "to grow the ensemble",
+    )
+
+    ensemble_mean = all_preds.mean(axis=0)
+    print(
+        f"[MR/CVaR] Ensemble mean reward: "
+        f"{ensemble_mean.mean():.4f} ± {ensemble_mean.std():.4f}"
+    )
+    reward_label = (
+        "ensemble mean reward" if alpha == 0.0 else f"CVaR reward (alpha={alpha})"
+    )
+    print(f"[MR/CVaR] {reward_label}: {penalized_r.mean():.4f} ± {penalized_r.std():.4f}")
+    if penalized_r.std() < 1e-6:
+        warnings.warn(
+            "CVaR rewards have near-zero std — the penalty may have collapsed all "
+            "rewards to the same value. Consider a smaller mr_alpha.",
+            RuntimeWarning,
+        )
+
+    del all_preds, partitioned
+
+    return {
+        "observations": obs_all[:-1][keep],
+        "actions": act_all[:-1][keep],
+        "next_observations": obs_all[1:][keep],
+        "rewards": penalized_r[keep],
+        "terminals": dataset["terminals"][:-1][keep],
+    }
+
+
 def qlearning_dataset_pt(
     env, r_model, query_length=100, dataset=None, terminate_on_end=False, **kwargs
 ):
@@ -1129,22 +1323,31 @@ def _strip_compile_prefix(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def load_mlp_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
-    with open(os.path.join(model_dir, "config.yaml")) as f:
-        cfg = yaml.safe_load(f)
-    ckpt = torch.load(
-        os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False
-    )
-    state = _strip_compile_prefix(ckpt["net"])
+def _build_mlp_reward_model(
+    state: Dict[str, Any], activations: str, device: str = "cpu"
+) -> nn.Module:
+    """Instantiate a RewardMLP matching the architecture implied by ``state``."""
     input_dim = state["layers.0.W"].shape[0]
     hidden_dims = [state["layers.0.W"].shape[1]]
     i = 1
     while f"layers.linear_{i}.W" in state:
         hidden_dims.append(state[f"layers.linear_{i}.W"].shape[1])
         i += 1
-    model = RewardMLP(input_dim, 1, hidden_dims, cfg.get("activations", "relu")).to(
-        device
+    return RewardMLP(input_dim, 1, hidden_dims, activations).to(device)
+
+
+def _mr_activations(model_dir: str) -> str:
+    with open(os.path.join(model_dir, "config.yaml")) as f:
+        cfg = yaml.safe_load(f)
+    return cfg.get("activations", "relu")
+
+
+def load_mlp_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
+    ckpt = torch.load(
+        os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False
     )
+    state = _strip_compile_prefix(ckpt["net"])
+    model = _build_mlp_reward_model(state, _mr_activations(model_dir), device)
     model.load_state_dict(state)
     model.eval()
     return model
@@ -1205,6 +1408,15 @@ def train(config: TrainConfig):
                 reward_model_path,
                 alpha=config.bnn_alpha,
                 n_samples=config.bnn_n_samples,
+                device=config.device,
+            )
+        elif config.mr_ensemble:
+            # MR snapshot ensemble: snapshots are loaded one at a time internally.
+            dataset = qlearning_dataset_mr_ensemble(
+                env,
+                reward_model_path,
+                alpha=config.mr_alpha,
+                burn_in=config.mr_burn_in,
                 device=config.device,
             )
         elif config.query_length > 1:
