@@ -20,4 +20,4 @@ parameters:
   # normalize_reward:
   #   value: 1
   bnn_alpha:
-    values: [0.0, 0.95]
+    value: 0.0
