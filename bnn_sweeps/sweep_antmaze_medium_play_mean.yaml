@@ -1,0 +1,21 @@
+project: IQL-pref
+program: algorithms/offline/iql.py
+method: grid
+parameters:
+  # specify all configs to run for the choosen algorithm
+  config_path:
+    value: "configs/offline/iql/antmaze/medium_play_v2.yaml"
+  reward_model_path:
+    value: "~/iqlpref/gp_reward-priors/exp/reward_learning/antmaze_medium_play_bnn/bnn-D4RL_antmaze-medium-play-v2-best"
+  bnn_reward_model:
+    value: true
+  bnn_n_samples:
+    value: -1
+  query_length:
+    value: 1
+  seed:
+    values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  normalize_reward:
+    value: 3
+  bnn_alpha:
+    value: 0.0 
