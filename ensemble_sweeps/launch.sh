@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Launch bnn_sweeps as W&B grid sweeps across a set of GPUs.
+# Launch ensemble_sweeps as W&B grid sweeps across a set of GPUs.
 #
 # Run from the REPO ROOT.
 #
 # Usage:
-#   ./bnn_sweeps/launch.sh [SWEEP] [GPU_LIST] [AGENTS_PER_GPU]
+#   ./ensemble_sweeps/launch.sh [SWEEP] [GPU_LIST] [AGENTS_PER_GPU]
 #
-#   SWEEP           "all" (the 8 bnn sweeps: cvar+mean per env) or a single sweep: full path,
+#   SWEEP           "all" (the 8 ensemble sweeps: cvar+mean per env) or a single sweep: full path,
 #                   basename with/without .yaml. Default: all
 #   GPU_LIST        space-separated GPU ids (quote it).      Default: "0 1 2 3 4 5"
 #   AGENTS_PER_GPU  wandb agents to launch on each GPU.      Default: 1
@@ -16,12 +16,12 @@
 # TOTAL_CORES (default 255). Agent slots are round-robined across the sweeps.
 #
 # Examples:
-#   ./bnn_sweeps/launch.sh                                        # all 8, 6 GPUs, 1/GPU (6 concurrent)
-#   ./bnn_sweeps/launch.sh sweep_antmaze_medium_play_cvar "0 1" 2 # one sweep, 2 GPUs, 2/GPU (4 concurrent)
+#   ./ensemble_sweeps/launch.sh                                        # all 8, 6 GPUs, 1/GPU (6 concurrent)
+#   ./ensemble_sweeps/launch.sh sweep_antmaze_medium_play_cvar "0 1" 2 # one sweep, 2 GPUs, 2/GPU (4 concurrent)
 set -euo pipefail
 
-if [[ ! -d bnn_sweeps || ! -f algorithms/offline/iql.py ]]; then
-  echo "ERROR: run this from the iqlpref repo root:  ./bnn_sweeps/launch.sh" >&2
+if [[ ! -d ensemble_sweeps || ! -f algorithms/offline/iql.py ]]; then
+  echo "ERROR: run this from the iqlpref repo root:  ./ensemble_sweeps/launch.sh" >&2
   exit 1
 fi
 
@@ -30,25 +30,25 @@ GPU_LIST="${2:-0 1 2 3 4 5}"
 AGENTS_PER_GPU="${3:-1}"
 TOTAL_CORES="${TOTAL_CORES:-255}"
 CPU_PER_RUN=25
-LOGDIR="bnn_sweeps/logs"; mkdir -p "$LOGDIR"
+LOGDIR="ensemble_sweeps/logs"; mkdir -p "$LOGDIR"
 
 # --- resolve sweep yaml(s) ---
 SWEEP_YAMLS=()
 if [[ "$SWEEP_ARG" == "all" ]]; then
   SWEEP_YAMLS=(
-    bnn_sweeps/sweep_antmaze_medium_play_cvar.yaml
-    bnn_sweeps/sweep_antmaze_medium_play_mean.yaml
-    bnn_sweeps/sweep_antmaze_medium_diverse_cvar.yaml
-    bnn_sweeps/sweep_antmaze_medium_diverse_mean.yaml
-    bnn_sweeps/sweep_antmaze_large_play_cvar.yaml
-    bnn_sweeps/sweep_antmaze_large_play_mean.yaml
-    bnn_sweeps/sweep_antmaze_large_diverse_cvar.yaml
-    bnn_sweeps/sweep_antmaze_large_diverse_mean.yaml
+    ensemble_sweeps/sweep_antmaze_medium_play_cvar.yaml
+    ensemble_sweeps/sweep_antmaze_medium_play_mean.yaml
+    ensemble_sweeps/sweep_antmaze_medium_diverse_cvar.yaml
+    ensemble_sweeps/sweep_antmaze_medium_diverse_mean.yaml
+    ensemble_sweeps/sweep_antmaze_large_play_cvar.yaml
+    ensemble_sweeps/sweep_antmaze_large_play_mean.yaml
+    ensemble_sweeps/sweep_antmaze_large_diverse_cvar.yaml
+    ensemble_sweeps/sweep_antmaze_large_diverse_mean.yaml
   )
 else
   y="$SWEEP_ARG"
   [[ "$y" == *.yaml ]] || y="${y}.yaml"
-  [[ "$y" == */* ]] || y="bnn_sweeps/${y}"
+  [[ "$y" == */* ]] || y="ensemble_sweeps/${y}"
   if [[ ! -f "$y" ]]; then
     echo "ERROR: sweep yaml not found: $y" >&2
     exit 1
