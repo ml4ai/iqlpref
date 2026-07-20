@@ -12,6 +12,10 @@ reward model trained on the *same* seed.
 - **Seeds:** `1 … 10`
 - **Hardware assumed:** 6× RTX A6000, 255 CPU cores
 
+> **Prerequisite:** activate your conda/virtual env first — every launcher uses the
+> `python` and `wandb` on `PATH`. (Override the interpreter for Phase 1 only with
+> `PY=/path/to/python ./train_rewards.sh …`.)
+
 ---
 
 ## Seed → path contract (the thing that makes this work)
