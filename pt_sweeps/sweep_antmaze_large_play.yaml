@@ -1,12 +1,12 @@
 project: IQL-pref
-program: algorithms/offline/iql.py
+program: algorithms/offline/iql_eval.py
 method: grid
 parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
     value: "configs/offline/iql/antmaze/large_play_v2.yaml"
-  reward_model_path:
-    value: "~/iqlpref/gp_reward-priors/exp/reward_learning/antmaze_large_play_pt/pt-D4RL_antmaze-large-play-v2-best"
+  reward_model_root:
+    value: "~/iqlpref/gp_reward-priors/exp/reward_learning/antmaze_large_play_pt_eval"
   query_length:
     value: 100
   seed:

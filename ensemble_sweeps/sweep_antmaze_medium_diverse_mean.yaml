@@ -1,12 +1,12 @@
 project: IQL-pref
-program: algorithms/offline/iql.py
+program: algorithms/offline/iql_eval.py
 method: grid
 parameters:
   # specify all configs to run for the choosen algorithm
   config_path:
     value: "configs/offline/iql/antmaze/medium_diverse_v2.yaml"
-  reward_model_path:
-    value: "~/iqlpref/gp_reward-priors/exp/reward_learning/antmaze_medium_diverse_mr/mr-D4RL_antmaze-medium-diverse-v2-best_ensemble"
+  reward_model_root:
+    value: "~/iqlpref/gp_reward-priors/exp/reward_learning/antmaze_medium_diverse_mr_eval"
   mr_ensemble:
     value: true
   query_length:
