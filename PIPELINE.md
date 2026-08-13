@@ -165,6 +165,22 @@ lineage: set `normalize_reward` to the single winning `value:` and restore
 each seed's reward model automatically. Reporting uses the identical statistic as
 selection; only the seed lineage differs.
 
+## Oracle baseline — `tr_sweeps` (task reward)
+
+`tr_sweeps` is the ground-truth reference the learned reward models are compared
+against: no `reward_model_path`, so `iql.py` falls through to
+`d4rl.qlearning_dataset(env)` and uses the environment's own task reward.
+
+It sits outside the seed-0 selection story entirely — there is no reward model, so
+there is nothing to tune. `normalize_reward` is fixed at **1** (`r − 1`, the shift
+conventionally applied to the antmaze task reward), and it runs the evaluation
+lineage directly at **seeds 1–10**. It also stays on `iql.py`, not `iql_eval.py`,
+since no seed-derived model path is needed.
+
+```bash
+./tr_sweeps/launch.sh all              # 4 sweeps × 10 seeds = 40 runs
+```
+
 **Concurrency / CPU cap.** Every IQL run's evaluation uses `n_envs=25` CPU workers, so
 `concurrency × 25 ≤ 255` cores. Defaults are `6 GPUs × 1 agent = 6` concurrent (150
 cores) — safe. The launchers warn if you oversubscribe; `AGENTS_PER_GPU=2` (12
@@ -184,4 +200,5 @@ concurrent, 300 cores) exceeds 255 and evals will contend when they sync. Stay a
 | `algorithms/offline/iql_eval.py` | Phase-2 IQL, seed-derived `reward_model_root` (iql.py untouched) |
 | `configs/offline/iql/antmaze/<variant>.yaml` | IQL run config (`n_episodes`, `eval_freq`, `max_timesteps`) |
 | `{bnn,ensemble,mr,pt}_sweeps/sweep_antmaze_*.yaml` | Phase-2 W&B sweeps (currently: seed 0 × normalize_reward 0–7) |
-| `{bnn,ensemble,mr,pt}_sweeps/launch.sh` | Phase-2 launchers (W&B agents across GPUs) |
+| `tr_sweeps/sweep_antmaze_*.yaml` | Oracle task-reward baseline (`iql.py`, seeds 1–10, `normalize_reward: 1`) |
+| `{bnn,ensemble,mr,pt,tr}_sweeps/launch.sh` | Phase-2 launchers (W&B agents across GPUs) |

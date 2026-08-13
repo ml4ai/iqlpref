@@ -17,7 +17,7 @@
 #
 # Examples:
 #   ./pt_sweeps/launch.sh                                        # all 4, 6 GPUs, 1/GPU (6 concurrent)
-#   ./pt_sweeps/launch.sh sweep_antmaze_medium_play_cvar "0 1" 2 # one sweep, 2 GPUs, 2/GPU (4 concurrent)
+#   ./pt_sweeps/launch.sh sweep_antmaze_medium_play "0 1" 2 # one sweep, 2 GPUs, 2/GPU (4 concurrent)
 set -euo pipefail
 
 if [[ ! -d pt_sweeps || ! -f algorithms/offline/iql.py ]]; then

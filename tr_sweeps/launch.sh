@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Launch mr_sweeps as W&B grid sweeps across a set of GPUs.
+# Launch tr_sweeps as W&B grid sweeps across a set of GPUs.
 #
 # Run from the REPO ROOT.
 #
 # Usage:
-#   ./mr_sweeps/launch.sh [SWEEP] [GPU_LIST] [AGENTS_PER_GPU]
+#   ./tr_sweeps/launch.sh [SWEEP] [GPU_LIST] [AGENTS_PER_GPU]
 #
-#   SWEEP           "all" (the 4 mr sweeps: one per antmaze variant) or a single sweep: full path,
+#   SWEEP           "all" (the 4 tr sweeps: one per antmaze variant) or a single sweep: full path,
 #                   basename with/without .yaml. Default: all
 #   GPU_LIST        space-separated GPU ids (quote it).      Default: "0 1 2 3 4 5"
 #   AGENTS_PER_GPU  wandb agents to launch on each GPU.      Default: 1
@@ -16,12 +16,12 @@
 # TOTAL_CORES (default 255). Agent slots are round-robined across the sweeps.
 #
 # Examples:
-#   ./mr_sweeps/launch.sh                                        # all 4, 6 GPUs, 1/GPU (6 concurrent)
-#   ./mr_sweeps/launch.sh sweep_antmaze_medium_play "0 1" 2 # one sweep, 2 GPUs, 2/GPU (4 concurrent)
+#   ./tr_sweeps/launch.sh                                        # all 4, 6 GPUs, 1/GPU (6 concurrent)
+#   ./tr_sweeps/launch.sh sweep_antmaze_medium_play "0 1" 2 # one sweep, 2 GPUs, 2/GPU (4 concurrent)
 set -euo pipefail
 
-if [[ ! -d mr_sweeps || ! -f algorithms/offline/iql.py ]]; then
-  echo "ERROR: run this from the iqlpref repo root:  ./mr_sweeps/launch.sh" >&2
+if [[ ! -d tr_sweeps || ! -f algorithms/offline/iql.py ]]; then
+  echo "ERROR: run this from the iqlpref repo root:  ./tr_sweeps/launch.sh" >&2
   exit 1
 fi
 
@@ -30,21 +30,21 @@ GPU_LIST="${2:-0 1 2 3 4 5}"
 AGENTS_PER_GPU="${3:-1}"
 TOTAL_CORES="${TOTAL_CORES:-255}"
 CPU_PER_RUN=25
-LOGDIR="mr_sweeps/logs"; mkdir -p "$LOGDIR"
+LOGDIR="tr_sweeps/logs"; mkdir -p "$LOGDIR"
 
 # --- resolve sweep yaml(s) ---
 SWEEP_YAMLS=()
 if [[ "$SWEEP_ARG" == "all" ]]; then
   SWEEP_YAMLS=(
-    mr_sweeps/sweep_antmaze_medium_play.yaml
-    mr_sweeps/sweep_antmaze_medium_diverse.yaml
-    mr_sweeps/sweep_antmaze_large_play.yaml
-    mr_sweeps/sweep_antmaze_large_diverse.yaml
+    tr_sweeps/sweep_antmaze_medium_play.yaml
+    tr_sweeps/sweep_antmaze_medium_diverse.yaml
+    tr_sweeps/sweep_antmaze_large_play.yaml
+    tr_sweeps/sweep_antmaze_large_diverse.yaml
   )
 else
   y="$SWEEP_ARG"
   [[ "$y" == *.yaml ]] || y="${y}.yaml"
-  [[ "$y" == */* ]] || y="mr_sweeps/${y}"
+  [[ "$y" == */* ]] || y="tr_sweeps/${y}"
   if [[ ! -f "$y" ]]; then
     echo "ERROR: sweep yaml not found: $y" >&2
     exit 1
