@@ -71,6 +71,29 @@ class TrainConfig:
     normalize: bool = True
     # whether to normalize reward (like in IQL) (0 is none, other integers lead to different types of normalizations)
     normalize_reward: int = 0
+    # Gauge fixing for LEARNED reward models (handoff HANDOFF_HP_SELECTION.md
+    # section 5.1).  A preference-trained reward is only identified up to an
+    # additive constant -- Bradley-Terry depends on Phi_1 - Phi_2, so f and
+    # f + c fit the data identically -- but IQL is NOT invariant to that
+    # constant on antmaze, because episodes terminate at the goal and truncate
+    # at 1000 steps, so a constant accumulates differently by
+    # time-to-termination and does not cancel from the advantage.  Left
+    # unfixed, the level of every learned reward field is an arbitrary sampler
+    # artefact, it is not reproducible across seeds, and a CVaR-vs-mean
+    # comparison confounds conservative shaping with a global downward shift.
+    #   "max0" — subtract max(r) so all rewards are <= 0 and the best
+    #            state-action sits at 0.  The closest analogue of the antmaze
+    #            task reward convention (-1/0), where every step is a penalty.
+    #   "mean0" — subtract mean(r).
+    #   "none"  — leave the level alone (pre-2026-08-30 behaviour).
+    # Applied to MR, PT and BNN identically, BEFORE modify_reward, and NEVER to
+    # the D4RL oracle reward, whose 0/1 level is the task definition (gauging it
+    # would silently reproduce normalize_reward=1 and double-apply with it).
+    # This is gauge fixing, not hyperparameter selection: the offset is
+    # unidentified by the likelihood, so pinning it changes nothing the data
+    # constrains.  It must stay identical across families or it breaks the
+    # cross-family comparability it exists to protect.
+    gauge_reward: str = "max0"
     # V-critic function learning rate
     vf_lr: float = 3e-4
     # Q-critic learning rate
@@ -358,6 +381,32 @@ def return_reward_range(dataset, max_episode_steps):
     lengths.append(ep_len)  # but still keep track of number of steps
     assert sum(lengths) == len(dataset["rewards"])
     return min(returns), max(returns), trj_lens
+
+
+def gauge_reward(dataset, mode):
+    """Pin the unidentified additive constant of a LEARNED reward field.
+
+    See TrainConfig.gauge_reward and handoff section 5.1.  Call only when the
+    rewards came from a reward model, never on the D4RL oracle reward, and
+    always BEFORE modify_reward -- indices 0-5 of that grid pass the offset
+    through (4/5 amplify it by roughly the trajectory length), so the level has
+    to be settled first.
+
+    Returns the constant subtracted, for logging.
+    """
+    if mode in (None, "", "none"):
+        return 0.0
+    r = np.asarray(dataset["rewards"], dtype=np.float64)
+    if mode == "max0":
+        c = float(r.max())
+    elif mode == "mean0":
+        c = float(r.mean())
+    else:
+        raise ValueError(
+            f"gauge_reward must be one of 'max0', 'mean0', 'none'; got {mode!r}"
+        )
+    dataset["rewards"] = (r - c).astype(dataset["rewards"].dtype)
+    return c
 
 
 def modify_reward(dataset, env_name, normalize_reward, max_episode_steps=1000):
@@ -1429,6 +1478,17 @@ def train(config: TrainConfig):
             del reward_model
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        # Gauge the LEARNED reward field before anything else consumes it
+        # (handoff section 5.1).  Inside this branch deliberately: the oracle
+        # reward in the else-branch below keeps its 0/1 level, which is the task
+        # definition, not an unidentified constant.
+        _gauge_c = gauge_reward(dataset, config.gauge_reward)
+        _r = dataset["rewards"]
+        print(
+            f"[gauge_reward] mode={config.gauge_reward!r} subtracted {_gauge_c:.6g}"
+            f" -> reward range [{float(_r.min()):.6g}, {float(_r.max()):.6g}],"
+            f" mean {float(_r.mean()):.6g}"
+        )
     else:
         dataset = d4rl.qlearning_dataset(env)
 
