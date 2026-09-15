@@ -148,10 +148,21 @@ ls -d exp/reward_learning/antmaze_*_pt_eval_*  | wc -l
 ```
 
 **Selection statistic.** One IQL run is 1,000,000 steps with an evaluation every 5,000
-steps = **200 evaluation points**, each the mean score over **100 episodes**. The
-winning index is the one maximising the **max over those 200 points**. These operative
+steps = **200 evaluation points**, each the mean score over **100 episodes**. A run's
+score is the **mean of its last 10 evaluation points** (the last 50,000 steps, 1,000
+episodes), with the last-20 mean as the robustness check. The winning index is the one
+with the highest score, and exact ties go to the lowest index. Runs without all 200
+evaluation points are not scored. The statistic is defined once, in
+`results/iql_score.py`, used both here (`python results/iql_score.py --stage4
+<entity>/IQL-pref/<sweep_id>`) and by `results/results_table.ipynb`. These operative
 values come from the IQL run config (`configs/offline/iql/antmaze/<variant>.yaml`), not
 from the `iql.py` dataclass defaults.
+
+*Changed 2026-09-15 (`gp_reward-priors/HANDOFF_HP_SELECTION.md` §4.3.107) from the
+**max** over the 200 points.* The max is spike-driven, needs online checkpoint
+selection, and resolved half as many method comparisons across the existing
+evaluation runs. Stage-4 grids and evaluation runs completed before that date were
+selected and scored with the max.
 
 The index must be selected **per (family × variant)**: indices 2–7 derive their
 constants from `min_ret`/`max_ret` of each reward model's own labels, so the same index
