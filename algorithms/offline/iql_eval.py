@@ -150,6 +150,15 @@ class TrainConfig:
     # α ≥ 0.9 selects a single snapshot, i.e. the worst-case member.
     # α=0.0 averages every snapshot (plain ensemble mean).
     mr_alpha: float = 0.95
+    # Item F (handoff 4.3.114): centre each posterior draw before the CVaR
+    # reduction, so the per-transition tail selection is driven by the
+    # IDENTIFIED reward shape rather than by the draw's unidentified additive
+    # constant -- which gauge_reward() overwrites a few lines later anyway.
+    # DEFAULT FALSE so every result produced before 2026-09-18 reproduces
+    # bit-identically; the round-5 configs set it True.  Applies to BOTH the BNN
+    # posterior and the MR snapshot ensemble, or handoff 3.1's cross-family
+    # comparability breaks.  MUST match the selection side's centre_draws.
+    centre_draws: bool = False
     # skip checkpoint_{epoch}.pt with epoch < mr_burn_in; 0 keeps every snapshot.
     # checkpoint_0.pt is saved before any gradient step, so a burn-in of at least
     # 1 is usually wanted — undertrained snapshots otherwise dominate the CVaR tail.
@@ -906,6 +915,7 @@ def qlearning_dataset_bnn(
     device: str = "cpu",
     dataset=None,
     terminate_on_end: bool = False,
+    centre_draws: bool = False,
     **kwargs,
 ) -> Dict[str, np.ndarray]:
     """Build a qlearning dataset using empirical CVaR rewards from a BNN posterior.
@@ -1077,6 +1087,26 @@ def qlearning_dataset_bnn(
     # kth must be a valid row index in [0, S-1].  When alpha=0, n_tail == S
     # (the full posterior mean), so clamp the pivot to S-1; taking the first
     # n_tail == S rows still averages every sample, giving the plain mean.
+    # ---- Item F (handoff 4.3.114): centre each draw before the CVaR --------
+    # f_j = g_j + c_j, with c_j the draw's unidentified additive constant.  The
+    # BT likelihood is exactly invariant to it and gauge_reward() overwrites the
+    # reward's LEVEL a few lines downstream, so left in, c_j dominates the
+    # per-transition sort below: the SAME draws are selected everywhere, the
+    # penalty depth goes near-constant, and the CVaR reward collapses to
+    # `mean - constant` whose conservatism the gauge then cancels.  Measured on
+    # ten runs (handoff 4.3.113/4.3.114): raw CVaR accuracy was 0.80-0.92, i.e.
+    # indistinguishable from the mean reward's.
+    #
+    # Centring subtracts a per-draw scalar, so the posterior MEAN reward changes
+    # only by a constant that gauge_reward removes -- the mean-reward baseline
+    # and the MR/PT comparison are untouched.
+    #
+    # MUST stay in step with the SELECTION side (gp_reward-priors
+    # diagnose_sampling_tail.cvar_ce, centre_draws), or handoff 3.2.1's
+    # selection-matches-deployment property breaks.
+    if centre_draws:
+        all_preds = all_preds - all_preds.mean(axis=1, keepdims=True)
+
     kth = min(n_tail, all_preds.shape[0] - 1)
     partitioned = np.partition(all_preds, kth, axis=0)  # (S, N-1)
     penalized_r = partitioned[:n_tail].mean(axis=0).astype(np.float32)  # (N-1,)
@@ -1161,6 +1191,7 @@ def qlearning_dataset_mr_ensemble(
     device: str = "cpu",
     dataset=None,
     terminate_on_end: bool = False,
+    centre_draws: bool = False,
     **kwargs,
 ) -> Dict[str, np.ndarray]:
     """Build a qlearning dataset using CVaR rewards from an MR snapshot ensemble.
@@ -1253,6 +1284,26 @@ def qlearning_dataset_mr_ensemble(
         torch.cuda.empty_cache()
 
     # Vectorized CVaR — see qlearning_dataset_bnn for the partition rationale.
+    # ---- Item F (handoff 4.3.114): centre each draw before the CVaR --------
+    # f_j = g_j + c_j, with c_j the draw's unidentified additive constant.  The
+    # BT likelihood is exactly invariant to it and gauge_reward() overwrites the
+    # reward's LEVEL a few lines downstream, so left in, c_j dominates the
+    # per-transition sort below: the SAME draws are selected everywhere, the
+    # penalty depth goes near-constant, and the CVaR reward collapses to
+    # `mean - constant` whose conservatism the gauge then cancels.  Measured on
+    # ten runs (handoff 4.3.113/4.3.114): raw CVaR accuracy was 0.80-0.92, i.e.
+    # indistinguishable from the mean reward's.
+    #
+    # Centring subtracts a per-draw scalar, so the posterior MEAN reward changes
+    # only by a constant that gauge_reward removes -- the mean-reward baseline
+    # and the MR/PT comparison are untouched.
+    #
+    # MUST stay in step with the SELECTION side (gp_reward-priors
+    # diagnose_sampling_tail.cvar_ce, centre_draws), or handoff 3.2.1's
+    # selection-matches-deployment property breaks.
+    if centre_draws:
+        all_preds = all_preds - all_preds.mean(axis=1, keepdims=True)
+
     kth = min(n_tail, all_preds.shape[0] - 1)
     partitioned = np.partition(all_preds, kth, axis=0)  # (S, N-1)
     penalized_r = partitioned[:n_tail].mean(axis=0).astype(np.float32)  # (N-1,)
@@ -1480,6 +1531,7 @@ def train(config: TrainConfig):
                 alpha=config.bnn_alpha,
                 n_samples=config.bnn_n_samples,
                 device=config.device,
+                centre_draws=config.centre_draws,
             )
         elif config.mr_ensemble:
             # MR snapshot ensemble: snapshots are loaded one at a time internally.
@@ -1489,6 +1541,7 @@ def train(config: TrainConfig):
                 alpha=config.mr_alpha,
                 burn_in=config.mr_burn_in,
                 device=config.device,
+                centre_draws=config.centre_draws,
             )
         elif config.query_length > 1:
             reward_model = load_pt_reward_model(reward_model_path, device=config.device)
