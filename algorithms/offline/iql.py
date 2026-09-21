@@ -29,6 +29,8 @@ sys.path.insert(
 )
 import glob as _glob
 
+import reward_label_cache as _rlc
+
 from optbnn.bnn.nets.mlp import MLP as RewardMLP
 from optbnn.bnn.nets.pref_trans import PT as RewardPT
 
@@ -885,73 +887,36 @@ def cvar_stability_check(
     return mean_ratio
 
 
-def qlearning_dataset_bnn(
-    env,
-    reward_model_dir: str,
-    alpha: float = 0.95,
-    n_samples: int = 500,
-    device: str = "cpu",
-    dataset=None,
-    terminate_on_end: bool = False,
-    centre_draws: bool = False,
-    **kwargs,
-) -> Dict[str, np.ndarray]:
-    """Build a qlearning dataset using empirical CVaR rewards from a BNN posterior.
+def _env_id(env):
+    """The d4rl env id, for the label-cache key (handoff 3.2.9, to-do 17).
 
-    r̃(s,a) = CVaR_alpha over the BNN posterior predictive distribution:
-        sort S reward samples ascending, return the mean of the worst (1-alpha)·S.
-
-    Posterior weight samples are loaded from all chain subdirectories::
-
-        <reward_model_dir>/sampling_f/chain_*/sampled_weights/sampled_weights_0000000
-
-    The BNN architecture (input_dim, width, depth) is inferred automatically
-    from the first sample's weight shapes, so no config.yaml is required.
-
-    All S forward passes are stored in a (S, N-1) float32 array so that the
-    CVaR can be computed with a single vectorized partial-sort.  For S=500 and
-    N=1 million transitions this requires ~2 GB of CPU RAM.
-
-    Args:
-        reward_model_dir: path to the BNN run directory (OUT_DIR/name from
-            run_bnn_training_f.py / run_bnn_full_training_f.py).
-        alpha: CVaR risk level in [0, 1).  Higher = more conservative.
-            alpha=0.95 averages the worst 5% of posterior reward samples.
-            alpha=0.0 returns the plain posterior mean reward (no conservatism).
-        n_samples: number of posterior weight samples S to use.  If fewer are
-            available the maximum available count is used with a warning.
-            Recommended minimum: ceil(30 / (1 - alpha)); e.g. 600 for alpha=0.95.
-        device: torch device string for GPU inference.
+    Key material, so it must be stable and must never silently collapse two
+    different datasets onto one entry.  If the id cannot be recovered we raise
+    rather than fall back to a constant: a wrong-but-plausible key is the one
+    failure mode this cache must not have.
     """
-    if not (0.0 <= alpha < 1.0):
-        raise ValueError(f"bnn_alpha must be in [0, 1), got {alpha!r}")
+    spec = getattr(env, "spec", None) or getattr(getattr(env, "unwrapped", None),
+                                                 "spec", None)
+    env_id = getattr(spec, "id", None)
+    if not env_id:
+        raise RuntimeError(
+            "cannot determine the env id for the reward-label cache key; "
+            "refusing to cache under an ambiguous key")
+    return str(env_id)
 
-    if dataset is None:
-        dataset = env.get_dataset(**kwargs)
 
-    N = dataset["rewards"].shape[0]
-    use_timeouts = "timeouts" in dataset
-    obs_all = dataset["observations"].astype(np.float32)
-    act_all = dataset["actions"].astype(np.float32)
+def _bnn_cvar_labels(reward_model_dir, alpha, n_samples, device,
+                     centre_draws, obs_all, act_all, N):
+    """The expensive half of qlearning_dataset_bnn: chains -> CVaR labels.
 
-    # Build keep mask (identical logic to qlearning_dataset_mr).
-    keep = np.ones(N - 1, dtype=bool)
-    ep = 0
-    for i in range(N - 1):
-        done_bool = bool(dataset["terminals"][i])
-        final = (
-            bool(dataset["timeouts"][i])
-            if use_timeouts
-            else ep == env._max_episode_steps - 1
-        )
-        if (not terminate_on_end) and final:
-            keep[i] = False
-            ep = 0
-            continue
-        if done_bool or final:
-            ep = 0
-        ep += 1
+    Split out so `reward_label_cache` can skip it entirely (handoff 3.2.9,
+    to-do 17).  The body below is UNCHANGED from when it lived inline; only
+    two lines differ, both marked, and both purely to carry diagnostics out
+    to the cache so a later HIT can still report them.
 
+    Returns (penalized_r, meta) where penalized_r is the (N-1,) float32 CVaR
+    reward BEFORE the keep mask, gauge_reward() and modify_reward().
+    """
     # ------------------------------------------------------------------ #
     # Discover and load posterior weight samples from all chains.
     # ------------------------------------------------------------------ #
@@ -1092,7 +1057,7 @@ def qlearning_dataset_bnn(
     # ------------------------------------------------------------------ #
     # Diagnostics
     # ------------------------------------------------------------------ #
-    cvar_stability_check(all_preds, alpha)
+    _stab = cvar_stability_check(all_preds, alpha)  # [moved: captured]
 
     posterior_mean = all_preds.mean(axis=0)
     print(
@@ -1112,7 +1077,122 @@ def qlearning_dataset_bnn(
             RuntimeWarning,
         )
 
+    meta = {  # [moved: was `del all_preds, partitioned`]
+        "n_draws": int(n_total), "n_chains": len(weight_files),
+        "width": int(width), "depth": int(depth),
+        "input_dim": int(input_dim), "n_tail": int(n_tail),
+        "stability_rel_diff": float(_stab),
+        "posterior_mean_mean": float(posterior_mean.mean()),
+        "posterior_mean_std": float(posterior_mean.std()),
+        "reward_mean": float(penalized_r.mean()),
+        "reward_std": float(penalized_r.std()),
+        "weights_digest": _rlc.digest_weights(all_weights),
+    }
     del all_preds, partitioned
+    return penalized_r, meta
+
+
+def qlearning_dataset_bnn(
+    env,
+    reward_model_dir: str,
+    alpha: float = 0.95,
+    n_samples: int = 500,
+    device: str = "cpu",
+    dataset=None,
+    terminate_on_end: bool = False,
+    centre_draws: bool = False,
+    **kwargs,
+) -> Dict[str, np.ndarray]:
+    """Build a qlearning dataset using empirical CVaR rewards from a BNN posterior.
+
+    r̃(s,a) = CVaR_alpha over the BNN posterior predictive distribution:
+        sort S reward samples ascending, return the mean of the worst (1-alpha)·S.
+
+    Posterior weight samples are loaded from all chain subdirectories::
+
+        <reward_model_dir>/sampling_f/chain_*/sampled_weights/sampled_weights_0000000
+
+    The BNN architecture (input_dim, width, depth) is inferred automatically
+    from the first sample's weight shapes, so no config.yaml is required.
+
+    All S forward passes are stored in a (S, N-1) float32 array so that the
+    CVaR can be computed with a single vectorized partial-sort.  For S=500 and
+    N=1 million transitions this requires ~2 GB of CPU RAM.
+
+    That work is done by `_bnn_cvar_labels` and is CACHED (handoff 3.2.9,
+    to-do 17): the resulting (N-1,) labels are ~4 MB against up to 458 GB of
+    chains, so the chains can be deleted after labelling, and stage 4's 8
+    normalization indices share one labelling instead of repeating it.  See
+    reward_label_cache.py; set REWARD_LABEL_CACHE_DIR to relocate the store.
+
+    Args:
+        reward_model_dir: path to the BNN run directory (OUT_DIR/name from
+            run_bnn_training_f.py / run_bnn_full_training_f.py).
+        alpha: CVaR risk level in [0, 1).  Higher = more conservative.
+            alpha=0.95 averages the worst 5% of posterior reward samples.
+            alpha=0.0 returns the plain posterior mean reward (no conservatism).
+        n_samples: number of posterior weight samples S to use.  If fewer are
+            available the maximum available count is used with a warning.
+            Recommended minimum: ceil(30 / (1 - alpha)); e.g. 600 for alpha=0.95.
+        device: torch device string for GPU inference.
+    """
+    if not (0.0 <= alpha < 1.0):
+        raise ValueError(f"bnn_alpha must be in [0, 1), got {alpha!r}")
+
+    if dataset is None:
+        dataset = env.get_dataset(**kwargs)
+
+    N = dataset["rewards"].shape[0]
+    use_timeouts = "timeouts" in dataset
+    obs_all = dataset["observations"].astype(np.float32)
+    act_all = dataset["actions"].astype(np.float32)
+
+    # Build keep mask (identical logic to qlearning_dataset_mr).
+    keep = np.ones(N - 1, dtype=bool)
+    ep = 0
+    for i in range(N - 1):
+        done_bool = bool(dataset["terminals"][i])
+        final = (
+            bool(dataset["timeouts"][i])
+            if use_timeouts
+            else ep == env._max_episode_steps - 1
+        )
+        if (not terminate_on_end) and final:
+            keep[i] = False
+            ep = 0
+            continue
+        if done_bool or final:
+            ep = 0
+        ep += 1
+
+    # ---- Label cache (handoff 3.2.9, to-do 17) ---------------------------
+    # 11 chain sets per variant is up to 5 TB; these labels are ~4 MB.  The
+    # cache is also what removes the re-labelling cost from each of stage 4's
+    # 8 normalization indices: gauge_reward() and modify_reward() are applied
+    # DOWNSTREAM of this point, so every index shares one entry.
+    _sampling_dir = os.path.join(reward_model_dir, "sampling_f")
+    _chain_files = sorted(_glob.glob(os.path.join(
+        _sampling_dir, "chain_*/sampled_weights/sampled_weights_0000000")))
+    _inv = _rlc.inventory(_chain_files, reward_model_dir) if _chain_files else []
+    _env_name = _env_id(env)
+    _key, _payload = _rlc.make_key(
+        "bnn", reward_model_dir, _env_name, N - 1,
+        {"alpha": float(alpha), "n_samples": int(n_samples),
+         "centre_draws": bool(centre_draws)},
+    )
+    penalized_r, _status = _rlc.load(_key, _payload, N - 1, _inv)
+    if penalized_r is None:
+        penalized_r, _meta = _bnn_cvar_labels(
+            reward_model_dir, alpha, n_samples, device, centre_draws,
+            obs_all, act_all, N)
+        _meta.update({"source_dir": os.path.abspath(reward_model_dir),
+                      "device": str(device), "env_name": _env_name})
+        _rlc.save(_key, _payload, penalized_r, _inv, meta=_meta)
+    else:
+        # A HIT skips the forward pass, so re-emit what it would have printed.
+        print(f"[BNN/CVaR] labels from cache: mean {penalized_r.mean():.4f} "
+              f"+- {penalized_r.std():.4f} (alpha={alpha}, "
+              f"centre_draws={centre_draws})")
 
     return {
         "observations": obs_all[:-1][keep],
