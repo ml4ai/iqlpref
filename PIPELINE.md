@@ -134,6 +134,19 @@ ls -d exp/reward_learning/antmaze_*_pt_eval_*  | wc -l
 
 ## Phase 2a — stage 4: output-normalization selection (seed 0)
 
+> **The 24 sweep files are GENERATED — do not hand-edit them.** `phase2_sweeps.py`
+> writes both lineages from one canonical spec and guarantees they differ only in
+> `seed` and `normalize_reward`. Hand-flipping failed in practice
+> (`gp_reward-priors/HANDOFF_HP_SELECTION.md` §4.3.139): `centre_draws` had been set
+> in **no** deployment file, so BNN and MR-ensemble runs would have deployed raw
+> CVaR against centred selection. And 16 files still held stage-4 indices from the
+> old reward models.
+>
+> ```bash
+> python phase2_sweeps.py check            # audit every file against the spec
+> python phase2_sweeps.py stage4 --write   # this lineage (current state, 2026-09-25)
+> ```
+
 **This is the sweeps' current state.** Each of the 24 sweeps pins `seed: 0` and grids
 `normalize_reward` over the **8 normalization functions, indices 0–7**, defined in
 `modify_reward()` in `iql.py`. Index 0 is the identity (the call site is guarded by
@@ -170,9 +183,23 @@ means a different transformation for each model.
 
 ## Phase 2b — evaluation (seeds 1–10)
 
-Once each (family × variant) has its winning index, flip the sweeps to the evaluation
-lineage: set `normalize_reward` to the single winning `value:` and restore
-`seed: values: [1,2,3,4,5,6,7,8,9,10]`. Nothing else changes — `iql_eval.py` resolves
+Once each (family × variant) has its winning index, **generate** the evaluation
+lineage. Do not hand-flip the files:
+
+```bash
+# score the finished stage-4 sweeps (ids as printed by <family>_sweeps/launch.sh)
+python phase2_sweeps.py winners <sweep_id> [<sweep_id> ...] --out phase2_winners.json
+# write seeds 1-10 + the winning index, for every file whose winner is known
+python phase2_sweeps.py eval --winners phase2_winners.json --write
+python phase2_sweeps.py check
+```
+
+`winners` uses `results/iql_score.py`'s own `select_normalization`, the same
+statistic as reporting, and maps each sweep back to its file by an exact match on
+its parameters. `eval` writes only files with a known winner, so families can move
+to evaluation as their stage 4 finishes. The generated file sets
+`normalize_reward` to the winning `value:` and `seed: values: [1..10]`, and
+**nothing else changes**, which the generator enforces. `iql_eval.py` resolves
 each seed's reward model automatically. Reporting uses the identical statistic as
 selection; only the seed lineage differs.
 
@@ -210,6 +237,7 @@ concurrent, 300 cores) exceeds 255 and evals will contend when they sync. Stay a
 | `gp_reward-priors/train_rewards.sh` | Phase-1 launcher (GPU-packed, all variants × seeds 0–10) |
 | `algorithms/offline/iql_eval.py` | Phase-2 IQL, seed-derived `reward_model_root` (iql.py untouched) |
 | `configs/offline/iql/antmaze/<variant>.yaml` | IQL run config (`n_episodes`, `eval_freq`, `max_timesteps`) |
-| `{bnn,ensemble,mr,pt}_sweeps/sweep_antmaze_*.yaml` | Phase-2 W&B sweeps (currently: seed 0 × normalize_reward 0–7) |
+| `phase2_sweeps.py` | **Generates** the 24 Phase-2 sweep files (stage-4 and evaluation lineages) from one spec; `check` audits them |
+| `{bnn,ensemble,mr,pt}_sweeps/sweep_antmaze_*.yaml` | Phase-2 W&B sweeps, generated (currently: seed 0 × normalize_reward 0–7) |
 | `tr_sweeps/sweep_antmaze_*.yaml` | Oracle task-reward baseline (`iql.py`, seeds 1–10, `normalize_reward: 1`) |
 | `{bnn,ensemble,mr,pt,tr}_sweeps/launch.sh` | Phase-2 launchers (W&B agents across GPUs) |
