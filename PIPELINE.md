@@ -225,6 +225,13 @@ cores) — safe. The launchers warn if you oversubscribe; `AGENTS_PER_GPU=2` (12
 concurrent, 300 cores) exceeds 255 and evals will contend when they sync. Stay at
 **6–8 concurrent**. Run the four groups back-to-back, or overlap two at 3 GPUs each.
 
+> ⚠️ **`launch.sh all` with fewer agents than sweeps starves the extra sweeps.**
+> Agents are round-robined over sweeps and each stays on its own sweep until that
+> grid is exhausted, then exits. So 4 agents on the 8 BNN or ensemble sweeps run
+> only the first 4, and the others never get an agent. On a partial GPU set, use
+> `./stage4_queue.sh "GPU_LIST" AGENTS_PER_GPU family:sweep …`, which runs one
+> sweep at a time with every agent on it (`DRY_RUN=1` validates the queue first).
+
 ---
 
 ## Files in this pipeline
@@ -241,3 +248,4 @@ concurrent, 300 cores) exceeds 255 and evals will contend when they sync. Stay a
 | `{bnn,ensemble,mr,pt}_sweeps/sweep_antmaze_*.yaml` | Phase-2 W&B sweeps, generated (currently: seed 0 × normalize_reward 0–7) |
 | `tr_sweeps/sweep_antmaze_*.yaml` | Oracle task-reward baseline (`iql.py`, seeds 1–10, `normalize_reward: 1`) |
 | `{bnn,ensemble,mr,pt,tr}_sweeps/launch.sh` | Phase-2 launchers (W&B agents across GPUs) |
+| `stage4_queue.sh` | Runs Phase-2 sweeps one at a time on a GPU subset, in a given order |
