@@ -231,6 +231,9 @@ concurrent, 300 cores) exceeds 255 and evals will contend when they sync. Stay a
 > only the first 4, and the others never get an agent. On a partial GPU set, use
 > `./stage4_queue.sh "GPU_LIST" AGENTS_PER_GPU family:sweep …`, which runs one
 > sweep at a time with every agent on it (`DRY_RUN=1` validates the queue first).
+> Tag each item `@stage4` or `@eval` to assert its lineage: both lineages of a
+> sweep live in the **same file**, so an un-pulled box would otherwise launch the
+> wrong one.
 
 ---
 

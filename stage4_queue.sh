@@ -14,7 +14,11 @@
 #   GPU_LIST        space-separated GPU ids (quote it)
 #   AGENTS_PER_GPU  agents per GPU; concurrency x 25 eval cores must fit
 #                   alongside whatever else is on the box
-#   ITEM            <family>:<sweep>, family in bnn|ensemble|mr|pt|tr
+#   ITEM            <family>:<sweep>[@stage4|@eval], family in bnn|ensemble|mr|pt|tr
+#                   The optional @tag asserts the file's lineage (the GENERATED
+#                   header phase2_sweeps.py writes).  A stage-4 and an evaluation
+#                   sweep share ONE file name, so without the tag a box that has
+#                   not pulled would silently launch the wrong lineage.
 #
 # DRY_RUN=1 prints the plan and checks every sweep file exists, launching nothing.
 # A failed launch is logged and the queue moves on.
@@ -33,9 +37,22 @@ GPU_LIST="$1"; AGENTS_PER_GPU="$2"; shift 2
 
 # Validate the whole queue before launching anything.
 for item in "$@"; do
-  fam="${item%%:*}"; sw="${item#*:}"; sw="${sw%.yaml}"
+  fam="${item%%:*}"; sw="${item#*:}"; want=""
+  if [[ "$sw" == *@* ]]; then want="${sw##*@}"; sw="${sw%@*}"; fi
+  sw="${sw%.yaml}"
   if [[ ! -f "${fam}_sweeps/${sw}.yaml" || ! -x "${fam}_sweeps/launch.sh" ]]; then
     echo "ERROR: ${fam}_sweeps/${sw}.yaml or its launch.sh not found ($item)" >&2
+    exit 1
+  fi
+  case "$want" in
+    "")     ;;
+    stage4) pat="Lineage: STAGE 4" ;;
+    eval)   pat="Lineage: EVALUATION" ;;
+    *)      echo "ERROR: unknown lineage tag @$want ($item); use @stage4 or @eval" >&2; exit 1 ;;
+  esac
+  if [[ -n "$want" ]] && ! grep -q "$pat" "${fam}_sweeps/${sw}.yaml"; then
+    echo "ERROR: ${fam}_sweeps/${sw}.yaml is not in the @$want lineage ($item)." >&2
+    echo "       git pull, or regenerate with phase2_sweeps.py." >&2
     exit 1
   fi
 done
@@ -43,8 +60,8 @@ done
 n=0
 for item in "$@"; do
   n=$(( n + 1 ))
-  fam="${item%%:*}"; sw="${item#*:}"; sw="${sw%.yaml}"
-  echo "[$(date -u +%FT%TZ)] ($n/$#) START $fam $sw  gpus=\"$GPU_LIST\" x$AGENTS_PER_GPU"
+  fam="${item%%:*}"; sw="${item#*:}"; sw="${sw%@*}"; sw="${sw%.yaml}"
+  echo "[$(date -u +%FT%TZ)] ($n/$#) START $item  gpus=\"$GPU_LIST\" x$AGENTS_PER_GPU"
   if [[ "${DRY_RUN:-0}" == 1 ]]; then
     continue
   fi
