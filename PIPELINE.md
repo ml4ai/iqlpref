@@ -209,14 +209,21 @@ selection; only the seed lineage differs.
 against: no `reward_model_path`, so `iql.py` falls through to
 `d4rl.qlearning_dataset(env)` and uses the environment's own task reward.
 
-It sits outside the seed-0 selection story entirely — there is no reward model, so
-there is nothing to tune. `normalize_reward` is fixed at **1** (`r − 1`, the shift
-conventionally applied to the antmaze task reward), and it runs the evaluation
-lineage directly at **seeds 1–10**. It also stays on `iql.py`, not `iql_eval.py`,
-since no seed-derived model path is needed.
+**Changed 2026-10-07 (`gp_reward-priors/HANDOFF_HP_SELECTION.md` §4.3.157): the
+oracle gets a stage 4 too.** It was run at a fixed `normalize_reward` **1**
+(`r − 1`, the conventional shift) while every learned reward had its index
+selected on seed 0, so "a learned reward beats the oracle" was partly a statement
+about normalization selection. `phase2_sweeps.py` now generates the four
+`tr_sweeps` files as well: stage 4 at **seed 0 over indices 0–3**, then seeds 1–10
+at the winner. Indices 4–7 are omitted because, for a 0/1 reward whose minimum
+trajectory return is 0, they are identical to 2, 3, 2 and 3. The seeds 1–10
+sweeps at index 1 (`nv89vprk`, `9pbsrxod`, `xnafxwa2`, `ezttwir0`, 2026-08) stay
+valid and are re-used wherever index 1 wins. It stays on `iql.py`, not
+`iql_eval.py`, since no seed-derived model path is needed.
 
 ```bash
-./tr_sweeps/launch.sh all              # 4 sweeps × 10 seeds = 40 runs
+python phase2_sweeps.py stage4 --only tr_sweeps --write   # ONLY the oracle files
+./tr_sweeps/launch.sh all              # stage 4: 4 sweeps × 4 indices = 16 runs
 ```
 
 **Concurrency / CPU cap.** Every IQL run's evaluation uses `n_envs=25` CPU workers, so
@@ -247,8 +254,8 @@ concurrent, 300 cores) exceeds 255 and evals will contend when they sync. Stay a
 | `gp_reward-priors/train_rewards.sh` | Phase-1 launcher (GPU-packed, all variants × seeds 0–10) |
 | `algorithms/offline/iql_eval.py` | Phase-2 IQL, seed-derived `reward_model_root` (iql.py untouched) |
 | `configs/offline/iql/antmaze/<variant>.yaml` | IQL run config (`n_episodes`, `eval_freq`, `max_timesteps`) |
-| `phase2_sweeps.py` | **Generates** the 24 Phase-2 sweep files (stage-4 and evaluation lineages) from one spec; `check` audits them |
+| `phase2_sweeps.py` | **Generates** the 28 Phase-2 sweep files (24 learned-reward + 4 oracle) (stage-4 and evaluation lineages) from one spec; `check` audits them |
 | `{bnn,ensemble,mr,pt}_sweeps/sweep_antmaze_*.yaml` | Phase-2 W&B sweeps, generated (currently: seed 0 × normalize_reward 0–7) |
-| `tr_sweeps/sweep_antmaze_*.yaml` | Oracle task-reward baseline (`iql.py`, seeds 1–10, `normalize_reward: 1`) |
+| `tr_sweeps/sweep_antmaze_*.yaml` | Oracle task-reward baseline (`iql.py`), generated: stage 4 over indices 0–3, then seeds 1–10 |
 | `{bnn,ensemble,mr,pt,tr}_sweeps/launch.sh` | Phase-2 launchers (W&B agents across GPUs) |
 | `stage4_queue.sh` | Runs Phase-2 sweeps one at a time on a GPU subset, in a given order |
