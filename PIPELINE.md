@@ -203,6 +203,19 @@ to evaluation as their stage 4 finishes. The generated file sets
 each seed's reward model automatically. Reporting uses the identical statistic as
 selection; only the seed lineage differs.
 
+**Registering results.** As evaluation sweeps finish, from the repo root:
+
+```bash
+python phase2_sweeps.py register           # dry run: what would be registered, and why not
+python phase2_sweeps.py register --write   # rewrite the notebook's registry cells
+```
+
+It finds every evaluation sweep on W&B by an exact match on its parameters and
+writes it into `results/results_table.ipynb`'s `SWEEPS` only when seeds 1–10 have
+all finished at the stage-4 winning index in `phase2_winners.json`. A sweep at any
+other index, or two complete sweeps for one cell, is reported and not registered.
+The registry cells are generated: do not hand-edit them.
+
 ## Oracle baseline — `tr_sweeps` (task reward)
 
 `tr_sweeps` is the ground-truth reference the learned reward models are compared
