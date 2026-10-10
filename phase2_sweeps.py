@@ -333,13 +333,17 @@ def build_registry(found, sp):
     cell is a problem, never a silent pick."""
     reg = {dataset_of(n): {} for n in sp}
     notes, probs = {}, []
+    conventional, any_r1 = {}, False      # dataset -> the oracle's index-1 sweep
     for n in sp:
         reg[dataset_of(n)][method_of(n)] = None
         notes[(dataset_of(n), method_of(n))] = "no evaluation sweep yet"
     for name, sid, status, note in found:
         d, m = dataset_of(name), method_of(name)
+        if is_oracle(name) and status in ("REGISTER", "R1") \
+                and note.startswith(f"idx {ORACLE_CONVENTIONAL} "):
+            conventional[d] = sid
         if status == "R1":
-            m = ORACLE_R1[0]
+            m, any_r1 = ORACLE_R1[0], True
         if status in ("REGISTER", "R1"):
             if reg[d].get(m):
                 probs.append(f"{d} {m}: two complete sweeps, {reg[d][m]} and {sid}")
@@ -350,6 +354,14 @@ def build_registry(found, sp):
                 notes[(d, m)] = f"running: {sid}, {note}"
         else:
             probs.append(f"{name} {sid}: {note}")
+    # Once any variant's stage 4 picked a non-conventional index, the r - 1
+    # column exists.  It then shows the index-1 sweep for EVERY variant, including
+    # those where index 1 also won, so the column is the conventional oracle
+    # throughout and never a mix of blanks.
+    if any_r1:
+        for d, sid in conventional.items():
+            reg[d][ORACLE_R1[0]] = sid
+            notes[(d, ORACLE_R1[0])] = f"idx {ORACLE_CONVENTIONAL} (conventional)"
     return reg, notes, probs
 
 
@@ -551,6 +563,17 @@ def selftest():
     assert ns["SWEEPS"][L]["BNN_CVAR"] == "aaa" and ns["SWEEPS"][L]["MR"] is None
     assert len(ns["SWEEPS"]) == 4 and len(ns["METHOD_COLUMNS"]) == 8   # 7 + r1
     assert ns["METHOD_COLUMNS"][1][0] == "task_reward_r1"
+    # the r - 1 column, once present, is filled for a variant where index 1 WON too
+    om = "tr_sweeps/sweep_antmaze_medium_play"
+    reg3, notes3, _ = build_registry(
+        [(o, "ooo", "R1", "idx 1 (conventional; stage 4 picked 2)"),
+         (om, "ppp", "REGISTER", "idx 1 (stage-4 winner)")], sp)
+    M = "antmaze-medium-play-v2"
+    assert reg3[M]["task_reward"] == "ppp" and reg3[M]["task_reward_r1"] == "ppp"
+    assert reg3[L]["task_reward"] is None and reg3[L]["task_reward_r1"] == "ooo"
+    # ... and absent when no variant changed index
+    reg4, _, _ = build_registry([(om, "ppp", "REGISTER", "idx 1 (stage-4 winner)")], sp)
+    assert not reg4[M].get("task_reward_r1")
     reg2, notes2, _ = build_registry([(b, "aaa", "REGISTER", "idx 3")], sp)
     exec(registry_cell(reg2, notes2), ns)
     assert len(ns["METHOD_COLUMNS"]) == 7                              # no r1 column
