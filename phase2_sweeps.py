@@ -267,9 +267,13 @@ def cmd_winners(sweep_ids, sp, out):
 # ---------------------------------------------------------------------------
 NOTEBOOK = os.path.join("results", "results_table.ipynb")
 REGISTRY_CELL, REGISTRY_DOC_CELL = "732f3aed", "cbfd8e4d"     # notebook cell ids
+ORACLE_DOC_CELL, ORACLE_CODE_CELL = "0c1e5e1a", "0c1e5e1b"   # appended at the end
 ORACLE_CONVENTIONAL = 1                    # r - 1, the index the oracle ran at
 TOTAL_STEPS = 1_000_000
 # (method key, (column group, subheader)) in table order.  Labels are the user's.
+# The oracle column is the STAGE-4-SELECTED index only (user, 2026-10-10); the
+# conventional r - 1 sweeps go to ORACLE_CONVENTIONAL and the end-of-notebook
+# comparison, never into the main tables or charts.
 COLUMNS = [
     ("task_reward", ("IQL with task reward", "")),
     ("MR", ("IQL with preference learning", "MR")),
@@ -279,7 +283,6 @@ COLUMNS = [
     ("BNN_MEAN", ("IQL with preference learning", "BNN w/ MEAN")),
     ("BNN_CVAR", ("IQL with preference learning", "BNN w/ CVaR")),
 ]
-ORACLE_R1 = ("task_reward_r1", ("IQL with task reward", "r - 1 (conventional)"))
 
 
 def method_of(name):
@@ -305,7 +308,8 @@ def classify(name, index, complete, n_done, winners):
 
     REGISTER   complete, and at the stage-4 winning index
     R1         oracle only: complete at the conventional index when stage 4
-               picked another one (reported beside the selected index, §4.3.157)
+               picked another one.  Kept OUT of the main table; it feeds the
+               winning-vs-conventional comparison (§4.3.157, §4.3.165)
     PENDING    right index, not all 10 seeds finished yet
     REJECT     wrong index, or no stage-4 winner on record
     """
@@ -313,7 +317,9 @@ def classify(name, index, complete, n_done, winners):
     if is_oracle(name) and win is None:
         if index != ORACLE_CONVENTIONAL:
             return "REJECT", f"idx {index} but oracle stage 4 has no winner yet"
-        note = f"idx {index} (conventional; oracle stage 4 pending)"
+        # Not a winner until stage 4 says so: hold it as the conventional sweep.
+        return (("R1", f"idx {index} (conventional; oracle stage 4 pending)")
+                if complete else ("PENDING", f"idx {index}, {n_done}/10 seeds"))
     elif win is None:
         return "REJECT", f"idx {index} but no stage-4 winner on record"
     elif index == win:
@@ -327,13 +333,15 @@ def classify(name, index, complete, n_done, winners):
 
 
 def build_registry(found, sp):
-    """found: [(name, sweep_id, status, note)].  -> (registry, notes, problems).
+    """found: [(name, sweep_id, status, note)].
+    -> (registry, notes, problems, conventional).
 
-    registry[dataset][method] = sweep_id or None.  Two complete sweeps for one
-    cell is a problem, never a silent pick."""
+    registry[dataset][method] = sweep_id or None: the main table, in which the
+    oracle cell is the stage-4-selected index ONLY.  conventional[dataset] = the
+    oracle's complete index-1 sweep, whether or not index 1 also won.  Two
+    complete sweeps for one cell is a problem, never a silent pick."""
     reg = {dataset_of(n): {} for n in sp}
-    notes, probs = {}, []
-    conventional, any_r1 = {}, False      # dataset -> the oracle's index-1 sweep
+    notes, probs, conventional = {}, [], {}
     for n in sp:
         reg[dataset_of(n)][method_of(n)] = None
         notes[(dataset_of(n), method_of(n))] = "no evaluation sweep yet"
@@ -341,10 +349,16 @@ def build_registry(found, sp):
         d, m = dataset_of(name), method_of(name)
         if is_oracle(name) and status in ("REGISTER", "R1") \
                 and note.startswith(f"idx {ORACLE_CONVENTIONAL} "):
-            conventional[d] = sid
-        if status == "R1":
-            m, any_r1 = ORACLE_R1[0], True
-        if status in ("REGISTER", "R1"):
+            if conventional.get(d):
+                probs.append(f"{d}: two complete index-{ORACLE_CONVENTIONAL} oracle "
+                             f"sweeps, {conventional[d]} and {sid}")
+            else:
+                conventional[d] = sid
+        if status == "R1":                 # never in the main table
+            if not reg[d].get(m):
+                notes[(d, m)] = f"winning-index sweep not there yet; {sid} is {note}"
+            continue
+        if status == "REGISTER":
             if reg[d].get(m):
                 probs.append(f"{d} {m}: two complete sweeps, {reg[d][m]} and {sid}")
                 continue
@@ -354,21 +368,12 @@ def build_registry(found, sp):
                 notes[(d, m)] = f"running: {sid}, {note}"
         else:
             probs.append(f"{name} {sid}: {note}")
-    # Once any variant's stage 4 picked a non-conventional index, the r - 1
-    # column exists.  It then shows the index-1 sweep for EVERY variant, including
-    # those where index 1 also won, so the column is the conventional oracle
-    # throughout and never a mix of blanks.
-    if any_r1:
-        for d, sid in conventional.items():
-            reg[d][ORACLE_R1[0]] = sid
-            notes[(d, ORACLE_R1[0])] = f"idx {ORACLE_CONVENTIONAL} (conventional)"
-    return reg, notes, probs
+    return reg, notes, probs, conventional
 
 
-def registry_cell(reg, notes):
+def registry_cell(reg, notes, conventional=None, oracle_index=None):
     """Source of the notebook's registry code cell."""
-    use_r1 = any(v.get(ORACLE_R1[0]) for v in reg.values())
-    cols = COLUMNS[:1] + ([ORACLE_R1] if use_r1 else []) + COLUMNS[1:]
+    conventional, oracle_index = conventional or {}, oracle_index or {}
     out = ["# GENERATED by `phase2_sweeps.py register --write` (run from the repo root).",
            "# Do not hand-edit: re-run it.  A sweep is registered only when it is",
            "# COMPLETE (seeds 1-10 all finished) at the stage-4 winning index.",
@@ -376,7 +381,7 @@ def registry_cell(reg, notes):
            "SWEEPS = {"]
     for d in reg:
         out.append(f'    "{d}": {{')
-        for m, _ in cols:
+        for m, _ in COLUMNS:
             sid = reg[d].get(m)
             val = f'"{sid}"' if sid else "None"
             out.append(f'        "{m}": {val},  # {notes.get((d, m), "")}')
@@ -384,8 +389,20 @@ def registry_cell(reg, notes):
     out += ["}", "",
             "# (method_key, (column group, column subheader)): table layout and order.",
             "METHOD_COLUMNS = ["]
-    out += [f'    ("{m}", ("{g}", "{s}")),' for m, (g, s) in cols]
-    out.append("]")
+    out += [f'    ("{m}", ("{g}", "{s}")),' for m, (g, s) in COLUMNS]
+    out += ["]", "",
+            "# The oracle (task reward).  The tables and charts above use the stage-4",
+            "# WINNING index only (SWEEPS[...][\"task_reward\"]).  These two feed the",
+            "# winning-vs-conventional comparison at the end of the notebook:",
+            "#   ORACLE_INDEX         the stage-4 winning index (None = stage 4 not done)",
+            f"#   ORACLE_CONVENTIONAL  the sweep at the conventional index {ORACLE_CONVENTIONAL} (r - 1)",
+            "ORACLE_INDEX = {"]
+    out += [f'    "{d}": {oracle_index.get(d)!r},' for d in reg]
+    out += ["}", "ORACLE_CONVENTIONAL = {"]
+    for d in reg:
+        sid = conventional.get(d)
+        out.append(f'    "{d}": ' + (f'"{sid}"' if sid else "None") + ",")
+    out.append("}")
     return "\n".join(out)
 
 
@@ -401,6 +418,9 @@ def registry_doc(reg, notes, probs):
            "registers it only when all of seeds 1-10 have finished at the stage-4",
            "winning index (`gp_reward-priors/HANDOFF_HP_SELECTION.md` §6).",
            "Unregistered cells render blank.", "",
+           "**The task-reward (oracle) column is the stage-4 winning index only.**",
+           "Where that differs from the conventional `r - 1`, the two are compared",
+           "in the last section of this notebook, not in the main tables.", "",
            f"**{done} of {len(reg) * len(COLUMNS)} cells registered.**"]
     if todo:
         txt += ["", "Not yet registered:", ""] + todo
@@ -410,9 +430,129 @@ def registry_doc(reg, notes, probs):
     return "\n".join(txt)
 
 
+ORACLE_DOC = """# Oracle: winning index vs the conventional index
+
+Every learned reward had its `normalize_reward` index selected on seed 0 (stage
+4). The oracle was given the same stage 4, over the four transformations that are
+distinct for a 0/1 reward (indices 0-3), so the tables above compare like with
+like: **they show the oracle at its stage-4 winning index only.**
+
+The convention for the antmaze task reward is index 1 (`r - 1`). Where stage 4
+picked a different index, this section compares the two on the same seeds 1-10.
+Variants where index 1 won are listed, not plotted: there the winning and the
+conventional oracle are the same sweep."""
+
+ORACLE_CODE = """# Oracle: stage-4 winning index vs the conventional index 1 (r - 1).
+# Uses SWEEPS / ORACLE_INDEX / ORACLE_CONVENTIONAL from the registry cell and
+# fetch_run_scores / summarize / fmt from the cells above.
+oracle_cmp, oracle_status = {}, []
+for dataset in SWEEPS:
+    sel = SWEEPS[dataset].get("task_reward")
+    conv = ORACLE_CONVENTIONAL.get(dataset)
+    idx = ORACLE_INDEX.get(dataset)
+    if idx is None:
+        oracle_status.append((dataset, "stage 4 not finished"))
+    elif idx == 1:
+        oracle_status.append((dataset, "index 1 won: winning = conventional"))
+    elif not sel:
+        oracle_status.append((dataset, f"index {idx} won; its seeds 1-10 sweep is not complete yet"))
+    elif not conv:
+        oracle_status.append((dataset, f"index {idx} won; no conventional sweep registered"))
+    else:
+        p_sel, r_sel, _ = fetch_run_scores(sel, verbose=False)
+        p_conv, r_conv, _ = fetch_run_scores(conv, verbose=False)
+        oracle_cmp[dataset] = {
+            "index": idx,
+            "winning": summarize(p_sel), "conventional": summarize(p_conv),
+            "winning_robust": summarize(r_sel), "conventional_robust": summarize(r_conv),
+        }
+        oracle_status.append((dataset, f"index {idx} won: compared below"))
+
+for dataset, status in oracle_status:
+    print(f"{dataset:28s} {status}")
+
+if not oracle_cmp:
+    print("\\nNothing to compare yet.")
+else:
+    oracle_table = pd.DataFrame(
+        {
+            dataset: {
+                "winning index": c["index"],
+                f"winning (last-{LAST_N})": fmt(c["winning"]),
+                f"conventional r - 1 (last-{LAST_N})": fmt(c["conventional"]),
+                "difference of means": round(c["winning"]["mean"] - c["conventional"]["mean"], 2),
+                f"winning (last-{ROBUST_N})": fmt(c["winning_robust"]),
+                f"conventional r - 1 (last-{ROBUST_N})": fmt(c["conventional_robust"]),
+            }
+            for dataset, c in oracle_cmp.items()
+        }
+    ).T
+    oracle_table.index.name = "Dataset"
+    display(oracle_table)
+
+    # Box-and-whisker with the per-seed scores as dots and the mean as an x,
+    # in the style of plot_box above.
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+
+    cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    colors = {"winning": cycle[0], "conventional": cycle[1]}
+    names = list(oracle_cmp)
+    rng = np.random.default_rng(0)
+    width = 0.34
+    fig, ax = plt.subplots(figsize=(max(5.0, 2.6 * len(names) + 2.0), 5))
+    for i, dataset in enumerate(names):
+        for key, off in (("winning", -width / 2), ("conventional", width / 2)):
+            vals = np.asarray(oracle_cmp[dataset][key]["values"], dtype=float)
+            bp = ax.boxplot(
+                [vals], positions=[i + off], widths=width * 0.85, patch_artist=True,
+                showfliers=False, showmeans=True,
+                meanprops=dict(marker="x", markeredgecolor="black", markersize=9,
+                               markeredgewidth=2),
+                medianprops=dict(color="black"),
+            )
+            bp["boxes"][0].set_facecolor(colors[key])
+            bp["boxes"][0].set_alpha(0.35)
+            bp["boxes"][0].set_edgecolor(colors[key])
+            ax.scatter(i + off + rng.uniform(-0.04, 0.04, size=len(vals)), vals,
+                       color=colors[key], edgecolor="white", linewidth=0.5, s=28, zorder=3)
+    ax.set_xticks(range(len(names)))
+    ax.set_xticklabels(
+        [f"{d}\\n(winning index {oracle_cmp[d]['index']})" for d in names]
+    )
+    ax.set_xlim(-0.6, len(names) - 0.4)
+    ax.set_ylabel(f"Score (last-{LAST_N} mean of mean_score × 100)")
+    ax.set_title("Oracle (task reward): stage-4 winning index vs conventional r - 1")
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(
+        handles=[
+            Patch(facecolor=colors["winning"], alpha=0.35, edgecolor=colors["winning"],
+                  label="winning index (used in the tables above)"),
+            Patch(facecolor=colors["conventional"], alpha=0.35,
+                  edgecolor=colors["conventional"], label="conventional index 1 (r - 1)"),
+            Line2D([], [], marker="x", color="black", linestyle="none", label="mean"),
+        ]
+    )
+    fig.tight_layout()
+    plt.show()"""
+
+
 def _as_source(text):
     lines = text.split("\n")
     return [l + "\n" for l in lines[:-1]] + [lines[-1]]
+
+
+def ensure_cell(nb, cell_id, cell_type, text):
+    """Set the source of the cell with this id, appending it at the END of the
+    notebook if it does not exist yet."""
+    for c in nb["cells"]:
+        if c.get("id") == cell_id:
+            c["source"] = _as_source(text)
+            return
+    cell = {"cell_type": cell_type, "id": cell_id, "metadata": {}, "source": _as_source(text)}
+    if cell_type == "code":
+        cell.update(execution_count=None, outputs=[])
+    nb["cells"].append(cell)
 
 
 def cmd_register(sp, winners_path, do_write, notebook=NOTEBOOK):
@@ -438,12 +578,14 @@ def cmd_register(sp, winners_path, do_write, notebook=NOTEBOOK):
         complete = done == EVAL_SEEDS and len(runs) == len(EVAL_SEEDS)
         index = flat(params)["normalize_reward"]
         found.append((name, sw.id) + classify(name, index, complete, len(done), winners))
-    reg, notes, probs = build_registry(found, sp)
+    reg, notes, probs, conventional = build_registry(found, sp)
+    oracle_index = {dataset_of(n): winners.get(n) for n in sp if is_oracle(n)}
     for d in reg:
         print(f"  {d}")
-        for m in [c[0] for c in COLUMNS] + [ORACLE_R1[0]]:
-            if m != ORACLE_R1[0] or reg[d].get(m):
-                print(f"    {m:15s} {str(reg[d].get(m)):10s} {notes.get((d, m), '')}")
+        for m, _ in COLUMNS:
+            print(f"    {m:15s} {str(reg[d].get(m)):10s} {notes.get((d, m), '')}")
+        print(f"    {'(oracle r - 1)':15s} {str(conventional.get(d)):10s} "
+              f"stage-4 winning index: {oracle_index.get(d)}")
     for x in probs:
         print(f"  !! {x}")
     path = os.path.join(ROOT, notebook)
@@ -452,15 +594,18 @@ def cmd_register(sp, winners_path, do_write, notebook=NOTEBOOK):
     cells = {c.get("id"): c for c in nb["cells"]}
     if REGISTRY_CELL not in cells or REGISTRY_DOC_CELL not in cells:
         sys.exit(f"{notebook}: registry cells {REGISTRY_CELL}/{REGISTRY_DOC_CELL} not found")
-    cells[REGISTRY_CELL]["source"] = _as_source(registry_cell(reg, notes))
+    cells[REGISTRY_CELL]["source"] = _as_source(
+        registry_cell(reg, notes, conventional, oracle_index))
     cells[REGISTRY_DOC_CELL]["source"] = _as_source(registry_doc(reg, notes, probs))
+    ensure_cell(nb, ORACLE_DOC_CELL, "markdown", ORACLE_DOC)
+    ensure_cell(nb, ORACLE_CODE_CELL, "code", ORACLE_CODE)
     new = json.dumps(nb, indent=1, ensure_ascii=False) + "\n"
     n_reg = sum(1 for d in reg for m in reg[d] if reg[d][m])
     state = "unchanged" if new == raw else "CHANGED"
     if do_write and new != raw:
         open(path, "w").write(new)
         state += " (written)"
-    print(f"\n  {n_reg} sweep(s) registered; {notebook} {state}"
+    print(f"\n  {n_reg} of {len(reg) * len(COLUMNS)} cells registered; {notebook} {state}"
           f"{'' if do_write else ' (dry run; --write to apply)'}")
     return 1 if probs else 0
 
@@ -544,42 +689,58 @@ def selftest():
     assert classify(b, 3, False, 6, W)[0] == "PENDING"
     assert classify(b, 2, True, 10, W)[0] == "REJECT"           # not the winner
     assert classify(b, 3, True, 10, {})[0] == "REJECT"          # no winner on record
-    assert classify(o, 1, True, 10, {})[0] == "REGISTER"        # oracle, stage 4 pending
+    assert classify(o, 1, True, 10, {})[0] == "R1"       # stage 4 pending: not a winner yet
     assert classify(o, 2, True, 10, {})[0] == "REJECT"
     assert classify(o, 1, True, 10, {o: 1})[0] == "REGISTER"
     assert classify(o, 1, True, 10, {o: 2})[0] == "R1"          # kept as conventional
     assert classify(o, 2, True, 10, {o: 2})[0] == "REGISTER"
     assert classify(o, 3, True, 10, {o: 2})[0] == "REJECT"
-    reg, notes, probs = build_registry(
-        [(b, "aaa", "REGISTER", "idx 3"), (o, "ooo", "R1", "idx 1"),
-         (o, "nnn", "REGISTER", "idx 2"),
-         ("mr_sweeps/sweep_antmaze_large_play", "mmm", "PENDING", "idx 3, 4/10 seeds")], sp)
-    L = "antmaze-large-play-v2"
-    assert reg[L]["BNN_CVAR"] == "aaa" and reg[L]["task_reward"] == "nnn"
-    assert reg[L]["task_reward_r1"] == "ooo" and reg[L]["MR"] is None and not probs
-    assert "running: mmm" in notes[(L, "MR")]
-    ns = {}
-    exec(registry_cell(reg, notes), ns)                 # the cell is valid Python
-    assert ns["SWEEPS"][L]["BNN_CVAR"] == "aaa" and ns["SWEEPS"][L]["MR"] is None
-    assert len(ns["SWEEPS"]) == 4 and len(ns["METHOD_COLUMNS"]) == 8   # 7 + r1
-    assert ns["METHOD_COLUMNS"][1][0] == "task_reward_r1"
-    # the r - 1 column, once present, is filled for a variant where index 1 WON too
+    L, M = "antmaze-large-play-v2", "antmaze-medium-play-v2"
     om = "tr_sweeps/sweep_antmaze_medium_play"
-    reg3, notes3, _ = build_registry(
-        [(o, "ooo", "R1", "idx 1 (conventional; stage 4 picked 2)"),
-         (om, "ppp", "REGISTER", "idx 1 (stage-4 winner)")], sp)
-    M = "antmaze-medium-play-v2"
-    assert reg3[M]["task_reward"] == "ppp" and reg3[M]["task_reward_r1"] == "ppp"
-    assert reg3[L]["task_reward"] is None and reg3[L]["task_reward_r1"] == "ooo"
-    # ... and absent when no variant changed index
-    reg4, _, _ = build_registry([(om, "ppp", "REGISTER", "idx 1 (stage-4 winner)")], sp)
-    assert not reg4[M].get("task_reward_r1")
-    reg2, notes2, _ = build_registry([(b, "aaa", "REGISTER", "idx 3")], sp)
-    exec(registry_cell(reg2, notes2), ns)
-    assert len(ns["METHOD_COLUMNS"]) == 7                              # no r1 column
-    _, _, probs = build_registry([(b, "aaa", "REGISTER", ""), (b, "bbb", "REGISTER", "")], sp)
+    # large_play: stage 4 picked 2 and both sweeps are complete; medium_play: index 1 won
+    reg, notes, probs, conv = build_registry(
+        [(b, "aaa", "REGISTER", "idx 3 (stage-4 winner)"),
+         (o, "ooo", "R1", "idx 1 (conventional; stage 4 picked 2)"),
+         (o, "nnn", "REGISTER", "idx 2 (stage-4 winner)"),
+         (om, "ppp", "REGISTER", "idx 1 (stage-4 winner)"),
+         ("mr_sweeps/sweep_antmaze_large_play", "mmm", "PENDING", "idx 3, 4/10 seeds")], sp)
+    assert not probs
+    assert reg[L]["BNN_CVAR"] == "aaa" and reg[L]["MR"] is None
+    assert "running: mmm" in notes[(L, "MR")]
+    # the main table carries the WINNING index only; index 1 never enters it
+    assert reg[L]["task_reward"] == "nnn" and reg[M]["task_reward"] == "ppp"
+    assert all("task_reward_r1" not in v for v in reg.values())
+    assert conv == {L: "ooo", M: "ppp"}                # index-1 sweeps, both variants
+    ns = {}
+    exec(registry_cell(reg, notes, conv, {L: 2, M: 1}), ns)      # valid Python
+    assert ns["SWEEPS"][L]["task_reward"] == "nnn" and ns["SWEEPS"][L]["MR"] is None
+    assert len(ns["SWEEPS"]) == 4 and len(ns["METHOD_COLUMNS"]) == 7   # never an r1 column
+    assert [m for m, _ in ns["METHOD_COLUMNS"]].count("task_reward") == 1
+    assert ns["ORACLE_CONVENTIONAL"][L] == "ooo" and ns["ORACLE_CONVENTIONAL"][M] == "ppp"
+    assert ns["ORACLE_INDEX"][L] == 2 and ns["ORACLE_INDEX"][M] == 1
+    assert ns["ORACLE_INDEX"]["antmaze-large-diverse-v2"] is None
+    # winning index picked but its sweep not complete: the main cell is BLANK,
+    # the conventional sweep is still available for the comparison section
+    reg5, _, _, conv5 = build_registry(
+        [(o, "ooo", "R1", "idx 1 (conventional; stage 4 picked 3)")], sp)
+    assert reg5[L]["task_reward"] is None and conv5 == {L: "ooo"}
+    # oracle stage 4 still pending: the index-1 sweep is NOT in the main table
+    reg6, notes6, _, conv6 = build_registry(
+        [(o,) + ("ooo",) + classify(o, 1, True, 10, {})], sp)
+    assert reg6[L]["task_reward"] is None and conv6 == {L: "ooo"}
+    assert "ooo" in notes6[(L, "task_reward")]
+    _, _, probs, _ = build_registry(
+        [(b, "aaa", "REGISTER", ""), (b, "bbb", "REGISTER", "")], sp)
     assert probs and "two complete sweeps" in probs[0]
     assert _as_source("a\nb") == ["a\n", "b"]
+    compile(ORACLE_CODE, "<oracle cell>", "exec")               # the cell parses
+    nbt = {"cells": [{"id": "x", "cell_type": "code", "source": []}]}
+    ensure_cell(nbt, ORACLE_DOC_CELL, "markdown", "a\nb")
+    ensure_cell(nbt, ORACLE_CODE_CELL, "code", "c")
+    ensure_cell(nbt, ORACLE_CODE_CELL, "code", "d")              # update, not a 2nd copy
+    assert [c["id"] for c in nbt["cells"]] == ["x", ORACLE_DOC_CELL, ORACLE_CODE_CELL]
+    assert nbt["cells"][-1]["source"] == ["d"] and nbt["cells"][-1]["outputs"] == []
+    assert "outputs" not in nbt["cells"][1]
     print("selftest OK")
     return 0
 
