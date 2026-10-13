@@ -14,7 +14,11 @@
 #   GPU_LIST        space-separated GPU ids (quote it)
 #   AGENTS_PER_GPU  agents per GPU; concurrency x 25 eval cores must fit
 #                   alongside whatever else is on the box
-#   ITEM            <family>:<sweep>[@stage4|@eval], family in bnn|ensemble|mr|pt|tr
+#   ITEM            <family>:<sweep>[@stage4|@eval|@<cond>], family in bnn|ensemble|mr|pt|tr
+#                   An experiment condition's sweeps live one directory down:
+#                   bnn:r32/sweep_antmaze_large_play_cvar@r32 is
+#                   bnn_sweeps/r32/sweep_antmaze_large_play_cvar.yaml, and @r32
+#                   asserts its header says "Lineage: EXPERIMENT r32,".
 #                   The optional @tag asserts the file's lineage (the GENERATED
 #                   header phase2_sweeps.py writes).  A stage-4 and an evaluation
 #                   sweep share ONE file name, so without the tag a box that has
@@ -48,7 +52,8 @@ for item in "$@"; do
     "")     ;;
     stage4) pat="Lineage: STAGE 4" ;;
     eval)   pat="Lineage: EVALUATION" ;;
-    *)      echo "ERROR: unknown lineage tag @$want ($item); use @stage4 or @eval" >&2; exit 1 ;;
+    r[0-9]*|n[0-9]*) pat="Lineage: EXPERIMENT ${want}," ;;
+    *)      echo "ERROR: unknown lineage tag @$want ($item); use @stage4, @eval or @<cond>" >&2; exit 1 ;;
   esac
   if [[ -n "$want" ]] && ! grep -q "$pat" "${fam}_sweeps/${sw}.yaml"; then
     echo "ERROR: ${fam}_sweeps/${sw}.yaml is not in the @$want lineage ($item)." >&2
@@ -65,7 +70,11 @@ for item in "$@"; do
   if [[ "${DRY_RUN:-0}" == 1 ]]; then
     continue
   fi
-  if "./${fam}_sweeps/launch.sh" "$sw" "$GPU_LIST" "$AGENTS_PER_GPU"; then
+  # A sweep in a sub-directory is handed over by its full path: launch.sh only
+  # prefixes <family>_sweeps/ to a name that has no slash in it.
+  arg="$sw"
+  [[ "$sw" == */* ]] && arg="${fam}_sweeps/${sw}.yaml"
+  if "./${fam}_sweeps/launch.sh" "$arg" "$GPU_LIST" "$AGENTS_PER_GPU"; then
     echo "[$(date -u +%FT%TZ)] ($n/$#) DONE  $fam $sw"
   else
     echo "[$(date -u +%FT%TZ)] ($n/$#) FAILED $fam $sw (exit $?) -- continuing" >&2
