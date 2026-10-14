@@ -1,9 +1,21 @@
 #!/usr/bin/env python
-"""exp_readout.py -- the REGISTERED reading of Experiment 1 (data sparsity).
+"""exp_readout.py -- the REGISTERED reading of Experiments 1 and 2 (H1).
 
-Implements gp_reward-priors/HANDOFF_HP_SELECTION.md §13.9 (fixed 2026-10-14, by
-the user, before any sparsity result existed) and Chapter 3's H1 and Statistical
-and Reporting Protocol.  Nothing here is a free choice.
+Implements gp_reward-priors/HANDOFF_HP_SELECTION.md §13.9 (sparsity axis) and
+§13.11 (label-noise axis), both fixed by the user on 2026-10-14 before any
+result of either experiment existed, and Chapter 3's H1 and Statistical and
+Reporting Protocol.  Nothing here is a free choice.  One verdict per axis; no
+verdict pools the two (§13.11).
+
+THE NOISE AXIS (§13.11) is the sparsity rule below with three substitutions:
+  levels     flip fraction p in {0.1, 0.2, 0.3, 0.4, 0.45}, PRIMARY arm (training
+             and test labels flipped, validation clean); the anchor is p = 0
+  H1a        u = mean of d over the five flip fractions (anchor excluded)
+  H1b        u = OLS slope of d on p ITSELF (linear) over all six points; H1
+             predicts a POSITIVE slope (the gap grows as p rises)
+  The sensitivity arm is descriptive only and is not read here.
+
+Run with --axis sparsity (default) or --axis noise.
 
 THE RULE (§13.9)
   statistic    last-10 mean, results/iql_score.py, all 200 points (as §12)
@@ -79,12 +91,37 @@ COMPARATORS = ("MR", "PT", "BNN_MEAN")                      # Chapter 3, H1
 DESCRIPTIVE = ("ENS_CVAR", "ENS_MEAN")
 LEVELS = ("r16", "r32", "r64", "r128")
 SPARSE_PAIRS = {"r16": 16, "r32": 32, "r64": 64, "r128": 128}
+NOISE_LEVELS = ("n01", "n02", "n03", "n04", "n045")
+FLIP = {"n01": 0.1, "n02": 0.2, "n03": 0.3, "n04": 0.4, "n045": 0.45}
 FULL = "full"                                                # the anchor
 VARIANTS = ("medium-play", "medium-diverse", "large-play", "large-diverse")
 # The anchor's training set is the whole train-pool; identical for every seed of
 # a variant (handoff §13.1).
 TRAIN_POOL = {"medium-play": 358, "medium-diverse": 498, "large-play": 254, "large-diverse": 514}
 SCORE_LATTICE = 0.001               # a last-10 mean of 100-episode success rates
+
+
+def _x_sparsity(variant, level):
+    return math.log2(TRAIN_POOL[variant] if level == FULL else SPARSE_PAIRS[level])
+
+
+def _x_noise(variant, level):
+    return 0.0 if level == FULL else FLIP[level]
+
+
+# What differs between the two axes.  "widen" is H1b's one-sided direction.
+AXES = {
+    "sparsity": {"levels": LEVELS, "x": _x_sparsity, "widen": "less", "section": "§13.9",
+                 "title": "EXPERIMENT 1 -- data sparsity",
+                 "levels_text": "16, 32, 64, 128 pairs + the full train-pool",
+                 "gap_text": "mean over 16-128",
+                 "slope_text": "slope per doubling of pairs, < 0 widens"},
+    "noise": {"levels": NOISE_LEVELS, "x": _x_noise, "widen": "greater", "section": "§13.11",
+              "title": "EXPERIMENT 2 -- label noise, primary arm",
+              "levels_text": "flip fraction 0.1, 0.2, 0.3, 0.4, 0.45 + the clean anchor (p = 0)",
+              "gap_text": "mean over p 0.1-0.45",
+              "slope_text": "slope per unit flip fraction, > 0 widens"},
+}
 
 
 # --------------------------------------------------------------------------
@@ -196,14 +233,14 @@ def _short(dataset):
     return dataset.replace("antmaze-", "").replace("-v2", "")
 
 
-def collect_exp(api, P, winners):
+def collect_exp(api, P, winners, axis="sparsity"):
     """{(variant, method, level): cell} for every experiment sweep at the
     anchor's stage-4 index.  Cells are built exactly as §12's are."""
     import iql_score
     sp = P.spec()
     E = P._conditions()
     by_params = {}
-    for cond in LEVELS:
+    for cond in AXES[axis]["levels"]:
         for name, (anchor, fixed) in P.exp_spec(sp, cond, E).items():
             by_params[name] = (cond, anchor, fixed)
     expsp = {n: f for n, (_, _, f) in by_params.items()}
@@ -270,33 +307,35 @@ def pairs_of(variant, level):
     return TRAIN_POOL[variant] if level == FULL else SPARSE_PAIRS[level]
 
 
-def units_for(cells, comp):
+def units_for(cells, comp, axis="sparsity"):
     """{variant: {"gap": [10], "slope": [10]}}, or the reason it cannot be read."""
+    ax = AXES[axis]
+    levels = ax["levels"]
     out = {}
     for v in VARIANTS:
         gap, slope = [], []
         for s in SEEDS:
             ds, xs = [], []
-            for lv in LEVELS + (FULL,):
+            for lv in levels + (FULL,):
                 a, b = cells.get((v, PROPOSED, lv)), cells.get((v, comp, lv))
                 why = R.cell_ready(a) or R.cell_ready(b)
                 if why:
                     who = PROPOSED if R.cell_ready(a) else comp
                     return None, f"{v} {lv} {who}: {why}"
                 ds.append(a["scores"][s] - b["scores"][s])
-                xs.append(math.log2(pairs_of(v, lv)))
-            gap.append(float(np.mean(ds[:len(LEVELS)])))          # sparse levels only
+                xs.append(ax["x"](v, lv))
+            gap.append(float(np.mean(ds[:len(levels)])))          # altered levels only
             slope.append(ols_slope(xs, ds))                        # all five levels
         out[v] = {"gap": gap, "slope": slope}
     return out, None
 
 
-def h1_for(units):
+def h1_for(units, axis="sparsity"):
     gap = [x for v in VARIANTS for x in units[v]["gap"]]
     slope = [x for v in VARIANTS for x in units[v]["slope"]]
     t_gap = signed_rank_exact(gap, "greater")
-    t_slope = signed_rank_exact(slope, "less")
-    dg, exact_g = unit_delta(gap, SCORE_LATTICE / len(LEVELS))
+    t_slope = signed_rank_exact(slope, AXES[axis]["widen"])
+    dg, exact_g = unit_delta(gap, SCORE_LATTICE / len(AXES[axis]["levels"]))
     e_gap = stratified_exact([units[v]["gap"] for v in VARIANTS], dg)
     e_slope = stratified_exact([units[v]["slope"] for v in VARIANTS], 1e-6)
     a_ok, b_ok = t_gap["p"] < ALPHA, t_slope["p"] < ALPHA
@@ -320,12 +359,14 @@ def checks(e):
     return bad
 
 
-def report(cells, notes, out=print):
+def report(cells, notes, out=print, axis="sparsity"):
+    ax = AXES[axis]
+    levels = ax["levels"]
     problems = 0
     out("=" * 100)
-    out("EXPERIMENT 1 READOUT (§13.9) -- data sparsity: BNN CVaR against MR, PT and the BNN mean")
-    out(f"levels {', '.join(str(SPARSE_PAIRS[l]) for l in LEVELS)} pairs + the full train-pool; "
-        f"one-sided Wilcoxon at {ALPHA}, 40 (variant, seed) units; exact stratified bootstrap")
+    out(f"{ax['title']} READOUT ({ax['section']}): BNN CVaR against MR, PT and the BNN mean")
+    out(f"levels {ax['levels_text']}; one-sided Wilcoxon at {ALPHA}, 40 (variant, seed) units; "
+        f"exact stratified bootstrap.  One verdict for this axis; none pools the two axes.")
     out("=" * 100)
     for n in notes:
         out(f"  note: {n}")
@@ -333,13 +374,13 @@ def report(cells, notes, out=print):
     out("\nA. H1, PER COMPARATOR  (SUPPORTED needs the gap AND its widening; Chapter 3's falsifier)")
     verdicts = {}
     for comp in COMPARATORS:
-        units, why = units_for(cells, comp)
+        units, why = units_for(cells, comp, axis)
         if units is None:
             out(f"  vs {comp:8s}  NOT READ -- {why}")
             problems += "AUDIT" in why
             verdicts[comp] = "NOT READ"
             continue
-        h = h1_for(units)
+        h = h1_for(units, axis)
         bad = checks(h["e_gap"]) + checks(h["e_slope"])
         if bad:
             out(f"  vs {comp:8s}  SELF-CHECK FAILED: {bad}")
@@ -349,12 +390,12 @@ def report(cells, notes, out=print):
         verdicts[comp] = h["verdict"]
         tg, ts, eg, es = h["t_gap"], h["t_slope"], h["e_gap"], h["e_slope"]
         out(f"  vs {comp:8s}  {h['verdict']}")
-        out(f"      H1a gap (mean over 16-128, BNN CVaR - {comp}):  {eg['mean']:+.4f}  "
+        out(f"      H1a gap ({ax['gap_text']}, BNN CVaR - {comp}):  {eg['mean']:+.4f}  "
             f"95% exact stratified [{eg['lower']:+.4f}, {eg['upper']:+.4f}]   "
             f"Wilcoxon one-sided p = {tg['p']:.4g}  (W+ {tg['w_plus']:g}, n {tg['n']}, "
             f"zeros dropped {tg['n_zero']})" + ("" if h["gap_on_lattice"] else
                                                 "   [units off the score lattice: 1e-6 grid]"))
-        out(f"      H1b widening (slope per doubling of pairs, < 0 widens): {es['mean']:+.4f}  "
+        out(f"      H1b widening ({ax['slope_text']}): {es['mean']:+.4f}  "
             f"95% exact stratified [{es['lower']:+.4f}, {es['upper']:+.4f}]   "
             f"Wilcoxon one-sided p = {ts['p']:.4g}  (W+ {ts['w_plus']:g}, n {ts['n']}, "
             f"zeros dropped {ts['n_zero']})")
@@ -367,7 +408,7 @@ def report(cells, notes, out=print):
                 f"gap > 0 on {sum(x > 0 for x in g)}/10")
     full = all(v == "SUPPORTED" for v in verdicts.values())
     read = [c for c, v in verdicts.items() if v not in ("NOT READ", "SELF-CHECK FAILED")]
-    out("\n   H1 as stated (the conjunction over the three comparators): " +
+    out(f"\n   H1 on the {axis} axis (the conjunction over the three comparators): " +
         ("SUPPORTED" if full else
          "NOT YET READ" if len(read) < len(COMPARATORS) else
          "NOT SUPPORTED IN FULL -- " + "; ".join(f"{c}: {v}" for c, v in verdicts.items())))
@@ -376,7 +417,7 @@ def report(cells, notes, out=print):
     for v in VARIANTS:
         for comp in COMPARATORS + DESCRIPTIVE:
             row = []
-            for lv in LEVELS + (FULL,):
+            for lv in levels + (FULL,):
                 a, b = cells.get((v, PROPOSED, lv)), cells.get((v, comp, lv))
                 if R.cell_ready(a) or R.cell_ready(b):
                     row.append(f"{lv:>4s}   --   ")
@@ -389,7 +430,7 @@ def report(cells, notes, out=print):
     for v in VARIANTS:
         for m in (PROPOSED,) + COMPARATORS + DESCRIPTIVE:
             row = []
-            for lv in LEVELS + (FULL,):
+            for lv in levels + (FULL,):
                 c = cells.get((v, m, lv))
                 r = R.cell_ready(c)
                 if r:
@@ -477,7 +518,7 @@ def selftest():
     assert report(world(True), [], out=lines.append) == 0
     txt = "\n".join(lines)
     assert txt.count("SUPPORTED") >= 3 and "NOT SUPPORTED" not in txt, txt
-    assert "H1 as stated (the conjunction over the three comparators): SUPPORTED" in txt
+    assert "H1 on the sparsity axis (the conjunction over the three comparators): SUPPORTED" in txt
     lines = []
     report(world(False), [], out=lines.append)
     txt = "\n".join(lines)
@@ -491,6 +532,35 @@ def selftest():
     txt = "\n".join(lines)
     assert "vs PT        NOT READ -- large-play r64 PT: INCOMPLETE" in txt, txt
     assert "vs MR        SUPPORTED" in txt and "NOT YET READ" in txt
+
+    # --- the noise axis: the gap must GROW with p (positive slope) ---
+    def noise_world(direction):
+        cells = {}
+        for v in VARIANTS:
+            base = rng.uniform(0.3, 0.6, 10)
+            for lv in NOISE_LEVELS + (FULL,):
+                p = _x_noise(v, lv)
+                gap = 0.02 + direction * 0.3 * p
+                cells[(v, PROPOSED, lv)] = cell(np.round(base + gap + rng.normal(0, 0.01, 10), 3))
+                for m in COMPARATORS + DESCRIPTIVE:
+                    cells[(v, m, lv)] = cell(np.round(base, 3))
+        return cells
+    lines = []
+    assert report(noise_world(+1), [], out=lines.append, axis="noise") == 0
+    txt = "\n".join(lines)
+    assert "EXPERIMENT 2" in txt and "NOT SUPPORTED" not in txt, txt
+    assert "H1 on the noise axis (the conjunction over the three comparators): SUPPORTED" in txt
+    lines = []
+    report(noise_world(-1), [], out=lines.append, axis="noise")      # gap shrinks as p rises
+    assert "no widening: H1b did not reject" in "\n".join(lines)
+    # the same widening world read on the wrong axis has no cells: nothing is read
+    lines = []
+    report(noise_world(+1), [], out=lines.append, axis="sparsity")
+    txt = "\n".join(lines)
+    assert all(f"vs {c:8s}  NOT READ --" in txt for c in COMPARATORS), txt
+    assert "comparators): NOT YET READ" in txt
+    assert _x_noise("large-play", FULL) == 0.0 and _x_noise("large-play", "n045") == 0.45
+    assert abs(_x_sparsity("large-play", FULL) - math.log2(254)) < 1e-12
     print("selftest OK")
     return 0
 
@@ -499,6 +569,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--winners", default=os.path.join(ROOT, "phase2_winners.json"))
+    ap.add_argument("--axis", choices=tuple(AXES), default="sparsity")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -509,10 +580,10 @@ def main():
     sys.argv = _argv
     winners = json.load(open(a.winners))
     api = wandb.Api(timeout=120)
-    cells, notes = collect_exp(api, P, winners)
+    cells, notes = collect_exp(api, P, winners, a.axis)
     anchor, anotes = R.collect(api, P, winners)
     add_anchor(cells, anchor)
-    return report(cells, notes + anotes)
+    return report(cells, notes + anotes, axis=a.axis)
 
 
 if __name__ == "__main__":
