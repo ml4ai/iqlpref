@@ -17,6 +17,16 @@ THE NOISE AXIS (§13.11) is the sparsity rule below with three substitutions:
 
 Run with --axis sparsity (default) or --axis noise.
 
+THE H3 GATE BESIDE EVERY VERDICT (§13.10, §13.12)
+  Each (variant, level) unit's calibration gate is read from
+  gp_reward-priors/calibration_results/measurements by calibration_gate.py.
+  * A unit that is not PASS is CONDITIONAL.  Under §13.12 it is FLAGGED, NOT
+    DROPPED: its cells enter the pooled tests unchanged, and the list of
+    conditional cells is printed beside every verdict.
+  * The gate is read FIRST (Chapter 3; §13.10: "before its BNN IQL results are
+    read").  So while any unit of the axis has no gate result, no H1 verdict is
+    printed, and the per-level curve shows no number for that unit.
+
 THE RULE (§13.9)
   statistic    last-10 mean, results/iql_score.py, all 200 points (as §12)
   gap          d = BNN CVaR - comparator, per (variant, seed, level), PAIRED
@@ -349,6 +359,32 @@ def h1_for(units, axis="sparsity"):
             "gap_on_lattice": exact_g, "verdict": v}
 
 
+GATE_DIR = os.path.join(ROOT, "gp_reward-priors", "calibration_results", "measurements")
+
+
+def gate_status(axis, in_dir=GATE_DIR):
+    """{(variant, level): verdict} for every unit of the axis, anchor included."""
+    sys.path.insert(0, os.path.join(ROOT, "gp_reward-priors", "scripts_bnn"))
+    import calibration_gate as G
+    out = {}
+    for v in VARIANTS:
+        vu = v.replace("-", "_")
+        for lv in AXES[axis]["levels"] + (FULL,):
+            cond = G.ANCHOR if lv == FULL else lv
+            out[(v, lv)] = G.gate_unit(G.load_records(in_dir, cond, vu))["verdict"]
+    return out
+
+
+def gate_lists(gate):
+    unread = [k for k, v in gate.items() if v.startswith("INCOMPLETE")]
+    conditional = [k for k, v in gate.items() if v != "PASS" and k not in unread]
+    return conditional, unread
+
+
+def _units(keys):
+    return ", ".join(f"{v} {lv}" for v, lv in keys) or "none"
+
+
 def checks(e):
     bad = []
     if abs(e["prob_sum"] - 1.0) > 1e-9:
@@ -359,10 +395,12 @@ def checks(e):
     return bad
 
 
-def report(cells, notes, out=print, axis="sparsity"):
+def report(cells, notes, out=print, axis="sparsity", gate=None):
     ax = AXES[axis]
     levels = ax["levels"]
     problems = 0
+    gate = gate_status(axis) if gate is None else gate
+    conditional, unread = gate_lists(gate)
     out("=" * 100)
     out(f"{ax['title']} READOUT ({ax['section']}): BNN CVaR against MR, PT and the BNN mean")
     out(f"levels {ax['levels_text']}; one-sided Wilcoxon at {ALPHA}, 40 (variant, seed) units; "
@@ -371,9 +409,18 @@ def report(cells, notes, out=print, axis="sparsity"):
     for n in notes:
         out(f"  note: {n}")
 
+    out("\nH3 GATE (§13.10), read first.  Conditional = not PASS; flagged, NOT dropped (§13.12).")
+    out(f"   conditional units ({len(conditional)}): {_units(conditional)}")
+    out(f"   gate not yet read ({len(unread)}): {_units(unread)}")
+
     out("\nA. H1, PER COMPARATOR  (SUPPORTED needs the gap AND its widening; Chapter 3's falsifier)")
     verdicts = {}
     for comp in COMPARATORS:
+        if unread:
+            out(f"  vs {comp:8s}  NOT READ -- the H3 gate is read first, and {len(unread)} "
+                f"unit(s) have no gate result yet")
+            verdicts[comp] = "NOT READ"
+            continue
         units, why = units_for(cells, comp, axis)
         if units is None:
             out(f"  vs {comp:8s}  NOT READ -- {why}")
@@ -390,6 +437,8 @@ def report(cells, notes, out=print, axis="sparsity"):
         verdicts[comp] = h["verdict"]
         tg, ts, eg, es = h["t_gap"], h["t_slope"], h["e_gap"], h["e_slope"]
         out(f"  vs {comp:8s}  {h['verdict']}")
+        out(f"      CONDITIONAL cells in this test (H3 not PASS; included, §13.12): "
+            f"{_units(conditional)}")
         out(f"      H1a gap ({ax['gap_text']}, BNN CVaR - {comp}):  {eg['mean']:+.4f}  "
             f"95% exact stratified [{eg['lower']:+.4f}, {eg['upper']:+.4f}]   "
             f"Wilcoxon one-sided p = {tg['p']:.4g}  (W+ {tg['w_plus']:g}, n {tg['n']}, "
@@ -413,17 +462,22 @@ def report(cells, notes, out=print, axis="sparsity"):
          "NOT YET READ" if len(read) < len(COMPARATORS) else
          "NOT SUPPORTED IN FULL -- " + "; ".join(f"{c}: {v}" for c, v in verdicts.items())))
 
-    out("\nB. THE CURVES  (BNN CVaR - comparator per level; exact 10-seed interval; DESCRIPTIVE)")
+    out("\nB. THE CURVES  (BNN CVaR - comparator per level; exact 10-seed interval; DESCRIPTIVE;"
+        " * = H3-conditional unit)")
     for v in VARIANTS:
         for comp in COMPARATORS + DESCRIPTIVE:
             row = []
             for lv in levels + (FULL,):
                 a, b = cells.get((v, PROPOSED, lv)), cells.get((v, comp, lv))
+                if (v, lv) in unread:
+                    row.append(f"{lv:>4s}  H3 unread ")
+                    continue
                 if R.cell_ready(a) or R.cell_ready(b):
                     row.append(f"{lv:>4s}   --   ")
                     continue
                 c = R.compare(a, b)
-                row.append(f"{lv:>4s} {c['mean']:+.3f} [{c['lower']:+.3f},{c['upper']:+.3f}]")
+                flag = "*" if (v, lv) in conditional else " "
+                row.append(f"{lv:>4s}{flag}{c['mean']:+.3f} [{c['lower']:+.3f},{c['upper']:+.3f}]")
             out(f"  {v:15s} - {comp:8s} " + "  ".join(row))
 
     out("\nC. THE CELLS  (last-10 mean ± sd over seeds 1-10; sweep)")
@@ -514,13 +568,15 @@ def selftest():
                 for m in COMPARATORS + DESCRIPTIVE:
                     cells[(v, m, lv)] = cell(np.round(base, 3))
         return cells
+    def all_pass(axis):
+        return {(v, lv): "PASS" for v in VARIANTS for lv in AXES[axis]["levels"] + (FULL,)}
     lines = []
-    assert report(world(True), [], out=lines.append) == 0
+    assert report(world(True), [], out=lines.append, gate=all_pass("sparsity")) == 0
     txt = "\n".join(lines)
     assert txt.count("SUPPORTED") >= 3 and "NOT SUPPORTED" not in txt, txt
     assert "H1 on the sparsity axis (the conjunction over the three comparators): SUPPORTED" in txt
     lines = []
-    report(world(False), [], out=lines.append)
+    report(world(False), [], out=lines.append, gate=all_pass("sparsity"))
     txt = "\n".join(lines)
     assert "NOT SUPPORTED (no widening: H1b did not reject)" in txt, txt
     # --- an incomplete cell blocks the comparator's test and nothing else ---
@@ -528,7 +584,7 @@ def selftest():
     w[("large-play", "PT", "r64")] = dict(w[("large-play", "PT", "r64")],
                                           incomplete=["seed 3 running"])
     lines = []
-    report(w, [], out=lines.append)
+    report(w, [], out=lines.append, gate=all_pass("sparsity"))
     txt = "\n".join(lines)
     assert "vs PT        NOT READ -- large-play r64 PT: INCOMPLETE" in txt, txt
     assert "vs MR        SUPPORTED" in txt and "NOT YET READ" in txt
@@ -546,20 +602,41 @@ def selftest():
                     cells[(v, m, lv)] = cell(np.round(base, 3))
         return cells
     lines = []
-    assert report(noise_world(+1), [], out=lines.append, axis="noise") == 0
+    assert report(noise_world(+1), [], out=lines.append, axis="noise", gate=all_pass("noise")) == 0
     txt = "\n".join(lines)
     assert "EXPERIMENT 2" in txt and "NOT SUPPORTED" not in txt, txt
     assert "H1 on the noise axis (the conjunction over the three comparators): SUPPORTED" in txt
     lines = []
-    report(noise_world(-1), [], out=lines.append, axis="noise")      # gap shrinks as p rises
+    report(noise_world(-1), [], out=lines.append, axis="noise", gate=all_pass("noise"))  # shrinks
     assert "no widening: H1b did not reject" in "\n".join(lines)
     # the same widening world read on the wrong axis has no cells: nothing is read
     lines = []
-    report(noise_world(+1), [], out=lines.append, axis="sparsity")
+    report(noise_world(+1), [], out=lines.append, axis="sparsity", gate=all_pass("sparsity"))
     txt = "\n".join(lines)
     assert all(f"vs {c:8s}  NOT READ --" in txt for c in COMPARATORS), txt
     assert "comparators): NOT YET READ" in txt
     assert _x_noise("large-play", FULL) == 0.0 and _x_noise("large-play", "n045") == 0.45
+    # --- H3 (§13.12): a failed unit is listed and the verdict is unchanged ---
+    g = all_pass("sparsity")
+    g[("large-play", "r16")] = "FAIL (spread interval reaches 0.5)"
+    g[("medium-play", FULL)] = "UNDEFINED (no wrong or no right pair on seeds [3]) -- not passed"
+    wt = world(True)
+    lines = []
+    report(wt, [], out=lines.append, gate=g)
+    txt = "\n".join(lines)
+    assert "conditional units (2): medium-play full, large-play r16" in txt, txt
+    assert txt.count("CONDITIONAL cells in this test") == 3 and "vs MR        SUPPORTED" in txt
+    assert "r16*" in txt                                           # flagged on the curve
+    lines0 = []
+    report(wt, [], out=lines0.append, gate=all_pass("sparsity"))
+    pick = lambda s: [x for x in s if "H1a gap" in x or "H1b widening" in x]
+    assert pick(lines) == pick(lines0)                             # flagged, NOT dropped
+    # --- the gate is read first: an unread unit blocks every verdict ---
+    g[("large-diverse", "r128")] = "INCOMPLETE (no measurement for seeds [1, 2])"
+    lines = []
+    report(wt, [], out=lines.append, gate=g)
+    txt = "\n".join(lines)
+    assert txt.count("NOT READ -- the H3 gate is read first") == 3 and "H3 unread" in txt
     assert abs(_x_sparsity("large-play", FULL) - math.log2(254)) < 1e-12
     print("selftest OK")
     return 0
@@ -580,10 +657,11 @@ def main():
     sys.argv = _argv
     winners = json.load(open(a.winners))
     api = wandb.Api(timeout=120)
+    gate = gate_status(a.axis)                     # the H3 gate first (§13.10)
     cells, notes = collect_exp(api, P, winners, a.axis)
     anchor, anotes = R.collect(api, P, winners)
     add_anchor(cells, anchor)
-    return report(cells, notes + anotes, axis=a.axis)
+    return report(cells, notes + anotes, axis=a.axis, gate=gate)
 
 
 if __name__ == "__main__":

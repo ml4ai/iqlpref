@@ -39,20 +39,20 @@ B. MECHANISM COMPARISONS  (same difference and interval; NOT verdicts, §12.2)
   antmaze-medium-diverse-v2    BNN CVaR - ensemble mean                                0.637 ± 0.053  vs  0.683 ± 0.037   diff -0.045   95% exact bootstrap [-0.084, -0.008]   paired-t [-0.092, +0.001]   ahead on 4/10
   antmaze-large-play-v2        BNN CVaR - BNN mean (the risk functional alone)         0.534 ± 0.060  vs  0.481 ± 0.070   diff +0.053   95% exact bootstrap [+0.011, +0.093]   paired-t [+0.003, +0.103]   ahead on 8/10
   antmaze-large-play-v2        BNN CVaR - ensemble CVaR (how the spread was obtained)  0.534 ± 0.060  vs  0.391 ± 0.070   diff +0.143   95% exact bootstrap [+0.105, +0.180]   paired-t [+0.098, +0.189]   ahead on 10/10
-  antmaze-large-play-v2        BNN CVaR - ensemble mean                                NOT READ -- INCOMPLETE (0/10 seeds scored)
+  antmaze-large-play-v2        BNN CVaR - ensemble mean                                0.534 ± 0.060  vs  0.440 ± 0.064   diff +0.094   95% exact bootstrap [+0.046, +0.138]   paired-t [+0.038, +0.150]   ahead on 9/10
   antmaze-large-diverse-v2     BNN CVaR - BNN mean (the risk functional alone)         0.291 ± 0.137  vs  0.252 ± 0.113   diff +0.039   95% exact bootstrap [-0.063, +0.123]   paired-t [-0.075, +0.153]   ahead on 7/10
-  antmaze-large-diverse-v2     BNN CVaR - ensemble CVaR (how the spread was obtained)  NOT READ -- no evaluation sweep
-  antmaze-large-diverse-v2     BNN CVaR - ensemble mean                                NOT READ -- no evaluation sweep
+  antmaze-large-diverse-v2     BNN CVaR - ensemble CVaR (how the spread was obtained)  0.291 ± 0.137  vs  0.171 ± 0.080   diff +0.120   95% exact bootstrap [+0.016, +0.205]   paired-t [+0.004, +0.236]   ahead on 9/10
+  antmaze-large-diverse-v2     BNN CVaR - ensemble mean                                0.291 ± 0.137  vs  0.283 ± 0.078   diff +0.009   95% exact bootstrap [-0.061, +0.080]   paired-t [-0.078, +0.095]   ahead on 5/10
 
 C. EVERY METHOD AGAINST THE TASK REWARD  (not verdicts, §12.2)
    The task reward is at its stage-4 winning index; where that is not the conventional r - 1,
    the conventional one is shown as well.
-  antmaze-medium-play-v2       BNN_CVAR  - task reward (winning index)      NOT READ -- INCOMPLETE (8/10 seeds scored)
-  antmaze-medium-play-v2       BNN_MEAN  - task reward (winning index)      NOT READ -- INCOMPLETE (8/10 seeds scored)
-  antmaze-medium-play-v2       MR        - task reward (winning index)      NOT READ -- INCOMPLETE (8/10 seeds scored)
-  antmaze-medium-play-v2       PT        - task reward (winning index)      NOT READ -- INCOMPLETE (8/10 seeds scored)
-  antmaze-medium-play-v2       ENS_CVAR  - task reward (winning index)      NOT READ -- INCOMPLETE (8/10 seeds scored)
-  antmaze-medium-play-v2       ENS_MEAN  - task reward (winning index)      NOT READ -- INCOMPLETE (8/10 seeds scored)
+  antmaze-medium-play-v2       BNN_CVAR  - task reward (winning index)      0.734 ± 0.048  vs  0.519 ± 0.086   diff +0.215   95% exact bootstrap [+0.173, +0.261]   paired-t [+0.160, +0.269]   ahead on 10/10
+  antmaze-medium-play-v2       BNN_MEAN  - task reward (winning index)      0.779 ± 0.028  vs  0.519 ± 0.086   diff +0.260   95% exact bootstrap [+0.213, +0.309]   paired-t [+0.201, +0.319]   ahead on 10/10
+  antmaze-medium-play-v2       MR        - task reward (winning index)      0.642 ± 0.042  vs  0.519 ± 0.086   diff +0.123   95% exact bootstrap [+0.062, +0.184]   paired-t [+0.049, +0.198]   ahead on 9/10
+  antmaze-medium-play-v2       PT        - task reward (winning index)      0.690 ± 0.060  vs  0.519 ± 0.086   diff +0.171   95% exact bootstrap [+0.126, +0.216]   paired-t [+0.115, +0.226]   ahead on 10/10
+  antmaze-medium-play-v2       ENS_CVAR  - task reward (winning index)      0.683 ± 0.029  vs  0.519 ± 0.086   diff +0.164   95% exact bootstrap [+0.114, +0.220]   paired-t [+0.098, +0.229]   ahead on 10/10
+  antmaze-medium-play-v2       ENS_MEAN  - task reward (winning index)      0.711 ± 0.025  vs  0.519 ± 0.086   diff +0.192   95% exact bootstrap [+0.136, +0.253]   paired-t [+0.121, +0.264]   ahead on 10/10
   antmaze-medium-play-v2       BNN_CVAR  - task reward (conventional r - 1) 0.734 ± 0.048  vs  0.648 ± 0.048   diff +0.086   95% exact bootstrap [+0.043, +0.130]   paired-t [+0.033, +0.139]   ahead on 9/10
   antmaze-medium-play-v2       BNN_MEAN  - task reward (conventional r - 1) 0.779 ± 0.028  vs  0.648 ± 0.048   diff +0.131   95% exact bootstrap [+0.093, +0.169]   paired-t [+0.084, +0.178]   ahead on 10/10
   antmaze-medium-play-v2       MR        - task reward (conventional r - 1) 0.642 ± 0.042  vs  0.648 ± 0.048   diff -0.006   95% exact bootstrap [-0.040, +0.029]   paired-t [-0.047, +0.036]   ahead on 6/10
@@ -70,16 +70,16 @@ C. EVERY METHOD AGAINST THE TASK REWARD  (not verdicts, §12.2)
   antmaze-large-play-v2        MR        - task reward (winning index)      0.425 ± 0.054  vs  0.367 ± 0.079   diff +0.058   95% exact bootstrap [+0.007, +0.108]   paired-t [-0.004, +0.119]   ahead on 8/10
   antmaze-large-play-v2        PT        - task reward (winning index)      0.386 ± 0.073  vs  0.367 ± 0.079   diff +0.019   95% exact bootstrap [-0.049, +0.082]   paired-t [-0.061, +0.099]   ahead on 6/10
   antmaze-large-play-v2        ENS_CVAR  - task reward (winning index)      0.391 ± 0.070  vs  0.367 ± 0.079   diff +0.024   95% exact bootstrap [-0.034, +0.082]   paired-t [-0.047, +0.094]   ahead on 6/10
-  antmaze-large-play-v2        ENS_MEAN  - task reward (winning index)      NOT READ -- INCOMPLETE (0/10 seeds scored)
+  antmaze-large-play-v2        ENS_MEAN  - task reward (winning index)      0.440 ± 0.064  vs  0.367 ± 0.079   diff +0.073   95% exact bootstrap [+0.014, +0.135]   paired-t [-0.001, +0.147]   ahead on 7/10
   antmaze-large-diverse-v2     BNN_CVAR  - task reward (winning index)      0.291 ± 0.137  vs  0.272 ± 0.045   diff +0.019   95% exact bootstrap [-0.053, +0.096]   paired-t [-0.073, +0.110]   ahead on 5/10
   antmaze-large-diverse-v2     BNN_MEAN  - task reward (winning index)      0.252 ± 0.113  vs  0.272 ± 0.045   diff -0.020   95% exact bootstrap [-0.090, +0.054]   paired-t [-0.108, +0.068]   ahead on 5/10
   antmaze-large-diverse-v2     MR        - task reward (winning index)      0.241 ± 0.098  vs  0.272 ± 0.045   diff -0.031   95% exact bootstrap [-0.094, +0.035]   paired-t [-0.109, +0.047]   ahead on 3/10
   antmaze-large-diverse-v2     PT        - task reward (winning index)      0.169 ± 0.136  vs  0.272 ± 0.045   diff -0.103   95% exact bootstrap [-0.186, -0.011]   paired-t [-0.210, +0.004]   ahead on 3/10
-  antmaze-large-diverse-v2     ENS_CVAR  - task reward (winning index)      NOT READ -- no evaluation sweep
-  antmaze-large-diverse-v2     ENS_MEAN  - task reward (winning index)      NOT READ -- no evaluation sweep
+  antmaze-large-diverse-v2     ENS_CVAR  - task reward (winning index)      0.171 ± 0.080  vs  0.272 ± 0.045   diff -0.101   95% exact bootstrap [-0.160, -0.034]   paired-t [-0.178, -0.024]   ahead on 1/10
+  antmaze-large-diverse-v2     ENS_MEAN  - task reward (winning index)      0.283 ± 0.078  vs  0.272 ± 0.045   diff +0.010   95% exact bootstrap [-0.042, +0.064]   paired-t [-0.055, +0.075]   ahead on 6/10
 
 D. THE CELLS  (last-10 mean ± sd over seeds 1-10; sweep; index)
-  antmaze-medium-play-v2       task_reward     79ke5lc3  idx 3  INCOMPLETE (8/10 seeds scored)
+  antmaze-medium-play-v2       task_reward     79ke5lc3  idx 3  0.519 ± 0.086
   antmaze-medium-play-v2       task_reward_r1  nv89vprk  idx 1  0.648 ± 0.048
   antmaze-medium-play-v2       MR              7lzll81d  idx 0  0.642 ± 0.042
   antmaze-medium-play-v2       PT              v13djkou  idx 3  0.690 ± 0.060
@@ -97,15 +97,15 @@ D. THE CELLS  (last-10 mean ± sd over seeds 1-10; sweep; index)
   antmaze-large-play-v2        task_reward     xnafxwa2  idx 1  0.367 ± 0.079
   antmaze-large-play-v2        MR              dqsfjy7h  idx 3  0.425 ± 0.054
   antmaze-large-play-v2        PT              rpfaj2xr  idx 3  0.386 ± 0.073
-  antmaze-large-play-v2        ENS_MEAN        n56v005j  idx 3  INCOMPLETE (0/10 seeds scored)
+  antmaze-large-play-v2        ENS_MEAN        n56v005j  idx 3  0.440 ± 0.064
   antmaze-large-play-v2        ENS_CVAR        ncb3zdmx  idx 3  0.391 ± 0.070
   antmaze-large-play-v2        BNN_MEAN        3rv6olwb  idx 3  0.481 ± 0.070
   antmaze-large-play-v2        BNN_CVAR        x7mpih67  idx 3  0.534 ± 0.060
   antmaze-large-diverse-v2     task_reward     ezttwir0  idx 1  0.272 ± 0.045
   antmaze-large-diverse-v2     MR              pio60aa6  idx 3  0.241 ± 0.098
   antmaze-large-diverse-v2     PT              03tyo1up  idx 0  0.169 ± 0.136
-  antmaze-large-diverse-v2     ENS_MEAN        no evaluation sweep
-  antmaze-large-diverse-v2     ENS_CVAR        no evaluation sweep
+  antmaze-large-diverse-v2     ENS_MEAN        gpyiq4w5  idx 3  0.283 ± 0.078
+  antmaze-large-diverse-v2     ENS_CVAR        ub50fhd3  idx 3  0.171 ± 0.080
   antmaze-large-diverse-v2     BNN_MEAN        lashr9nz  idx 3  0.252 ± 0.113
   antmaze-large-diverse-v2     BNN_CVAR        ucd752vz  idx 3  0.291 ± 0.137
 
