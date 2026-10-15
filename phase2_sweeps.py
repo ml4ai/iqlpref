@@ -546,11 +546,12 @@ def _as_source(text):
 
 
 def ensure_cell(nb, cell_id, cell_type, text):
-    """Set the source of the cell with this id, appending it at the END of the
-    notebook if it does not exist yet."""
+    """Append the cell with this id at the END of the notebook if it does not
+    exist yet.  An existing cell is left exactly as it is: these cells are not
+    generated data, and the user edits them (2026-10-14: the oracle cell was
+    reformatted by hand, and rewriting it on every register would undo that)."""
     for c in nb["cells"]:
         if c.get("id") == cell_id:
-            c["source"] = _as_source(text)
             return
     cell = {"cell_type": cell_type, "id": cell_id, "metadata": {}, "source": _as_source(text)}
     if cell_type == "code":
@@ -606,6 +607,11 @@ def cmd_register(sp, winners_path, do_write, notebook=NOTEBOOK):
     cells[REGISTRY_DOC_CELL]["source"] = _as_source(registry_doc(reg, notes, probs))
     ensure_cell(nb, ORACLE_DOC_CELL, "markdown", ORACLE_DOC)
     ensure_cell(nb, ORACLE_CODE_CELL, "code", ORACLE_CODE)
+    # The notebook is committed with every output cell empty (user rule,
+    # 2026-10-14), so the registry writes it that way.
+    for c in nb["cells"]:
+        if c.get("cell_type") == "code":
+            c["outputs"], c["execution_count"] = [], None
     new = json.dumps(nb, indent=1, ensure_ascii=False) + "\n"
     n_reg = sum(1 for d in reg for m in reg[d] if reg[d][m])
     state = "unchanged" if new == raw else "CHANGED"
@@ -855,9 +861,9 @@ def selftest():
     nbt = {"cells": [{"id": "x", "cell_type": "code", "source": []}]}
     ensure_cell(nbt, ORACLE_DOC_CELL, "markdown", "a\nb")
     ensure_cell(nbt, ORACLE_CODE_CELL, "code", "c")
-    ensure_cell(nbt, ORACLE_CODE_CELL, "code", "d")              # update, not a 2nd copy
+    ensure_cell(nbt, ORACLE_CODE_CELL, "code", "d")              # neither a 2nd copy nor a rewrite
     assert [c["id"] for c in nbt["cells"]] == ["x", ORACLE_DOC_CELL, ORACLE_CODE_CELL]
-    assert nbt["cells"][-1]["source"] == ["d"] and nbt["cells"][-1]["outputs"] == []
+    assert nbt["cells"][-1]["source"] == ["c"] and nbt["cells"][-1]["outputs"] == []
     assert "outputs" not in nbt["cells"][1]
     # ---- exp ----
     E = _conditions()
