@@ -108,6 +108,19 @@ class TrainConfig:
     # constrains.  It must stay identical across families or it breaks the
     # cross-family comparability it exists to protect.
     gauge_reward: str = "max0"
+    # ---- CONTROLS (handoff §13.14).  Both OFF by default. ----------------
+    # antmaze's D4RL `terminals` are exactly the goal arrivals (§13.13.1), so a
+    # terminal tells IQL where the goal is whatever the reward says.
+    #   drop_terminals    zero every terminal AFTER the reward is built, gauged
+    #                     and normalized (so the normalization constants are the
+    #                     anchor's), leaving the reward as the only goal signal.
+    #   heuristic_reward  "path_length": the reward of a transition is the torso
+    #                     displacement ||xy' - xy|| (raw, before state
+    #                     normalization).  No reward model; gauged like a learned
+    #                     reward.  The policy-level twin of Chapter 3's
+    #                     trivial-heuristic floor.
+    drop_terminals: bool = False
+    heuristic_reward: Optional[str] = None
     # V-critic function learning rate
     vf_lr: float = 3e-4
     # Q-critic learning rate
@@ -178,6 +191,11 @@ class TrainConfig:
         # scripts write each run to a deterministic "{root}_{seed}" directory.
         if self.reward_model_root:
             self.reward_model_path = f"{self.reward_model_root}_{self.seed}"
+        if self.heuristic_reward is not None:
+            if self.heuristic_reward != "path_length":
+                raise ValueError(f"heuristic_reward must be 'path_length', got {self.heuristic_reward!r}")
+            if self.reward_model_path:
+                raise ValueError("heuristic_reward and a reward model are mutually exclusive")
 
 
 def soft_update(target: nn.Module, source: nn.Module, tau: float):
@@ -440,6 +458,19 @@ def gauge_reward(dataset, mode):
         )
     dataset["rewards"] = (r - c).astype(dataset["rewards"].dtype)
     return c
+
+
+def heuristic_rewards(dataset, mode="path_length"):
+    """Per-transition heuristic reward from RAW observations (handoff §13.14).
+
+    path_length: ||xy' - xy||, the torso displacement of the step.  obs[:, :2]
+    is the antmaze torso (x, y).  The per-segment sum of this is the statistic
+    of Chapter 3's trivial-heuristic floor (§13.13)."""
+    if mode != "path_length":
+        raise ValueError(f"unknown heuristic reward {mode!r}")
+    o = np.asarray(dataset["observations"])[:, :2]
+    n = np.asarray(dataset["next_observations"])[:, :2]
+    return np.linalg.norm(n - o, axis=1).astype(np.float32)
 
 
 def modify_reward(dataset, env_name, normalize_reward, max_episode_steps=1000):
@@ -1644,11 +1675,28 @@ def train(config: TrainConfig):
             f" -> reward range [{float(_r.min()):.6g}, {float(_r.max()):.6g}],"
             f" mean {float(_r.mean()):.6g}"
         )
+    elif config.heuristic_reward is not None:
+        dataset = d4rl.qlearning_dataset(env)
+        dataset["rewards"] = heuristic_rewards(dataset, config.heuristic_reward)
+        # Gauged exactly as a learned reward is: it stands in for one.
+        _gauge_c = gauge_reward(dataset, config.gauge_reward)
+        _r = dataset["rewards"]
+        print(
+            f"[heuristic_reward] {config.heuristic_reward}: gauge {config.gauge_reward!r} "
+            f"subtracted {_gauge_c:.6g} -> range [{float(_r.min()):.6g}, {float(_r.max()):.6g}]"
+        )
     else:
         dataset = d4rl.qlearning_dataset(env)
 
     if config.normalize_reward:
         modify_reward(dataset, config.env, config.normalize_reward)
+
+    if config.drop_terminals:
+        # AFTER modify_reward, whose return range is computed over trajectories
+        # that the terminals help delimit: the normalization stays the anchor's.
+        _n_term = int(np.asarray(dataset["terminals"]).sum())
+        dataset["terminals"] = np.zeros_like(dataset["terminals"])
+        print(f"[drop_terminals] zeroed {_n_term} terminals; the reward is the only goal signal")
 
     if config.normalize:
         state_mean, state_std = compute_mean_std(dataset["observations"], eps=1e-3)

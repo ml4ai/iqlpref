@@ -53,7 +53,8 @@ for item in "$@"; do
     stage4) pat="Lineage: STAGE 4" ;;
     eval)   pat="Lineage: EVALUATION" ;;
     r[0-9]*|n[0-9]*) pat="Lineage: EXPERIMENT ${want}," ;;
-    *)      echo "ERROR: unknown lineage tag @$want ($item); use @stage4, @eval or @<cond>" >&2; exit 1 ;;
+    control) pat="Lineage: CONTROL" ;;
+    *)      echo "ERROR: unknown lineage tag @$want ($item); use @stage4, @eval, @control or @<cond>" >&2; exit 1 ;;
   esac
   if [[ -n "$want" ]] && ! grep -q "$pat" "${fam}_sweeps/${sw}.yaml"; then
     echo "ERROR: ${fam}_sweeps/${sw}.yaml is not in the @$want lineage ($item)." >&2
