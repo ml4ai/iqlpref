@@ -21,6 +21,11 @@ THE QUESTIONS, fixed before the results
          each anchor method - the path-length heuristic
      The task reward is in C too, at its stage-4 winning index.
   D. The cells: each one's own mean ± sd.
+  E. The no-terminals normalization grids (added 2026-10-17, §13.14.5, before
+     any grid run existed): seed 0, every index, scored and selected by the
+     stage-4 rule (iql_score.select_normalization: last-10, argmax, ties to the
+     lowest index), beside the index the seeds 1-10 control used.  Where they
+     differ, the seeds 1-10 cell is re-run at the grid's winner.
 
 Run from the repo root:
     python results/control_readout.py
@@ -105,6 +110,65 @@ def collect_controls(api, P, winners):
     return cells, notes
 
 
+def collect_grids(api, P):
+    """{(variant, kind): {"sweep", "anchor", "grid", "runs": [score_run dicts], "notes"}}."""
+    import iql_score
+    sp = P.spec()
+    gspec = P.control_grid_spec(sp)
+    fixed_of = {n: f for n, (_, f) in gspec.items()}
+    grids = {}
+    for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
+        params = sw.config.get("parameters")
+        hits = P.match_entry(params, fixed_of)
+        if len(hits) != 1:
+            continue
+        flat = P.flat(params)
+        anchor, fixed = gspec[hits[0]]
+        if flat.get("seed") != 0 or flat.get("normalize_reward") != list(P.grid_of(anchor)):
+            continue                                   # a seeds 1-10 control, not a grid
+        key = (_short(P.dataset_of(anchor)), "noterm_" + P.method_of(anchor))
+        g = {"sweep": sw.id, "anchor": anchor, "grid": list(P.grid_of(anchor)), "runs": [],
+             "notes": []}
+        for r in sw.runs:
+            bad = R.audit_run(r.config or {}, hits[0], 0, fixed, (r.config or {}).get("normalize_reward"),
+                              anchor.startswith("tr_"))
+            if bad:
+                g["notes"].append(f"run {r.id}: AUDIT {bad[0]}")
+            g["runs"].append(iql_score.score_run(r))
+        if key in grids:
+            grids[key]["notes"].append(f"second grid sweep {sw.id} -- NOT read")
+            continue
+        grids[key] = g
+    return grids
+
+
+def grid_section(grids, winners, ctrl, out):
+    import iql_score
+    out("\nE. NO-TERMINALS NORMALIZATION GRIDS  (seed 0; stage-4 rule; the index the seeds 1-10 control used)")
+    for v in VARIANTS:
+        for kind in ("noterm_task_reward", "noterm_MR", "noterm_BNN_MEAN", "noterm_BNN_CVAR"):
+            g = grids.get((v, kind))
+            tag = f"  {v:15s} {kind:19s}"
+            if g is None:
+                out(f"{tag} no grid sweep")
+                continue
+            used = winners.get(g["anchor"])
+            if g["notes"]:
+                out(f"{tag} {g['sweep']}  NOT READ -- {g['notes'][0]}")
+                continue
+            try:
+                win, table = iql_score.select_normalization(g["runs"], g["grid"])
+            except ValueError as e:
+                done = sum(1 for s in g["runs"] if s.get("score") is not None)
+                out(f"{tag} {g['sweep']}  INCOMPLETE ({done}/{len(g['grid'])} scored): {e}")
+                continue
+            by = {s["normalize_reward"]: s["score"] for s in table}
+            row = " ".join(f"{by[i]:.3f}" for i in g["grid"])
+            verdict = "same as used" if win == used else f"DIFFERS from {used}: re-run seeds 1-10 at {win}"
+            out(f"{tag} {g['sweep']}  idx {g['grid'][0]}-{g['grid'][-1]}: {row}   winner {win}  "
+                f"({verdict})")
+
+
 def line(a, b, out, tag):
     ra, rb = R.cell_ready(a), R.cell_ready(b)
     if ra or rb:
@@ -113,7 +177,7 @@ def line(a, b, out, tag):
         out(f"{tag} {R.fmt_cmp(R.compare(a, b))}")
 
 
-def report(ctrl, anchor, notes, out=print):
+def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
     out("=" * 100)
     out("IQL CONTROLS (handoff §13.13-§13.14): terminals, and motion shaping.  DESCRIPTIVE.")
     out("last-10 statistic; paired by seed; exact bootstrap over seeds, paired-t beside it")
@@ -124,7 +188,7 @@ def report(ctrl, anchor, notes, out=print):
 
     out("\nA. WHAT THE TERMINALS CARRY  (anchor, with terminals - the same reward without them)")
     for v in VARIANTS:
-        for m in ("task_reward", "MR", "BNN_CVAR"):
+        for m in ("task_reward", "MR", "BNN_MEAN", "BNN_CVAR"):
             line(A[v][m], ctrl.get((v, f"noterm_{m}")), out,
                  f"  {v:15s} {m:9s} with - without terminals   ")
 
@@ -134,11 +198,13 @@ def report(ctrl, anchor, notes, out=print):
              f"  {v:15s} without terminals              ")
         line(A[v]["BNN_CVAR"], A[v]["MR"], out,
              f"  {v:15s} with terminals (the §12 cell)  ")
+        line(ctrl.get((v, "noterm_BNN_CVAR")), ctrl.get((v, "noterm_BNN_MEAN")), out,
+             f"  {v:15s} BNN CVaR - BNN mean, no terminals")
 
     out("\nB2. WITHOUT TERMINALS, DOES A LEARNED REWARD CARRY MORE GOAL INFORMATION THAN THE TASK REWARD?"
         "  (learned - task reward, both without terminals)")
     for v in VARIANTS:
-        for m in ("MR", "BNN_CVAR"):
+        for m in ("MR", "BNN_MEAN", "BNN_CVAR"):
             line(ctrl.get((v, f"noterm_{m}")), ctrl.get((v, "noterm_task_reward")), out,
                  f"  {v:15s} {m:9s} - task reward, no terminals")
 
@@ -150,7 +216,8 @@ def report(ctrl, anchor, notes, out=print):
 
     out("\nD. THE CONTROL CELLS  (last-10 mean ± sd over seeds 1-10)")
     for v in VARIANTS:
-        for kind in ("noterm_task_reward", "noterm_MR", "noterm_BNN_CVAR", "heuristic"):
+        for kind in ("noterm_task_reward", "noterm_MR", "noterm_BNN_MEAN", "noterm_BNN_CVAR",
+                     "heuristic"):
             c = ctrl.get((v, kind))
             r = R.cell_ready(c)
             if r:
@@ -159,6 +226,8 @@ def report(ctrl, anchor, notes, out=print):
                 x = np.array([c["scores"][s] for s in SEEDS])
                 out(f"  {v:15s} {kind:16s} {c['sweep']}  idx {c['index']}  "
                     f"{x.mean():.3f} ± {x.std(ddof=1):.3f}")
+    if grids is not None:
+        grid_section(grids, winners or {}, ctrl, out)
     return 0
 
 
@@ -185,11 +254,27 @@ def selftest():
     assert txt.count("diff +0.250") == 4 and txt.count("diff +0.150") == 4      # A, learned
     assert txt.count("diff +0.350") == 4                                        # A, task reward
     assert "medium-play     MR        - task reward, no terminals diff" not in txt
-    assert txt.count("- task reward, no terminals") == 8                       # B2
+    assert txt.count("- task reward, no terminals") == 12                      # B2: 4 variants x 3
     assert txt.count("diff +0.100") == 8                    # B without (4) + B2 MR (4)
     assert txt.count("diff +0.200") == 4                    # B2 BNN CVaR
     assert "large-play      MR          - heuristic           NOT READ" in txt
     assert txt.count("diff +0.050") == 21                                       # C, 3 variants x 7
+    # --- section E: winner by the stage-4 rule, ties to the lowest index ---
+    def runs(scores):
+        return [{"id": f"r{i}", "normalize_reward": i, "score": s, "error": None}
+                for i, s in enumerate(scores)]
+    grids = {("medium-play", "noterm_BNN_CVAR"): {"sweep": "g1", "anchor": "bnn_sweeps/a", "grid": list(range(8)),
+                                                  "runs": runs([.1, .2, .6, .6, .0, .0, .3, .3]), "notes": []},
+             ("medium-play", "noterm_MR"): {"sweep": "g2", "anchor": "mr_sweeps/a", "grid": list(range(8)),
+                                            "runs": runs([.5, .5, .4, .4, .0, .0, .2, .2]), "notes": []},
+             ("large-play", "noterm_MR"): {"sweep": "g3", "anchor": "mr_sweeps/b", "grid": list(range(8)),
+                                           "runs": runs([.5, .5, .4]), "notes": []}}
+    lines = []
+    grid_section(grids, {"bnn_sweeps/a": 2, "mr_sweeps/a": 3, "mr_sweeps/b": 3}, {}, lines.append)
+    txt = "\n".join(lines)
+    assert "winner 2  (same as used)" in txt                     # tie 2/3 -> 2
+    assert "winner 0  (DIFFERS from 3: re-run seeds 1-10 at 0)" in txt
+    assert "INCOMPLETE (3/8 scored)" in txt
     print("selftest OK")
     return 0
 
@@ -205,7 +290,8 @@ def main():
     api = wandb.Api(timeout=120)
     ctrl, notes = collect_controls(api, P, winners)
     anchor, anotes = R.collect(api, P, winners)
-    return report(ctrl, anchor, notes + anotes)
+    grids = collect_grids(api, P)
+    return report(ctrl, anchor, notes + anotes, grids=grids, winners=winners)
 
 
 if __name__ == "__main__":

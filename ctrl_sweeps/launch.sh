@@ -6,7 +6,7 @@
 # Usage:
 #   ./ctrl_sweeps/launch.sh [SWEEP] [GPU_LIST] [AGENTS_PER_GPU]
 #
-#   SWEEP           "all" (the 16 control sweeps, handoff 13.14) or a single sweep: full path,
+#   SWEEP           "all" (the 36 control sweeps, handoff 13.14) or a single sweep: full path,
 #                   basename with/without .yaml. Default: all
 #   GPU_LIST        space-separated GPU ids (quote it).      Default: "0 1 2 3 4 5"
 #   AGENTS_PER_GPU  wandb agents to launch on each GPU.      Default: 1
@@ -52,6 +52,26 @@ if [[ "$SWEEP_ARG" == "all" ]]; then
     ctrl_sweeps/noterm_antmaze_medium_diverse_task.yaml
     ctrl_sweeps/noterm_antmaze_large_play_task.yaml
     ctrl_sweeps/noterm_antmaze_large_diverse_task.yaml
+    ctrl_sweeps/noterm_antmaze_medium_play_bnn_mean.yaml
+    ctrl_sweeps/noterm_antmaze_medium_diverse_bnn_mean.yaml
+    ctrl_sweeps/noterm_antmaze_large_play_bnn_mean.yaml
+    ctrl_sweeps/noterm_antmaze_large_diverse_bnn_mean.yaml
+    ctrl_sweeps/s4noterm_antmaze_medium_play_mr.yaml
+    ctrl_sweeps/s4noterm_antmaze_medium_play_bnn_cvar.yaml
+    ctrl_sweeps/s4noterm_antmaze_medium_play_bnn_mean.yaml
+    ctrl_sweeps/s4noterm_antmaze_medium_play_task.yaml
+    ctrl_sweeps/s4noterm_antmaze_medium_diverse_mr.yaml
+    ctrl_sweeps/s4noterm_antmaze_medium_diverse_bnn_cvar.yaml
+    ctrl_sweeps/s4noterm_antmaze_medium_diverse_bnn_mean.yaml
+    ctrl_sweeps/s4noterm_antmaze_medium_diverse_task.yaml
+    ctrl_sweeps/s4noterm_antmaze_large_play_mr.yaml
+    ctrl_sweeps/s4noterm_antmaze_large_play_bnn_cvar.yaml
+    ctrl_sweeps/s4noterm_antmaze_large_play_bnn_mean.yaml
+    ctrl_sweeps/s4noterm_antmaze_large_play_task.yaml
+    ctrl_sweeps/s4noterm_antmaze_large_diverse_mr.yaml
+    ctrl_sweeps/s4noterm_antmaze_large_diverse_bnn_cvar.yaml
+    ctrl_sweeps/s4noterm_antmaze_large_diverse_bnn_mean.yaml
+    ctrl_sweeps/s4noterm_antmaze_large_diverse_task.yaml
   )
 else
   y="$SWEEP_ARG"
