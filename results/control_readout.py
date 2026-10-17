@@ -13,6 +13,10 @@ THE QUESTIONS, fixed before the results
   B. Do the reward models separate once the terminals are gone?
          BNN CVaR - MR, without terminals, beside the same difference WITH
          terminals (the §12 cell)
+  B2. Without terminals, does a learned reward carry more goal information
+         than the task reward?  learned - task reward, both without terminals
+         (the task-reward control was added 2026-10-17, still before any
+         control result; A covers it too)
   C. Do the learned rewards beat motion shaping?  With terminals, paired by seed:
          each anchor method - the path-length heuristic
      The task reward is in C too, at its stage-4 winning index.
@@ -76,8 +80,9 @@ def collect_controls(api, P, winners):
             if s in seen:
                 cell["audit"].append(f"seed {s} appears twice")
             seen.add(s)
+            no_model = anchor is None or anchor.startswith("tr_")   # heuristic, task reward
             cell["audit"] += [f"run {r.id}: {x}" for x in
-                              R.audit_run(r.config or {}, name, s, fixed, index, anchor is None)]
+                              R.audit_run(r.config or {}, name, s, fixed, index, no_model)]
             if r.state != "finished":
                 cell["incomplete"].append(f"seed {s} {r.state}")
                 continue
@@ -119,7 +124,7 @@ def report(ctrl, anchor, notes, out=print):
 
     out("\nA. WHAT THE TERMINALS CARRY  (anchor, with terminals - the same reward without them)")
     for v in VARIANTS:
-        for m in ("MR", "BNN_CVAR"):
+        for m in ("task_reward", "MR", "BNN_CVAR"):
             line(A[v][m], ctrl.get((v, f"noterm_{m}")), out,
                  f"  {v:15s} {m:9s} with - without terminals   ")
 
@@ -130,6 +135,13 @@ def report(ctrl, anchor, notes, out=print):
         line(A[v]["BNN_CVAR"], A[v]["MR"], out,
              f"  {v:15s} with terminals (the §12 cell)  ")
 
+    out("\nB2. WITHOUT TERMINALS, DOES A LEARNED REWARD CARRY MORE GOAL INFORMATION THAN THE TASK REWARD?"
+        "  (learned - task reward, both without terminals)")
+    for v in VARIANTS:
+        for m in ("MR", "BNN_CVAR"):
+            line(ctrl.get((v, f"noterm_{m}")), ctrl.get((v, "noterm_task_reward")), out,
+                 f"  {v:15s} {m:9s} - task reward, no terminals")
+
     out("\nC. LEARNED REWARDS AGAINST MOTION SHAPING  (each method - path-length heuristic, both with terminals)")
     for v in VARIANTS:
         h = ctrl.get((v, "heuristic"))
@@ -138,7 +150,7 @@ def report(ctrl, anchor, notes, out=print):
 
     out("\nD. THE CONTROL CELLS  (last-10 mean ± sd over seeds 1-10)")
     for v in VARIANTS:
-        for kind in ("noterm_MR", "noterm_BNN_CVAR", "heuristic"):
+        for kind in ("noterm_task_reward", "noterm_MR", "noterm_BNN_CVAR", "heuristic"):
             c = ctrl.get((v, kind))
             r = R.cell_ready(c)
             if r:
@@ -164,13 +176,18 @@ def selftest():
         ctrl[(v, "noterm_MR")] = cell(base - 0.2)
         ctrl[(v, "noterm_BNN_CVAR")] = cell(base - 0.1)
         ctrl[(v, "heuristic")] = cell(base)
+        ctrl[(v, "noterm_task_reward")] = cell(base - 0.3)
     ctrl[("large-play", "heuristic")]["incomplete"] = ["seed 4 running"]
     lines = []
     report(ctrl, anchor, [], out=lines.append)
     txt = "\n".join(lines)
     assert "medium-play     MR        with - without terminals    " in txt
-    assert txt.count("diff +0.250") == 4 and txt.count("diff +0.150") == 4      # A
-    assert txt.count("diff +0.100") == 4                                        # B, without
+    assert txt.count("diff +0.250") == 4 and txt.count("diff +0.150") == 4      # A, learned
+    assert txt.count("diff +0.350") == 4                                        # A, task reward
+    assert "medium-play     MR        - task reward, no terminals diff" not in txt
+    assert txt.count("- task reward, no terminals") == 8                       # B2
+    assert txt.count("diff +0.100") == 8                    # B without (4) + B2 MR (4)
+    assert txt.count("diff +0.200") == 4                    # B2 BNN CVaR
     assert "large-play      MR          - heuristic           NOT READ" in txt
     assert txt.count("diff +0.050") == 21                                       # C, 3 variants x 7
     print("selftest OK")

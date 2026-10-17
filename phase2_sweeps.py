@@ -748,7 +748,8 @@ def cmd_exp(sp, conds, winners, do_write):
 #   heuristic  no reward model: the torso path length per step, gauged like a
 #              learned reward, with the terminals, at index 3 FIXED in advance.
 CONTROL_DIR = "ctrl_sweeps"
-CONTROL_NOTERM = ("mr_sweeps/sweep_antmaze_{v}", "bnn_sweeps/sweep_antmaze_{v}_cvar")
+CONTROL_NOTERM = ("mr_sweeps/sweep_antmaze_{v}", "bnn_sweeps/sweep_antmaze_{v}_cvar",
+                  "tr_sweeps/sweep_antmaze_{v}")   # task reward: added 2026-10-17 (§13.14.3)
 HEURISTIC_INDEX = 3
 
 
@@ -762,7 +763,7 @@ def control_spec(sp):
     for v in VARIANTS:
         for pat in CONTROL_NOTERM:
             anchor = pat.format(v=v)
-            fam = "mr" if anchor.startswith("mr_") else "bnn_cvar"
+            fam = {"mr": "mr", "bn": "bnn_cvar", "tr": "task"}[anchor[:2]]
             out[f"{CONTROL_DIR}/noterm_antmaze_{v}_{fam}"] = (
                 anchor, dict(sp[anchor], drop_terminals=True), None)
         base = {"config_path": sp[f"tr_sweeps/sweep_antmaze_{v}"]["config_path"],
@@ -995,7 +996,10 @@ def selftest():
     assert not any(is_condition_root(f.get("reward_model_root")) for f in sp.values())
     # ---- control ----
     cs = control_spec(sp)
-    assert len(cs) == 12
+    assert len(cs) == 16
+    a, f, i = cs["ctrl_sweeps/noterm_antmaze_medium_play_task"]
+    # the task reward runs under iql_eval.py with no reward model: iql.py's path exactly
+    assert a == "tr_sweeps/sweep_antmaze_medium_play" and f == dict(sp[a], drop_terminals=True)
     a, f, i = cs["ctrl_sweeps/noterm_antmaze_large_play_bnn_cvar"]
     assert a == "bnn_sweeps/sweep_antmaze_large_play_cvar" and f["drop_terminals"] is True
     assert {k: v for k, v in f.items() if k != "drop_terminals"} == sp[a]
