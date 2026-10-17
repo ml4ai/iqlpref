@@ -1,0 +1,195 @@
+#!/usr/bin/env python
+"""control_readout.py -- the reading of the IQL controls (handoff §13.13-§13.14).
+
+Written 2026-10-16, before any control run had finished.  Every number is the
+§12.5 machinery unchanged: last-10 statistic, completeness gate (ten seeds x 200
+points), config audit, and the exact paired bootstrap over seeds with the
+paired-t interval beside it.  DESCRIPTIVE: no margin and no verdict.  What the
+controls imply for the research direction is the user's call (§13.14).
+
+THE QUESTIONS, fixed before the results
+  A. What do the terminals carry?  Within a family, paired by seed:
+         anchor (with terminals) - no terminals            MR, BNN CVaR
+  B. Do the reward models separate once the terminals are gone?
+         BNN CVaR - MR, without terminals, beside the same difference WITH
+         terminals (the §12 cell)
+  C. Do the learned rewards beat motion shaping?  With terminals, paired by seed:
+         each anchor method - the path-length heuristic
+     The task reward is in C too, at its stage-4 winning index.
+  D. The cells: each one's own mean ± sd.
+
+Run from the repo root:
+    python results/control_readout.py
+"""
+
+import json
+import os
+import sys
+
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, HERE)
+sys.path.insert(0, ROOT)
+
+import eval_readout as R                                   # noqa: E402
+
+VARIANTS = R.VARIANTS
+SEEDS = R.SEEDS
+ANCHOR_METHODS = ("task_reward", "MR", "PT", "ENS_MEAN", "ENS_CVAR", "BNN_MEAN", "BNN_CVAR")
+
+
+def _short(dataset):
+    return dataset.replace("antmaze-", "").replace("-v2", "")
+
+
+def collect_controls(api, P, winners):
+    """{(variant, kind): cell}, kind in noterm_MR, noterm_BNN_CVAR, heuristic."""
+    import iql_score
+    sp = P.spec()
+    cspec = P.control_spec(sp)
+    fixed_of = {n: f for n, (_, f, _) in cspec.items()}
+    cells, notes = {}, []
+    for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
+        params = sw.config.get("parameters")
+        hits = P.match_entry(params, fixed_of)
+        if len(hits) != 1:
+            continue
+        name = hits[0]
+        anchor, fixed, index = cspec[name]
+        index = winners.get(anchor) if anchor else index
+        flat = P.flat(params)
+        if flat.get("seed") != P.EVAL_SEEDS or flat.get("normalize_reward") != index:
+            notes.append(f"{sw.id}: {name} at seed {flat.get('seed')} index "
+                         f"{flat.get('normalize_reward')} (expected {index}) -- ignored")
+            continue
+        v = _short(P.dataset_of(anchor)) if anchor else name.split("heuristic_antmaze_")[1].replace("_", "-")
+        kind = ("noterm_" + P.method_of(anchor)) if anchor else "heuristic"
+        cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {},
+                "incomplete": [], "audit": [], "name": name}
+        if sw.config.get("program") != P.DEFAULT_PROGRAM:
+            cell["audit"].append(f"program {sw.config.get('program')!r}")
+        seen = set()
+        for r in sw.runs:
+            s = (r.config or {}).get("seed")
+            if s in seen:
+                cell["audit"].append(f"seed {s} appears twice")
+            seen.add(s)
+            cell["audit"] += [f"run {r.id}: {x}" for x in
+                              R.audit_run(r.config or {}, name, s, fixed, index, anchor is None)]
+            if r.state != "finished":
+                cell["incomplete"].append(f"seed {s} {r.state}")
+                continue
+            try:
+                _, curve = iql_score.run_curve(r)
+                cell["scores"][s] = iql_score.score_curve(curve, n=iql_score.LAST_N)
+                cell["robust"][s] = iql_score.score_curve(curve, n=iql_score.ROBUST_N)
+            except (iql_score.IncompleteRun, ValueError) as e:
+                cell["incomplete"].append(f"seed {s}: {e}")
+        missing = [s for s in SEEDS if s not in cell["scores"] and
+                   not any(x.startswith(f"seed {s}") for x in cell["incomplete"])]
+        if missing:
+            cell["incomplete"].append(f"seeds not started: {missing}")
+        key = (v, kind)
+        if key in cells:
+            notes.append(f"{key}: two sweeps ({cells[key]['sweep']}, {sw.id}) -- cell NOT read")
+            cells[key]["audit"].append(f"second sweep {sw.id}")
+            continue
+        cells[key] = cell
+    return cells, notes
+
+
+def line(a, b, out, tag):
+    ra, rb = R.cell_ready(a), R.cell_ready(b)
+    if ra or rb:
+        out(f"{tag} NOT READ -- " + "; ".join(x for x in (ra, rb) if x))
+    else:
+        out(f"{tag} {R.fmt_cmp(R.compare(a, b))}")
+
+
+def report(ctrl, anchor, notes, out=print):
+    out("=" * 100)
+    out("IQL CONTROLS (handoff §13.13-§13.14): terminals, and motion shaping.  DESCRIPTIVE.")
+    out("last-10 statistic; paired by seed; exact bootstrap over seeds, paired-t beside it")
+    out("=" * 100)
+    for n in notes:
+        out(f"  note: {n}")
+    A = {v: {m: anchor.get((f"antmaze-{v}-v2", m)) for m in ANCHOR_METHODS} for v in VARIANTS}
+
+    out("\nA. WHAT THE TERMINALS CARRY  (anchor, with terminals - the same reward without them)")
+    for v in VARIANTS:
+        for m in ("MR", "BNN_CVAR"):
+            line(A[v][m], ctrl.get((v, f"noterm_{m}")), out,
+                 f"  {v:15s} {m:9s} with - without terminals   ")
+
+    out("\nB. DO THE REWARDS SEPARATE WITHOUT TERMINALS?  (BNN CVaR - MR)")
+    for v in VARIANTS:
+        line(ctrl.get((v, "noterm_BNN_CVAR")), ctrl.get((v, "noterm_MR")), out,
+             f"  {v:15s} without terminals              ")
+        line(A[v]["BNN_CVAR"], A[v]["MR"], out,
+             f"  {v:15s} with terminals (the §12 cell)  ")
+
+    out("\nC. LEARNED REWARDS AGAINST MOTION SHAPING  (each method - path-length heuristic, both with terminals)")
+    for v in VARIANTS:
+        h = ctrl.get((v, "heuristic"))
+        for m in ANCHOR_METHODS:
+            line(A[v][m], h, out, f"  {v:15s} {m:11s} - heuristic          ")
+
+    out("\nD. THE CONTROL CELLS  (last-10 mean ± sd over seeds 1-10)")
+    for v in VARIANTS:
+        for kind in ("noterm_MR", "noterm_BNN_CVAR", "heuristic"):
+            c = ctrl.get((v, kind))
+            r = R.cell_ready(c)
+            if r:
+                out(f"  {v:15s} {kind:16s} {'no sweep' if c is None else c['sweep'] + '  ' + r}")
+            else:
+                x = np.array([c["scores"][s] for s in SEEDS])
+                out(f"  {v:15s} {kind:16s} {c['sweep']}  idx {c['index']}  "
+                    f"{x.mean():.3f} ± {x.std(ddof=1):.3f}")
+    return 0
+
+
+def selftest():
+    rng = np.random.default_rng(0)
+
+    def cell(vals):
+        return {"scores": dict(zip(SEEDS, vals)), "robust": dict(zip(SEEDS, vals)),
+                "incomplete": [], "audit": [], "sweep": "s", "index": 3, "name": "n"}
+    anchor, ctrl = {}, {}
+    for v in VARIANTS:
+        base = rng.uniform(0.3, 0.6, 10)
+        for m in ANCHOR_METHODS:
+            anchor[(f"antmaze-{v}-v2", m)] = cell(base + 0.05)
+        ctrl[(v, "noterm_MR")] = cell(base - 0.2)
+        ctrl[(v, "noterm_BNN_CVAR")] = cell(base - 0.1)
+        ctrl[(v, "heuristic")] = cell(base)
+    ctrl[("large-play", "heuristic")]["incomplete"] = ["seed 4 running"]
+    lines = []
+    report(ctrl, anchor, [], out=lines.append)
+    txt = "\n".join(lines)
+    assert "medium-play     MR        with - without terminals    " in txt
+    assert txt.count("diff +0.250") == 4 and txt.count("diff +0.150") == 4      # A
+    assert txt.count("diff +0.100") == 4                                        # B, without
+    assert "large-play      MR          - heuristic           NOT READ" in txt
+    assert txt.count("diff +0.050") == 21                                       # C, 3 variants x 7
+    print("selftest OK")
+    return 0
+
+
+def main():
+    if "--selftest" in sys.argv:
+        return selftest()
+    import wandb
+    _argv, sys.argv = sys.argv, [sys.argv[0]]
+    import phase2_sweeps as P
+    sys.argv = _argv
+    winners = json.load(open(os.path.join(ROOT, "phase2_winners.json")))
+    api = wandb.Api(timeout=120)
+    ctrl, notes = collect_controls(api, P, winners)
+    anchor, anotes = R.collect(api, P, winners)
+    return report(ctrl, anchor, notes + anotes)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
