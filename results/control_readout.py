@@ -53,7 +53,7 @@ def _short(dataset):
     return dataset.replace("antmaze-", "").replace("-v2", "")
 
 
-def collect_controls(api, P, winners):
+def collect_controls(api, P, winners, gwin=None):
     """{(variant, kind): cell}, kind in noterm_MR, noterm_BNN_CVAR, heuristic."""
     import iql_score
     sp = P.spec()
@@ -71,12 +71,16 @@ def collect_controls(api, P, winners):
         flat = P.flat(params)
         if flat.get("seed") == 0 and isinstance(flat.get("normalize_reward"), list):
             continue                                   # a no-terminals grid: section E reads it
-        if flat.get("seed") != P.EVAL_SEEDS or flat.get("normalize_reward") != index:
+        prefix = "noterm_"
+        if (anchor and flat.get("seed") == P.EVAL_SEEDS and gwin and gwin.get(anchor) is not None
+                and flat.get("normalize_reward") == gwin[anchor] != index):
+            prefix, index = "rerun_", gwin[anchor]      # the re-run at the grid winner (§13.14.7)
+        elif flat.get("seed") != P.EVAL_SEEDS or flat.get("normalize_reward") != index:
             notes.append(f"{sw.id}: {name} at seed {flat.get('seed')} index "
                          f"{flat.get('normalize_reward')} (expected {index}) -- ignored")
             continue
         v = _short(P.dataset_of(anchor)) if anchor else name.split("heuristic_antmaze_")[1].replace("_", "-")
-        kind = ("noterm_" + P.method_of(anchor)) if anchor else "heuristic"
+        kind = (prefix + P.method_of(anchor)) if anchor else "heuristic"
         cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {},
                 "incomplete": [], "audit": [], "name": name}
         if sw.config.get("program") != P.DEFAULT_PROGRAM:
@@ -145,7 +149,9 @@ def collect_grids(api, P):
 
 
 def grid_section(grids, winners, ctrl, out):
+    """Prints section E; returns {anchor: winner} for every COMPLETE grid."""
     import iql_score
+    found = {}
     out("\nE. NO-TERMINALS NORMALIZATION GRIDS  (seed 0; stage-4 rule; the index the seeds 1-10 control used)")
     for v in VARIANTS:
         for kind in ("noterm_task_reward", "noterm_MR", "noterm_BNN_MEAN", "noterm_BNN_CVAR"):
@@ -164,11 +170,38 @@ def grid_section(grids, winners, ctrl, out):
                 done = sum(1 for s in g["runs"] if s.get("score") is not None)
                 out(f"{tag} {g['sweep']}  INCOMPLETE ({done}/{len(g['grid'])} scored): {e}")
                 continue
+            found[g["anchor"]] = win
             by = {s["normalize_reward"]: s["score"] for s in table}
             row = " ".join(f"{by[i]:.3f}" for i in g["grid"])
             verdict = "same as used" if win == used else f"DIFFERS from {used}: re-run seeds 1-10 at {win}"
             out(f"{tag} {g['sweep']}  idx {g['grid'][0]}-{g['grid'][-1]}: {row}   winner {win}  "
                 f"({verdict})")
+    return found
+
+
+_ANCHOR = {"MR": "mr_sweeps/sweep_antmaze_{u}", "BNN_CVAR": "bnn_sweeps/sweep_antmaze_{u}_cvar",
+           "BNN_MEAN": "bnn_sweeps/sweep_antmaze_{u}_mean", "task_reward": "tr_sweeps/sweep_antmaze_{u}"}
+
+
+def at_winner(ctrl, gwin, winners, v, m):
+    """The no-terminals cell at its grid winner: the re-run where the winner moved,
+    the original control where it did not, None while the grid is not complete."""
+    a = _ANCHOR[m].format(u=v.replace("-", "_"))
+    if a not in gwin:
+        return None
+    return ctrl.get((v, f"noterm_{m}")) if gwin[a] == winners.get(a) else ctrl.get((v, f"rerun_{m}"))
+
+
+def rerun_section(ctrl, A, gwin, winners, out):
+    out("\nF. AT THE NO-TERMINALS WINNER  (each reward at its own no-terminals grid winner; §13.14.7)")
+    for v in VARIANTS:
+        for m in ("task_reward", "MR", "BNN_MEAN", "BNN_CVAR"):
+            line(A[v][m], at_winner(ctrl, gwin, winners, v, m), out,
+                 f"  {v:15s} {m:9s} with terminals - without, at its winner")
+        line(at_winner(ctrl, gwin, winners, v, "BNN_CVAR"), at_winner(ctrl, gwin, winners, v, "MR"), out,
+             f"  {v:15s} BNN CVaR - MR, no terminals, each at its winner")
+        line(at_winner(ctrl, gwin, winners, v, "BNN_CVAR"), at_winner(ctrl, gwin, winners, v, "BNN_MEAN"), out,
+             f"  {v:15s} BNN CVaR - BNN mean, no terminals, each at its winner")
 
 
 def line(a, b, out, tag):
@@ -228,9 +261,19 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
                 x = np.array([c["scores"][s] for s in SEEDS])
                 out(f"  {v:15s} {kind:16s} {c['sweep']}  idx {c['index']}  "
                     f"{x.mean():.3f} ± {x.std(ddof=1):.3f}")
+    found = {}
     if grids is not None:
-        grid_section(grids, winners or {}, ctrl, out)
-    return 0
+        found = grid_section(grids, winners or {}, ctrl, out)
+        rerun_section(ctrl, A, found, winners or {}, out)
+        for v in VARIANTS:
+            for m in ("MR", "BNN_MEAN", "BNN_CVAR", "task_reward"):
+                c = ctrl.get((v, f"rerun_{m}"))
+                if c is not None:
+                    r = R.cell_ready(c)
+                    out(f"  {v:15s} rerun_{m:12s} {c['sweep']}  idx {c['index']}  "
+                        + (r if r else "{:.3f} ± {:.3f}".format(
+                            *(lambda x: (x.mean(), x.std(ddof=1)))(np.array([c["scores"][s] for s in SEEDS])))))
+    return found
 
 
 def selftest():
@@ -277,6 +320,21 @@ def selftest():
     assert "winner 2  (same as used)" in txt                     # tie 2/3 -> 2
     assert "winner 0  (DIFFERS from 3: re-run seeds 1-10 at 0)" in txt
     assert "INCOMPLETE (3/8 scored)" in txt
+    # --- section F: the re-run where the winner moved, the original where it did not ---
+    w = {"mr_sweeps/sweep_antmaze_medium_play": 0, "bnn_sweeps/sweep_antmaze_medium_play_cvar": 2}
+    g = {"mr_sweeps/sweep_antmaze_medium_play": 1, "bnn_sweeps/sweep_antmaze_medium_play_cvar": 2}
+    base = rng.uniform(0.3, 0.6, 10)
+    ct = {("medium-play", "noterm_MR"): cell(base), ("medium-play", "rerun_MR"): cell(base + 0.3),
+          ("medium-play", "noterm_BNN_CVAR"): cell(base + 0.1)}
+    assert at_winner(ct, g, w, "medium-play", "MR") is ct[("medium-play", "rerun_MR")]
+    assert at_winner(ct, g, w, "medium-play", "BNN_CVAR") is ct[("medium-play", "noterm_BNN_CVAR")]
+    assert at_winner(ct, g, w, "large-play", "MR") is None
+    lines = []
+    An = {v: {m: cell(base + 0.5) for m in ANCHOR_METHODS} for v in VARIANTS}
+    rerun_section(ct, An, g, w, lines.append)
+    txt = "\n".join(lines)
+    fl = [x for x in txt.splitlines() if "medium-play     BNN CVaR - MR, no terminals, each at its winner" in x]
+    assert len(fl) == 1 and "diff -0.200" in fl[0], txt                # re-run MR vs original BNN CVaR
     print("selftest OK")
     return 0
 
@@ -290,10 +348,22 @@ def main():
     sys.argv = _argv
     winners = json.load(open(os.path.join(ROOT, "phase2_winners.json")))
     api = wandb.Api(timeout=120)
-    ctrl, notes = collect_controls(api, P, winners)
     anchor, anotes = R.collect(api, P, winners)
+    gpath = os.path.join(ROOT, P.GRID_WINNERS)
+    gwin = json.load(open(gpath)) if os.path.exists(gpath) else {}
+    ctrl, notes = collect_controls(api, P, winners, gwin)
     grids = collect_grids(api, P)
-    return report(ctrl, anchor, notes + anotes, grids=grids, winners=winners)
+    found = report(ctrl, anchor, notes + anotes, grids=grids, winners=winners)
+    if "--write-grid-winners" in sys.argv:
+        merged = dict(gwin)
+        for k, w in found.items():
+            if k in merged and merged[k] != w:
+                raise SystemExit(f"!! grid winner for {k} changed {merged[k]} -> {w}: not written")
+            merged[k] = w
+        with open(gpath, "w") as f:
+            json.dump(dict(sorted(merged.items())), f, indent=1)
+        print(f"\n  {len(merged)} grid winner(s) in {P.GRID_WINNERS}")
+    return 0
 
 
 if __name__ == "__main__":
