@@ -69,6 +69,8 @@ def collect_controls(api, P, winners):
         anchor, fixed, index = cspec[name]
         index = winners.get(anchor) if anchor else index
         flat = P.flat(params)
+        if flat.get("seed") == 0 and isinstance(flat.get("normalize_reward"), list):
+            continue                                   # a no-terminals grid: section E reads it
         if flat.get("seed") != P.EVAL_SEEDS or flat.get("normalize_reward") != index:
             notes.append(f"{sw.id}: {name} at seed {flat.get('seed')} index "
                          f"{flat.get('normalize_reward')} (expected {index}) -- ignored")
