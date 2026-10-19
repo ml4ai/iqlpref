@@ -1,0 +1,23 @@
+STEPS-TO-GOAL, with vs without terminals (success-weighted, last 10 evaluations; DESCRIPTIVE)
+steps are counted over SUCCESSFUL episodes only; 'succ' = last-10 success rate
+
+  medium-play     MR        with terminals    steps  417.1 ±  35.5 (10 seeds with a success)   succ 0.642
+                            without terminals steps  435.3 ±  48.4 (10 seeds with a success)   succ 0.636
+                            without - with, paired over 10 seeds: +18.3 steps (seeds: +75, -19, -25, +10, -79, +0, +47, +54, +101, +17)   95% exact [-13.2, +48.9]
+
+  medium-play     BNN CVaR  with terminals    steps  359.9 ±  17.1 (10 seeds with a success)   succ 0.734
+                            without terminals steps  491.5 ±  70.5 (8 seeds with a success)   succ 0.226
+                            without - with, paired over 8 seeds: +134.9 steps (seeds: +68, +144, +162, +146, +79, +147, +266, +67)
+
+  medium-diverse  MR        with terminals    steps  418.0 ±  11.8 (10 seeds with a success)   succ 0.647
+                            without terminals steps  514.2 ±  43.5 (10 seeds with a success)   succ 0.306
+                            without - with, paired over 10 seeds: +96.3 steps (seeds: +69, +85, +112, +98, +54, +90, +215, +106, +80, +53)   95% exact [+73.6, +127.0]
+
+  medium-diverse  BNN CVaR  with terminals    steps  401.4 ±   9.9 (10 seeds with a success)   succ 0.637
+                            without terminals steps  438.0 ±  20.0 (10 seeds with a success)   succ 0.490
+                            without - with, paired over 10 seeds: +36.6 steps (seeds: +39, +43, +53, +50, +42, +45, +61, +8, +11, +13)   95% exact [+25.0, +47.2]
+
+REFERENCE: the task reward, with terminals
+  medium-play     task reward, stage-4 index 3     steps  455.8 ±  41.5   succ 0.519
+  medium-play     task reward, conventional r-1    steps  423.3 ±  26.1   succ 0.648
+  medium-diverse  task reward                      steps  433.7 ±  22.9   succ 0.607
