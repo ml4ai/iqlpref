@@ -73,6 +73,21 @@ def cell_means(values, rows, cols, min_n=MIN_PER_CELL):
     return out
 
 
+def map_detail(means, dist, occ):
+    """rho of the reward map with cell occupancy, and the top cell's (cell, BFS
+    distance to the goal, occupancy).  A reward that only tracks data density has
+    rho_occ near +1; a top cell away from the goal is where a policy without
+    terminals may settle."""
+    from scipy.stats import spearmanr
+    cells = [c for c in means if c in dist and c in occ]
+    if len(cells) < 5:
+        return None, None
+    r = np.array([means[c][0] for c in cells])
+    o = np.array([occ[c][1] for c in cells])
+    top = cells[int(np.argmax(r))]
+    return float(spearmanr(r, o)[0]), (top, dist[top], occ[top][1])
+
+
 def goal_rho(means, dist):
     """Spearman rho between cell-mean reward and BFS distance to the goal, over cells
     that have both; and the goal cell's reward rank (1 = highest)."""
@@ -151,14 +166,22 @@ def run(a):
         occ = cell_means(np.ones(n), xr, xc, 1)
         print(f"  state coverage: {len(occ)} cells visited; transitions in the goal cell "
               f"{occ.get((int(gr[0]), int(gc[0])), (0, 0))[1]:,}")
+        from scipy.stats import spearmanr
+        oc = [c for c in occ if c in dist]
+        print(f"  occupancy vs BFS distance to the goal: rho "
+              f"{float(spearmanr([occ[c][1] for c in oc], [dist[c] for c in oc])[0]):+.3f} "
+              f"(negative = the data crowds toward the goal)")
 
         # ---- 1. reward maps ----------------------------------------------------
         refs = {"task reward (0/1)": np.asarray(raw["rewards"], dtype=float),
                 "path-length heuristic": np.r_[np.linalg.norm(
                     np.diff(np.asarray(raw["observations"])[:, :2], axis=0), axis=1), 0.0]}
         for lab, val in refs.items():
-            rho, rank, k = goal_rho(cell_means(val, xr, xc), dist)
-            print(f"  {lab:24s}            rho {rho:+.3f}   goal cell's reward rank {rank} of {k}")
+            cm = cell_means(val, xr, xc)
+            rho, rank, k = goal_rho(cm, dist)
+            ro, top = map_detail(cm, dist, occ)
+            print(f"  {lab:24s}            rho {rho:+.3f}   goal cell's reward rank {rank} of {k}   "
+                  f"rho vs occupancy {ro:+.3f}   top cell {top[0]} at distance {top[1]}, {top[2]:,} transitions")
         for kind in a.kinds.split(","):
             kind = kind.strip()
             for s in [int(x) for x in a.seeds.split()]:
@@ -168,9 +191,12 @@ def run(a):
                     print(f"  {kind:9s} seed {s:2d}  FAILED: {type(e).__name__}: {e}")
                     continue
                 r_, c_ = cells_of(np.asarray(ds["observations"])[:, :2], scaling, offset)
-                rho, rank, k = goal_rho(cell_means(np.asarray(ds["rewards"], dtype=float), r_, c_), dist)
+                cm = cell_means(np.asarray(ds["rewards"], dtype=float), r_, c_)
+                rho, rank, k = goal_rho(cm, dist)
+                ro, top = map_detail(cm, dist, occ)
                 print(f"  {kind:9s} seed {s:2d}   {len(ds['rewards']):,} transitions   rho {rho:+.3f}   "
-                      f"goal cell's reward rank {rank} of {k}")
+                      f"goal cell's reward rank {rank} of {k}   rho vs occupancy {ro:+.3f}   "
+                      f"top cell {top[0]} at distance {top[1]}, {top[2]:,} transitions")
     return 0
 
 
@@ -197,6 +223,10 @@ def selftest():
     m = cell_means(np.array(vals), np.array(rows), np.array(cols))
     rho, rank, k = goal_rho(m, dist)
     assert abs(rho + 1) < 1e-12 and rank == 1 and k == len(dist)
+    # map_detail: a reward equal to occupancy has rho_occ = +1; the top cell is reported
+    occ = {c: (1.0, 100 + 10 * d) for c, d in dist.items()}
+    ro, top = map_detail({c: (float(occ[c][1]), 60) for c in dist}, dist, occ)
+    assert abs(ro - 1) < 1e-12 and top[1] == max(dist.values())
     # sparse cells are dropped
     assert cell_means(np.ones(10), np.zeros(10, int), np.zeros(10, int)) == {}
     print("selftest OK")
