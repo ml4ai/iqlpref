@@ -121,6 +121,10 @@ class TrainConfig:
     #                     trivial-heuristic floor.
     drop_terminals: bool = False
     heuristic_reward: Optional[str] = None
+    # Log every evaluation episode's FINAL torso (x, y), raw (un-normalized), its
+    # success and length, to final_positions.csv in the wandb run (§13.14.14).
+    # Diagnostic only; OFF by default.
+    log_final_positions: bool = False
     # V-critic function learning rate
     vf_lr: float = 3e-4
     # Q-critic learning rate
@@ -347,7 +351,8 @@ def eval_actor(
     n_episodes: int,
     seed: int,
     n_envs: int = 25,
-) -> Tuple[np.ndarray, List[int]]:
+    return_final: bool = False,
+):
     """Evaluate the actor over ``n_episodes`` parallel episodes.
 
     Returns
@@ -359,6 +364,10 @@ def eval_actor(
         taken in each *successful* episode (one where the goal was reached, i.e.
         a reward of 1 was received).  Empty for non-antmaze envs or when no
         episode reached the goal.
+    finals : List[(x, y, success, length)], only when ``return_final``: each
+        episode's final torso (x, y), un-normalized, from the terminal
+        observation the vector env reports (falling back to the last pre-step
+        observation, one step earlier, where it reports none).
     """
     is_antmaze = "antmaze" in env_name.lower()
     n_envs = min(n_envs, n_episodes)
@@ -374,6 +383,22 @@ def eval_actor(
     ep_steps = np.zeros(n_envs, dtype=np.int64)
     completed: List[float] = []
     steps_to_goal: List[int] = []
+    finals: List[Tuple[float, float, int, int]] = []
+    _mean = np.asarray(state_mean, dtype=np.float64)
+    _std = np.asarray(state_std, dtype=np.float64)
+
+    def _final_obs(infos, i, prev):
+        # gym < 0.24: tuple of per-env dicts; gym >= 0.24: dict of arrays.
+        keys = ("terminal_observation", "final_observation")
+        if isinstance(infos, dict):
+            for k in keys:
+                if k in infos and infos[k][i] is not None:
+                    return np.asarray(infos[k][i], dtype=np.float64)
+        elif infos is not None:
+            for k in keys:
+                if k in infos[i]:
+                    return np.asarray(infos[i][k], dtype=np.float64)
+        return np.asarray(prev, dtype=np.float64)
 
     try:
         while len(completed) < n_episodes:
@@ -392,7 +417,8 @@ def eval_actor(
                     .numpy()
                 )
 
-            obs, rewards, dones, _ = vec_env.step(actions)
+            prev_obs = obs
+            obs, rewards, dones, infos = vec_env.step(actions)
 
             ep_rewards += rewards
             ep_steps += 1
@@ -403,6 +429,10 @@ def eval_actor(
                     # of 1 (and 0 otherwise), so a positive return means success.
                     if is_antmaze and ep_rewards[i] > 0.5:
                         steps_to_goal.append(int(ep_steps[i]))
+                    if return_final:
+                        raw = _final_obs(infos, i, prev_obs[i]) * _std + _mean
+                        finals.append((float(raw[0]), float(raw[1]),
+                                       int(ep_rewards[i] > 0.5), int(ep_steps[i])))
                     completed.append(float(ep_rewards[i]))
                     ep_rewards[i] = 0.0
                     ep_steps[i] = 0
@@ -412,6 +442,8 @@ def eval_actor(
         vec_env.close()
 
     actor.train()
+    if return_final:
+        return np.asarray(completed[:n_episodes]), steps_to_goal, finals[:n_episodes]
     return np.asarray(completed[:n_episodes]), steps_to_goal
 
 
@@ -1807,7 +1839,7 @@ def train(config: TrainConfig):
             log_buffer = {}
         # Evaluate episode
         if (t + 1) % config.eval_freq == 0:
-            eval_scores, steps_to_goal = eval_actor(
+            _ev = eval_actor(
                 config.env,
                 actor,
                 max_action=max_action,
@@ -1816,7 +1848,19 @@ def train(config: TrainConfig):
                 device=config.device,
                 n_episodes=config.n_episodes,
                 seed=config.seed,
+                return_final=config.log_final_positions,
             )
+            eval_scores, steps_to_goal = _ev[0], _ev[1]
+            if config.log_final_positions:
+                _fp = os.path.join(wandb.run.dir, "final_positions.csv")
+                _new = not os.path.exists(_fp)
+                with open(_fp, "a") as _f:
+                    if _new:
+                        _f.write("eval_step,episode,x,y,success,length\n")
+                    for _k, (_x, _y, _s, _l) in enumerate(_ev[2]):
+                        _f.write(f"{t + 1},{_k},{_x:.4f},{_y:.4f},{_s},{_l}\n")
+                if _new:
+                    wandb.save(_fp, base_path=wandb.run.dir, policy="live")
             mean_eval_score = eval_scores.mean()
             if config.checkpoints_path is not None:
                 torch.save(
