@@ -83,6 +83,10 @@ def main():
         allrows, n_runs = [], 0
         print(f"=== {sid}")
         for r in sorted(sw.runs, key=lambda r: r.config.get("seed", 0)):
+            if r.state != "finished":
+                # its CSV holds only early evaluations: never read them as the scoring window
+                print(f"  seed {r.config.get('seed'):2d}  {r.state} -- not read")
+                continue
             try:
                 f = r.file("final_positions.csv").download(replace=True, root=f"/tmp/fp_{sid}_{r.id}")
                 rows = list(csv.DictReader(open(f.name)))
