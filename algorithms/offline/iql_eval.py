@@ -119,8 +119,16 @@ class TrainConfig:
     #                     normalization).  No reward model; gauged like a learned
     #                     reward.  The policy-level twin of Chapter 3's
     #                     trivial-heuristic floor.
+    #   trivial_reward    (handoff §14.2 item 2; Shin et al. 2023's references)
+    #                     "zero": 0 on every transition.  "mean": the task
+    #                     reward's mean over this offline dataset, on every
+    #                     transition.  No reward model, NOT gauged, and only at
+    #                     normalize_reward 0.  With terminals a positive constant
+    #                     makes ending an episode bad and zero makes it neutral,
+    #                     so these also check the sign effect of §13.14.2.
     drop_terminals: bool = False
     heuristic_reward: Optional[str] = None
+    trivial_reward: Optional[str] = None
     # Log every evaluation episode's FINAL torso (x, y), raw (un-normalized), its
     # success and length, to final_positions.csv in the wandb run (§13.14.14).
     # Diagnostic only; OFF by default.
@@ -200,6 +208,14 @@ class TrainConfig:
                 raise ValueError(f"heuristic_reward must be 'path_length', got {self.heuristic_reward!r}")
             if self.reward_model_path:
                 raise ValueError("heuristic_reward and a reward model are mutually exclusive")
+        if self.trivial_reward is not None:
+            if self.trivial_reward not in ("zero", "mean"):
+                raise ValueError(f"trivial_reward must be 'zero' or 'mean', got {self.trivial_reward!r}")
+            if self.reward_model_path or self.heuristic_reward is not None:
+                raise ValueError("trivial_reward excludes a reward model and heuristic_reward")
+            if self.normalize_reward != 0:
+                raise ValueError("trivial_reward runs at normalize_reward 0 only (§14.2 item 2), "
+                                 f"got {self.normalize_reward}")
 
 
 def soft_update(target: nn.Module, source: nn.Module, tau: float):
@@ -503,6 +519,19 @@ def heuristic_rewards(dataset, mode="path_length"):
     o = np.asarray(dataset["observations"])[:, :2]
     n = np.asarray(dataset["next_observations"])[:, :2]
     return np.linalg.norm(n - o, axis=1).astype(np.float32)
+
+
+def trivial_rewards(dataset, mode):
+    """Constant per-transition reward (handoff §14.2 item 2), from the dataset's
+    own task reward: "zero" -> 0, "mean" -> its mean over every transition."""
+    r = np.asarray(dataset["rewards"], dtype=np.float32)
+    if mode == "zero":
+        c = 0.0
+    elif mode == "mean":
+        c = float(r.mean())
+    else:
+        raise ValueError(f"unknown trivial reward {mode!r}")
+    return np.full_like(r, c, dtype=np.float32), c
 
 
 def modify_reward(dataset, env_name, normalize_reward, max_episode_steps=1000):
@@ -1717,6 +1746,12 @@ def train(config: TrainConfig):
             f"[heuristic_reward] {config.heuristic_reward}: gauge {config.gauge_reward!r} "
             f"subtracted {_gauge_c:.6g} -> range [{float(_r.min()):.6g}, {float(_r.max()):.6g}]"
         )
+    elif config.trivial_reward is not None:
+        dataset = d4rl.qlearning_dataset(env)
+        dataset["rewards"], _c = trivial_rewards(dataset, config.trivial_reward)
+        # NOT gauged: max0 would turn the mean constant into zero.
+        print(f"[trivial_reward] {config.trivial_reward}: {_c:.6g} on all "
+              f"{len(dataset['rewards'])} transitions (not gauged)")
     else:
         dataset = d4rl.qlearning_dataset(env)
 

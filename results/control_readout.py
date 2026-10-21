@@ -158,14 +158,19 @@ def collect_grids(api, P):
     return grids
 
 
+# Grids added 2026-10-21 (§14.2 item 5) with no anchor-index no-terminals cell:
+# their seeds 1-10 cell runs at the grid winner directly.
+GRID_ONLY = ("noterm_PT", "noterm_ENS_MEAN")
+
+
 def grid_section(grids, winners, ctrl, out):
     """Prints section E; returns {anchor: winner} for every COMPLETE grid."""
     import iql_score
     found = {}
     out("\nE. NO-TERMINALS NORMALIZATION GRIDS  (seed 0; stage-4 rule; the index the seeds 1-10 control used)")
     for v in VARIANTS:
-        for kind in [k for k in ("noterm_task_reward", "noterm_MR", "noterm_BNN_MEAN", "noterm_BNN_CVAR")
-                     if hold.shown_kind(k)]:
+        for kind in [k for k in ("noterm_task_reward", "noterm_MR", "noterm_PT", "noterm_ENS_MEAN",
+                                 "noterm_BNN_MEAN", "noterm_BNN_CVAR") if hold.shown_kind(k)]:
             g = grids.get((v, kind))
             tag = f"  {v:15s} {kind:19s}"
             if g is None:
@@ -184,7 +189,10 @@ def grid_section(grids, winners, ctrl, out):
             found[g["anchor"]] = win
             by = {s["normalize_reward"]: s["score"] for s in table}
             row = " ".join(f"{by[i]:.3f}" for i in g["grid"])
-            verdict = "same as used" if win == used else f"DIFFERS from {used}: re-run seeds 1-10 at {win}"
+            if kind in GRID_ONLY:                      # no seeds 1-10 cell yet: it runs at the winner
+                verdict = f"anchor index {used}; seeds 1-10 run at {win}"
+            else:
+                verdict = "same as used" if win == used else f"DIFFERS from {used}: re-run seeds 1-10 at {win}"
             out(f"{tag} {g['sweep']}  idx {g['grid'][0]}-{g['grid'][-1]}: {row}   winner {win}  "
                 f"({verdict})")
     return found
@@ -339,6 +347,11 @@ def selftest():
     assert "winner 2  (same as used)" in txt                     # tie 2/3 -> 2
     assert "winner 0  (DIFFERS from 3: re-run seeds 1-10 at 0)" in txt
     assert "INCOMPLETE (3/8 scored)" in txt
+    lines = []
+    grid_section({("medium-play", "noterm_PT"): {"sweep": "g4", "anchor": "pt_sweeps/a", "grid": list(range(8)),
+                                                "runs": runs([.1, .2, .3, .7, .0, .0, .2, .2]), "notes": []}},
+                 {"pt_sweeps/a": 0}, {}, lines.append)
+    assert any("noterm_PT" in x and "winner 3  (anchor index 0; seeds 1-10 run at 3)" in x for x in lines), lines
     # --- section F: the re-run where the winner moved, the original where it did not ---
     w = {"mr_sweeps/sweep_antmaze_medium_play": 0, "bnn_sweeps/sweep_antmaze_medium_play_cvar": 2}
     g = {"mr_sweeps/sweep_antmaze_medium_play": 1, "bnn_sweeps/sweep_antmaze_medium_play_cvar": 2}
