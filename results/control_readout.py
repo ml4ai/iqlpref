@@ -140,14 +140,18 @@ def collect_grids(api, P):
         anchor, fixed = gspec[hits[0]]
         if flat.get("seed") != 0 or flat.get("normalize_reward") != list(P.grid_of(anchor)):
             continue                                   # a seeds 1-10 control, not a grid
-        key = (_short(P.dataset_of(anchor)), "noterm_" + P.method_of(anchor))
+        heur = P.is_heuristic_anchor(anchor)
+        key = ((anchor.split("heuristic_antmaze_")[1].replace("_", "-"), "noterm_heuristic") if heur
+               else (_short(P.dataset_of(anchor)), "noterm_" + P.method_of(anchor)))
         if not hold.shown_kind(key[1]):
             continue                                   # covered by the hold (§14.1)
         g = {"sweep": sw.id, "anchor": anchor, "grid": list(P.grid_of(anchor)), "runs": [],
              "notes": []}
+        if heur:
+            g["used"] = P.HEURISTIC_INDEX              # its with-terminals index, fixed in advance
         for r in sw.runs:
             bad = R.audit_run(r.config or {}, hits[0], 0, fixed, (r.config or {}).get("normalize_reward"),
-                              anchor.startswith("tr_"))
+                              anchor.startswith("tr_") or heur)
             if bad:
                 g["notes"].append(f"run {r.id}: AUDIT {bad[0]}")
             g["runs"].append(iql_score.score_run(r))
@@ -160,7 +164,7 @@ def collect_grids(api, P):
 
 # Grids added 2026-10-21 (§14.2 item 5) with no anchor-index no-terminals cell:
 # their seeds 1-10 cell runs at the grid winner directly.
-GRID_ONLY = ("noterm_PT", "noterm_ENS_MEAN")
+GRID_ONLY = ("noterm_PT", "noterm_ENS_MEAN", "noterm_heuristic")   # heuristic: §14.7 decision 2
 
 
 def grid_section(grids, winners, ctrl, out):
@@ -170,13 +174,14 @@ def grid_section(grids, winners, ctrl, out):
     out("\nE. NO-TERMINALS NORMALIZATION GRIDS  (seed 0; stage-4 rule; the index the seeds 1-10 control used)")
     for v in VARIANTS:
         for kind in [k for k in ("noterm_task_reward", "noterm_MR", "noterm_PT", "noterm_ENS_MEAN",
-                                 "noterm_BNN_MEAN", "noterm_BNN_CVAR") if hold.shown_kind(k)]:
+                                 "noterm_heuristic", "noterm_BNN_MEAN", "noterm_BNN_CVAR")
+                     if hold.shown_kind(k)]:
             g = grids.get((v, kind))
             tag = f"  {v:15s} {kind:19s}"
             if g is None:
                 out(f"{tag} no grid sweep")
                 continue
-            used = winners.get(g["anchor"])
+            used = g.get("used", winners.get(g["anchor"]))
             if g["notes"]:
                 out(f"{tag} {g['sweep']}  NOT READ -- {g['notes'][0]}")
                 continue
@@ -352,6 +357,12 @@ def selftest():
                                                 "runs": runs([.1, .2, .3, .7, .0, .0, .2, .2]), "notes": []}},
                  {"pt_sweeps/a": 0}, {}, lines.append)
     assert any("noterm_PT" in x and "winner 3  (anchor index 0; seeds 1-10 run at 3)" in x for x in lines), lines
+    lines = []
+    grid_section({("large-play", "noterm_heuristic"): {"sweep": "g5", "anchor": "ctrl_sweeps/heuristic_antmaze_large_play",
+                                                      "grid": list(range(8)), "used": 3, "notes": [],
+                                                      "runs": runs([.2, .1, .1, .1, .0, .0, .1, .1])}},
+                 {}, {}, lines.append)
+    assert any("noterm_heuristic" in x and "winner 0  (anchor index 3; seeds 1-10 run at 0)" in x for x in lines), lines
     # --- section F: the re-run where the winner moved, the original where it did not ---
     w = {"mr_sweeps/sweep_antmaze_medium_play": 0, "bnn_sweeps/sweep_antmaze_medium_play_cvar": 2}
     g = {"mr_sweeps/sweep_antmaze_medium_play": 1, "bnn_sweeps/sweep_antmaze_medium_play_cvar": 2}
