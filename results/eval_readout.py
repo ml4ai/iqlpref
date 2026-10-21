@@ -57,6 +57,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 sys.path.insert(0, ROOT)
+import hold                                                # noqa: E402  §14.1
 
 MARGIN = 0.10                       # §12.2, the same on every variant
 COVERAGE = 0.95
@@ -210,8 +211,10 @@ def collect(api, P, winners):
             else:
                 notes.append(f"{sw.id}: {name} at index {index}, not the winner {win} -- ignored")
                 continue
+        if not hold.shown(method):
+            continue                                   # covered by the hold (§14.1): not fetched
         key = (P.dataset_of(name), method)
-        cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {},
+        cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
                 "incomplete": [], "audit": [], "name": name}
         if sw.config.get("program") != P.program_of(name):
             cell["audit"].append(f"program {sw.config.get('program')!r}")
@@ -231,6 +234,7 @@ def collect(api, P, winners):
                 _, curve = iql_score.run_curve(r)
                 cell["scores"][s] = iql_score.score_curve(curve, n=iql_score.LAST_N)
                 cell["robust"][s] = iql_score.score_curve(curve, n=iql_score.ROBUST_N)
+                cell["max"][s] = iql_score.score_curve(curve, statistic="max")   # §14.2 item 4
             except (iql_score.IncompleteRun, ValueError) as e:
                 cell["incomplete"].append(f"seed {s}: {e}")
         missing = [s for s in SEEDS if s not in cell["scores"] and

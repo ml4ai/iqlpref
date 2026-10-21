@@ -87,7 +87,9 @@ def collect_controls(api, P, winners, gwin=None):
             continue
         v = _short(P.dataset_of(anchor)) if anchor else name.split("heuristic_antmaze_")[1].replace("_", "-")
         kind = (prefix + P.method_of(anchor)) if anchor else "heuristic"
-        cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {},
+        if not hold.shown_kind(kind):
+            continue                                   # covered by the hold (§14.1): not fetched
+        cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
                 "incomplete": [], "audit": [], "name": name}
         if sw.config.get("program") != P.DEFAULT_PROGRAM:
             cell["audit"].append(f"program {sw.config.get('program')!r}")
@@ -107,6 +109,7 @@ def collect_controls(api, P, winners, gwin=None):
                 _, curve = iql_score.run_curve(r)
                 cell["scores"][s] = iql_score.score_curve(curve, n=iql_score.LAST_N)
                 cell["robust"][s] = iql_score.score_curve(curve, n=iql_score.ROBUST_N)
+                cell["max"][s] = iql_score.score_curve(curve, statistic="max")   # §14.2 item 4
             except (iql_score.IncompleteRun, ValueError) as e:
                 cell["incomplete"].append(f"seed {s}: {e}")
         missing = [s for s in SEEDS if s not in cell["scores"] and
@@ -114,8 +117,6 @@ def collect_controls(api, P, winners, gwin=None):
         if missing:
             cell["incomplete"].append(f"seeds not started: {missing}")
         key = (v, kind)
-        if not hold.shown_kind(kind):
-            continue                                   # covered by the hold (§14.1)
         if key in cells:
             notes.append(f"{key}: two sweeps ({cells[key]['sweep']}, {sw.id}) -- cell NOT read")
             cells[key]["audit"].append(f"second sweep {sw.id}")

@@ -268,8 +268,10 @@ def collect_exp(api, P, winners, axis="sparsity"):
             notes.append(f"{sw.id}: {name} seed {flat.get('seed')} index {index} "
                          f"(anchor winner {win}) -- not this experiment's lineage, ignored")
             continue
+        if not R.hold.shown(P.method_of(anchor)):
+            continue                                   # covered by the hold (§14.1): not fetched
         key = (_short(P.dataset_of(anchor)), P.method_of(anchor), cond)
-        cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {},
+        cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
                 "incomplete": [], "audit": [], "name": name}
         if sw.config.get("program") != P.program_of(anchor):
             cell["audit"].append(f"program {sw.config.get('program')!r}")
@@ -288,6 +290,7 @@ def collect_exp(api, P, winners, axis="sparsity"):
                 _, curve = iql_score.run_curve(r)
                 cell["scores"][s] = iql_score.score_curve(curve, n=iql_score.LAST_N)
                 cell["robust"][s] = iql_score.score_curve(curve, n=iql_score.ROBUST_N)
+                cell["max"][s] = iql_score.score_curve(curve, statistic="max")   # §14.2 item 4
             except (iql_score.IncompleteRun, ValueError) as e:
                 cell["incomplete"].append(f"seed {s}: {e}")
         missing = [s for s in SEEDS if s not in cell["scores"] and

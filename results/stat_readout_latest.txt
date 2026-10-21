@@ -1,0 +1,119 @@
+====================================================================================================
+MAX vs LAST-10 (handoff §14.2 item 4).  DESCRIPTIVE.  Paired by seed; 95% exact bootstrap.
+Flags: ranking of cell means changes; a paired difference changes sign; its interval
+changes between excluding and including zero.
+BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not fetched.
+====================================================================================================
+
+A. THE ANCHOR, WITH TERMINALS
+
+  medium-play: the anchor, with terminals
+    task_reward              last-10 0.519 ± 0.086   max 0.658 ± 0.051   max - last-10 +0.139
+    task_reward_r1           last-10 0.648 ± 0.048   max 0.802 ± 0.030   max - last-10 +0.154
+    MR                       last-10 0.642 ± 0.042   max 0.772 ± 0.043   max - last-10 +0.130
+    PT                       last-10 0.690 ± 0.060   max 0.803 ± 0.047   max - last-10 +0.114
+    ENS_MEAN                 last-10 0.711 ± 0.025   max 0.836 ± 0.025   max - last-10 +0.125
+    ranking  last-10: ENS_MEAN > PT > task_reward_r1 > MR > task_reward
+             max:     ENS_MEAN > PT > task_reward_r1 > MR > task_reward   (same)
+    task_reward - task_reward_r1:  last-10 -0.129 [-0.184, -0.072]   max -0.144 [-0.177, -0.112]
+    task_reward - MR:  last-10 -0.123 [-0.184, -0.062]   max -0.114 [-0.160, -0.070]
+    task_reward - PT:  last-10 -0.171 [-0.216, -0.126]   max -0.145 [-0.183, -0.109]
+    task_reward - ENS_MEAN:  last-10 -0.192 [-0.253, -0.136]   max -0.178 [-0.211, -0.144]
+    task_reward_r1 - MR:  last-10 +0.006 [-0.029, +0.040]   max +0.030 [-0.005, +0.069]
+    task_reward_r1 - PT:  last-10 -0.042 [-0.075, -0.004]   max -0.001 [-0.024, +0.020]   ** SEPARATION CHANGES
+    task_reward_r1 - ENS_MEAN:  last-10 -0.064 [-0.086, -0.043]   max -0.034 [-0.046, -0.021]
+    MR - PT:  last-10 -0.047 [-0.089, -0.001]   max -0.031 [-0.073, +0.011]   ** SEPARATION CHANGES
+    MR - ENS_MEAN:  last-10 -0.069 [-0.099, -0.039]   max -0.064 [-0.096, -0.035]
+    PT - ENS_MEAN:  last-10 -0.022 [-0.061, +0.013]   max -0.033 [-0.055, -0.013]   ** SEPARATION CHANGES
+
+  medium-diverse: the anchor, with terminals
+    task_reward              last-10 0.607 ± 0.055   max 0.808 ± 0.034   max - last-10 +0.201
+    MR                       last-10 0.647 ± 0.057   max 0.813 ± 0.048   max - last-10 +0.166
+    PT                       last-10 0.550 ± 0.172   max 0.712 ± 0.173   max - last-10 +0.162
+    ENS_MEAN                 last-10 0.683 ± 0.037   max 0.772 ± 0.038   max - last-10 +0.089
+    ranking  last-10: ENS_MEAN > MR > task_reward > PT
+             max:     MR > task_reward > ENS_MEAN > PT   ** RANKING CHANGES
+    task_reward - MR:  last-10 -0.040 [-0.096, +0.017]   max -0.005 [-0.048, +0.035]
+    task_reward - PT:  last-10 +0.056 [-0.032, +0.173]   max +0.096 [+0.020, +0.211]   ** SEPARATION CHANGES
+    task_reward - ENS_MEAN:  last-10 -0.076 [-0.122, -0.032]   max +0.036 [+0.007, +0.063]   ** SIGN FLIPS
+    MR - PT:  last-10 +0.096 [+0.004, +0.206]   max +0.101 [+0.005, +0.222]
+    MR - ENS_MEAN:  last-10 -0.036 [-0.079, +0.002]   max +0.041 [-0.002, +0.087]   ** SIGN FLIPS
+    PT - ENS_MEAN:  last-10 -0.132 [-0.237, -0.048]   max -0.060 [-0.177, +0.020]   ** SEPARATION CHANGES
+
+  large-play: the anchor, with terminals
+    task_reward              last-10 0.367 ± 0.079   max 0.540 ± 0.066   max - last-10 +0.173
+    MR                       last-10 0.425 ± 0.054   max 0.564 ± 0.065   max - last-10 +0.139
+    PT                       last-10 0.386 ± 0.073   max 0.541 ± 0.048   max - last-10 +0.155
+    ENS_MEAN                 last-10 0.440 ± 0.064   max 0.580 ± 0.047   max - last-10 +0.140
+    ranking  last-10: ENS_MEAN > MR > PT > task_reward
+             max:     ENS_MEAN > MR > PT > task_reward   (same)
+    task_reward - MR:  last-10 -0.058 [-0.108, -0.007]   max -0.024 [-0.071, +0.023]   ** SEPARATION CHANGES
+    task_reward - PT:  last-10 -0.019 [-0.082, +0.049]   max -0.001 [-0.040, +0.043]
+    task_reward - ENS_MEAN:  last-10 -0.073 [-0.135, -0.014]   max -0.040 [-0.068, -0.010]
+    MR - PT:  last-10 +0.039 [-0.020, +0.097]   max +0.023 [-0.032, +0.072]
+    MR - ENS_MEAN:  last-10 -0.015 [-0.066, +0.048]   max -0.016 [-0.060, +0.034]
+    PT - ENS_MEAN:  last-10 -0.054 [-0.102, +0.002]   max -0.039 [-0.080, +0.004]
+
+  large-diverse: the anchor, with terminals
+    task_reward              last-10 0.272 ± 0.045   max 0.468 ± 0.062   max - last-10 +0.196
+    MR                       last-10 0.241 ± 0.098   max 0.437 ± 0.112   max - last-10 +0.196
+    PT                       last-10 0.169 ± 0.136   max 0.290 ± 0.148   max - last-10 +0.121
+    ENS_MEAN                 last-10 0.283 ± 0.078   max 0.466 ± 0.082   max - last-10 +0.183
+    ranking  last-10: ENS_MEAN > task_reward > MR > PT
+             max:     task_reward > ENS_MEAN > MR > PT   ** RANKING CHANGES
+    task_reward - MR:  last-10 +0.031 [-0.035, +0.094]   max +0.031 [-0.035, +0.095]
+    task_reward - PT:  last-10 +0.103 [+0.011, +0.186]   max +0.178 [+0.071, +0.277]
+    task_reward - ENS_MEAN:  last-10 -0.010 [-0.064, +0.042]   max +0.002 [-0.055, +0.062]   ** SIGN FLIPS
+    MR - PT:  last-10 +0.072 [-0.020, +0.164]   max +0.147 [+0.044, +0.253]   ** SEPARATION CHANGES
+    MR - ENS_MEAN:  last-10 -0.042 [-0.104, +0.026]   max -0.029 [-0.103, +0.047]
+    PT - ENS_MEAN:  last-10 -0.113 [-0.190, -0.039]   max -0.176 [-0.263, -0.089]
+
+B. THE CONTROLS
+
+  medium-play: the controls
+    noterm_MR                last-10 0.636 ± 0.071   max 0.795 ± 0.047   max - last-10 +0.159
+    rerun_MR                 last-10 0.652 ± 0.067   max 0.789 ± 0.085   max - last-10 +0.137
+    ranking  last-10: rerun_MR > noterm_MR
+             max:     noterm_MR > rerun_MR   ** RANKING CHANGES
+    noterm_MR - rerun_MR:  last-10 -0.016 [-0.044, +0.011]   max +0.006 [-0.045, +0.064]   ** SIGN FLIPS
+
+  medium-diverse: the controls
+    rerun_MR                 not read -- INCOMPLETE (5/10 seeds scored)
+    noterm_MR                last-10 0.306   max 0.632   (nothing to compare)
+
+  large-play: the controls
+
+  large-diverse: the controls
+    rerun_MR                 not read -- INCOMPLETE (5/10 seeds scored)
+
+C. DEGRADATION LADDERS
+
+  medium-play: MR, sparsity ladder
+    full                     last-10 0.642 ± 0.042   max 0.772 ± 0.043   max - last-10 +0.130
+    r16                      last-10 0.606 ± 0.090   max 0.774 ± 0.052   max - last-10 +0.168
+    ranking  last-10: full > r16
+             max:     r16 > full   ** RANKING CHANGES
+    full - r16:  last-10 +0.037 [-0.022, +0.100]   max -0.002 [-0.035, +0.032]   ** SIGN FLIPS
+
+  medium-diverse: MR, sparsity ladder
+    full                     last-10 0.647 ± 0.057   max 0.813 ± 0.048   max - last-10 +0.166
+    r16                      last-10 0.648 ± 0.064   max 0.800 ± 0.054   max - last-10 +0.152
+    ranking  last-10: r16 > full
+             max:     full > r16   ** RANKING CHANGES
+    full - r16:  last-10 -0.002 [-0.067, +0.061]   max +0.013 [-0.039, +0.066]   ** SIGN FLIPS
+
+  large-play: MR, sparsity ladder
+    full                     last-10 0.425 ± 0.054   max 0.564 ± 0.065   max - last-10 +0.139
+    r16                      last-10 0.500 ± 0.060   max 0.630 ± 0.056   max - last-10 +0.130
+    ranking  last-10: r16 > full
+             max:     r16 > full   (same)
+    full - r16:  last-10 -0.075 [-0.123, -0.030]   max -0.066 [-0.123, -0.015]
+
+  large-diverse: MR, sparsity ladder
+    full                     last-10 0.241 ± 0.098   max 0.437 ± 0.112   max - last-10 +0.196
+    r16                      last-10 0.317 ± 0.128   max 0.502 ± 0.118   max - last-10 +0.185
+    ranking  last-10: r16 > full
+             max:     r16 > full   (same)
+    full - r16:  last-10 -0.076 [-0.147, -0.008]   max -0.065 [-0.149, +0.012]   ** SEPARATION CHANGES
+
+SUMMARY: 9 groups read; ranking changes in 5; 33 paired comparisons, sign flips 6, separation changes 8.
