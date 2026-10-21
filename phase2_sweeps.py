@@ -104,7 +104,8 @@ def spec():
         out[f"mr_sweeps/sweep_antmaze_{v}"] = dict(
             base, reward_model_root=root("mr"), query_length=1)
         out[f"pt_sweeps/sweep_antmaze_{v}"] = dict(
-            base, reward_model_root=root("pt"), query_length=100)
+            base, reward_model_root=root("pt"), query_length=100,
+            seq_labeller=2)            # the fixed PT labeller (§14.10); older PT sweeps match nothing
         out[f"tr_sweeps/sweep_antmaze_{v}"] = dict(base)     # oracle: nothing else
     return out
 
@@ -573,7 +574,7 @@ def cmd_register(sp, winners_path, do_write, notebook=NOTEBOOK):
             # reward_model_root by design.  It is not an anchor cell: skip it
             # without comment.  Anything else that matches nothing is reported.
             if not (is_condition_root(flat(params).get("reward_model_root"))
-                    or is_control(flat(params))):
+                    or is_control(flat(params)) or is_pre_fix_seq(flat(params))):
                 print(f"  ?? {sw.id}: matches {len(hits)} spec entries -- ignored")
             continue
         name = hits[0]
@@ -764,6 +765,11 @@ HEURISTIC_INDEX = 3
 # gauged, with and without terminals; seeds 1-10.
 TRIVIAL_MODES = ("zero", "mean")
 TRIVIAL_INDEX = 0
+
+
+def is_pre_fix_seq(params_flat):
+    """A PT sweep from before the labeller fix (§14.10): superseded, never read."""
+    return (params_flat.get("query_length") or 1) > 1 and "seq_labeller" not in params_flat
 
 
 def is_control(params_flat):
@@ -1220,6 +1226,14 @@ def selftest():
         # exactly one grid entry (the ensemble shares MR's root), and never an anchor cell
         assert match_entry(gp, {n: f for n, (_, f) in gs.items()}) == [f"ctrl_sweeps/s4noterm_antmaze_large_play_{fam}"]
         assert not match_entry(gp, sp)
+    # §14.10: PT carries the fixed-labeller key; an older PT sweep matches nothing
+    for v in VARIANTS:
+        assert sp[f"pt_sweeps/sweep_antmaze_{v}"]["seq_labeller"] == 2
+    old_pt = {k: x for k, x in sp["pt_sweeps/sweep_antmaze_large_play"].items() if k != "seq_labeller"}
+    assert not match_entry(lineage_params(old_pt, "eval", 3), sp)
+    assert is_pre_fix_seq(flat(lineage_params(old_pt, "eval", 3)))
+    assert not is_pre_fix_seq(flat(lineage_params(sp["pt_sweeps/sweep_antmaze_large_play"], "eval", 3)))
+    assert not is_pre_fix_seq(flat(lineage_params(sp["mr_sweeps/sweep_antmaze_large_play"], "eval", 3)))
     ts = trivial_spec(sp)
     assert len(ts) == 16 and all(is_control(f) for f in ts.values())
     assert ts["ctrl_sweeps/trivial_zero_noterm_antmaze_large_play"] == {

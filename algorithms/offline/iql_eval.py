@@ -160,6 +160,11 @@ class TrainConfig:
     reward_model_root: Optional[str] = None
     # required for when loading a reward model. If ==1 then MR, if >1 then PT
     query_length: int = 1
+    # Sequence-model labeller version (handoff §14.10).  Must be 2 whenever
+    # query_length > 1: version 2 is the fixed window builder of
+    # qlearning_dataset_pt.  A PT run that does not declare it is refused, so an
+    # old sweep file can never run, and a box without the fix rejects the key.
+    seq_labeller: Optional[int] = None
     # set True when reward_model_path points to a BNN (fSGHMC) posterior save dir
     bnn_reward_model: bool = False
     # CVaR risk level α ∈ [0,1): r̃(s,a) = mean of worst (1-α) fraction of posterior samples
@@ -208,6 +213,9 @@ class TrainConfig:
                 raise ValueError(f"heuristic_reward must be 'path_length', got {self.heuristic_reward!r}")
             if self.reward_model_path:
                 raise ValueError("heuristic_reward and a reward model are mutually exclusive")
+        if self.query_length > 1 and self.seq_labeller != 2:
+            raise ValueError("a sequence reward model (query_length > 1) needs seq_labeller 2, "
+                             f"the fixed labeller (HANDOFF §14.10); got {self.seq_labeller!r}")
         if self.trivial_reward is not None:
             if self.trivial_reward not in ("zero", "mean"):
                 raise ValueError(f"trivial_reward must be 'zero' or 'mean', got {self.trivial_reward!r}")

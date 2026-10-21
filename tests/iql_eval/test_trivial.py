@@ -39,4 +39,12 @@ for bad in (dict(trivial_reward="one"), dict(trivial_reward="zero", normalize_re
         pass
 c = TC()
 assert c.trivial_reward is None and not c.drop_terminals and c.heuristic_reward is None
+# §14.10: a sequence reward model must declare the fixed labeller
+TC(query_length=100, seq_labeller=2)
+for bad in (dict(query_length=100), dict(query_length=100, seq_labeller=1)):
+    try:
+        TC(**bad); raise AssertionError(f"accepted {bad}")
+    except ValueError:
+        pass
+TC(query_length=1)                                     # MR / BNN / task reward: unaffected
 print("trivial rewards OK")
