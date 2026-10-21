@@ -1526,12 +1526,21 @@ def qlearning_dataset_pt(
     act_all = dataset["actions"].astype(np.float32)
     s_dim, a_dim = obs_all.shape[1], act_all.shape[1]
 
-    # Single pass: keep mask + per-transition episode step (used as window index).
+    # Single pass: keep mask + the GLOBAL row at which each transition's episode
+    # starts.  An episode ends at a terminal or a timeout; the next row starts one.
+    #
+    # FIXED 2026-10-21 (gp_reward-priors HANDOFF §14.10): the windows used to be
+    # indexed by the within-episode step as if it were a global row, so every
+    # transition was labelled from a window of the dataset's FIRST episode at the
+    # same step -- a reward depending on time since the episode start, not on the
+    # state.  The bug was present from the first per-step version (before
+    # 2ac29e1) and survived its vectorisation.  Windows now end at the
+    # transition's own row and never cross into the previous episode.
     keep = np.ones(N - 1, dtype=bool)
-    ep_steps = np.zeros(N - 1, dtype=np.int64)
-    ep = 0
+    ep_start = np.zeros(N - 1, dtype=np.int64)
+    ep, start = 0, 0
     for i in range(N - 1):
-        ep_steps[i] = ep
+        ep_start[i] = start
         done_bool = bool(dataset["terminals"][i])
         final = (
             bool(dataset["timeouts"][i])
@@ -1540,15 +1549,19 @@ def qlearning_dataset_pt(
         )
         if (not terminate_on_end) and final:
             keep[i] = False
-            ep = 0
+            ep, start = 0, i + 1
             continue
         if done_bool or final:
-            ep = 0
+            ep, start = 0, i + 1
+            continue
         ep += 1
 
-    # Chunked batched inference.  All windows are left-padded to query_length so
-    # we always read the reward from result["value"][:, 0, -1, 0] (last token).
-    # Padded positions receive attn_mask=0 which the transformer masks to -1e4.
+    # Chunked batched inference.  Every window ends at its transition's row and
+    # is left-padded to query_length, so the reward is always read from
+    # result["value"][:, 0, -1, 0] (the last token).  The conventions are the
+    # original ones: a full window has timesteps 0..query_length-1; a short one
+    # (the first query_length - 1 steps of an episode) carries 0..L-1
+    # right-aligned, with attn_mask 0 on the padding.
     device = next(r_model.parameters()).device
     CHUNK = 256
     all_rewards = np.zeros(N - 1, dtype=np.float32)
@@ -1557,33 +1570,15 @@ def qlearning_dataset_pt(
     with torch.inference_mode():
         for cs in range(0, N - 1, CHUNK):
             ce = min(cs + CHUNK, N - 1)
-            B = ce - cs
-            eps = ep_steps[cs:ce]
-
-            sts_c = np.zeros((B, query_length, s_dim), dtype=np.float32)
-            acts_c = np.zeros((B, query_length, a_dim), dtype=np.float32)
-            ts_c = np.zeros((B, query_length), dtype=np.int64)
-            am_c = np.zeros((B, query_length), dtype=np.float32)
-
-            # Full-length windows — vectorised with advanced indexing.
-            mask_full = eps >= query_length
-            if mask_full.any():
-                starts = eps[mask_full] - query_length + 1
-                row_idx = starts[:, None] + ts_template[None, :]  # [M, query_length]
-                sts_c[mask_full] = obs_all[row_idx]
-                acts_c[mask_full] = act_all[row_idx]
-                ts_c[mask_full] = ts_template
-                am_c[mask_full] = 1.0
-
-            # Short windows (only the first query_length steps of each episode).
-            for j in np.where(~mask_full)[0]:
-                ep_j = int(eps[j])
-                seq_len = ep_j + 1
-                pad = query_length - seq_len
-                sts_c[j, pad:] = obs_all[:seq_len]
-                acts_c[j, pad:] = act_all[:seq_len]
-                ts_c[j, pad:] = ts_template[:seq_len]
-                am_c[j, pad:] = 1.0
+            rows = np.arange(cs, ce, dtype=np.int64)
+            idx = rows[:, None] - (query_length - 1) + ts_template[None, :]   # [B, query_length]
+            valid = idx >= ep_start[cs:ce, None]                               # inside the own episode
+            L = valid.sum(axis=1)                                              # window length
+            idx_c = np.where(valid, idx, 0)
+            sts_c = np.where(valid[..., None], obs_all[idx_c], 0.0).astype(np.float32)
+            acts_c = np.where(valid[..., None], act_all[idx_c], 0.0).astype(np.float32)
+            ts_c = np.where(valid, ts_template[None, :] - (query_length - L)[:, None], 0).astype(np.int64)
+            am_c = valid.astype(np.float32)
 
             result, _ = r_model(
                 torch.from_numpy(sts_c).to(device),
