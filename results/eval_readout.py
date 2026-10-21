@@ -475,9 +475,12 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--winners", default=os.path.join(ROOT, "phase2_winners.json"))
     ap.add_argument("--selftest", action="store_true")
+    import hold
+    hold.parse()                                   # before argparse sees the flag
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    hold.refuse("eval_readout.py", "the §12 verdicts of BNN CVaR, and the BNN and ensemble cells")
     import wandb
     _argv, sys.argv = sys.argv, [sys.argv[0]]
     import phase2_sweeps as P

@@ -238,11 +238,20 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--variants", default="medium_play medium_diverse large_play large_diverse")
     ap.add_argument("--seeds", default="1 2 3")
-    ap.add_argument("--kinds", default="MR,PT,BNN mean,BNN CVaR")
+    # BNN kinds are covered by the BNN/CVaR hold (HANDOFF §14.1): not by default,
+    # and refused without --include-held.
+    ap.add_argument("--kinds", default="MR,PT")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--selftest", action="store_true")
+    import hold
+    hold.parse()                                   # before argparse sees the flag
     a = ap.parse_args()
-    return selftest() if a.selftest else run(a)
+    if a.selftest:
+        return selftest()
+    if not hold.INCLUDE and any(k.strip().startswith("BNN") for k in a.kinds.split(",")):
+        sys.exit("goal_structure.py: BNN kinds are covered by the BNN/CVaR hold (HANDOFF §14.1); "
+                 "--include-held overrides, only once the author has lifted it")
+    return run(a)
 
 
 if __name__ == "__main__":

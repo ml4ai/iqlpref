@@ -20,6 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import eval_readout as R                                   # noqa: E402
+import hold                                                # noqa: E402
 from iql_score import EVAL_POINTS, LAST_N                  # noqa: E402
 
 ENTITY, PROJECT = "champlin-university-of-arizona", "IQL-pref"
@@ -61,11 +62,16 @@ def by_seed(api, sweep_id):
 
 
 def main():
+    hold.parse()
     import wandb
     api = wandb.Api(timeout=120)
     print("STEPS-TO-GOAL, with vs without terminals (success-weighted, last 10 evaluations; DESCRIPTIVE)")
     print("steps are counted over SUCCESSFUL episodes only; 'succ' = last-10 success rate\n")
+    if not hold.INCLUDE:
+        print("BNN/CVaR HOLD (HANDOFF §14.1): BNN rows are not shown\n")
     for (v, rew), (w_id, wo_id) in PAIRS.items():
+        if not hold.shown(rew.upper().replace(" ", "_")):
+            continue
         a, b = by_seed(api, w_id), by_seed(api, wo_id)
         both = [s for s in R.SEEDS if a.get(s, (None, None))[1] is not None
                 and b.get(s, (None, None))[1] is not None]

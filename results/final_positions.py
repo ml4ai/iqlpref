@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "gp_reward-priors"))
 sys.path.insert(0, HERE)
 
 from goal_structure import bfs_distance, cells_of                  # noqa: E402
+import hold                                                        # noqa: E402
 
 ENTITY, PROJECT = "champlin-university-of-arizona", "IQL-pref"
 LAST = 10
@@ -75,11 +76,17 @@ def main():
         assert out["fail_cells"][0] == ((6, 5), 50) and out["fail_dist"][1] == 50
         print("selftest OK")
         return 0
+    hold.parse()
     import wandb
     api = wandb.Api(timeout=120)
     free, scaling, offset = layout("medium")
     for sid in sys.argv[1:]:
         sw = api.sweep(f"{ENTITY}/{PROJECT}/{sid}")
+        params = {k: (v.get("value") if isinstance(v, dict) else v)
+                  for k, v in (sw.config.get("parameters") or {}).items()}
+        if not hold.INCLUDE and hold.held_config(params):
+            print(f"=== {sid}: covered by the BNN/CVaR hold (HANDOFF §14.1) -- not read")
+            continue
         allrows, n_runs = [], 0
         print(f"=== {sid}")
         for r in sorted(sw.runs, key=lambda r: r.config.get("seed", 0)):

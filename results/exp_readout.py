@@ -648,9 +648,12 @@ def main():
     ap.add_argument("--winners", default=os.path.join(ROOT, "phase2_winners.json"))
     ap.add_argument("--axis", choices=tuple(AXES), default="sparsity")
     ap.add_argument("--selftest", action="store_true")
+    import hold
+    hold.parse()                                   # before argparse sees the flag
     a = ap.parse_args()
     if a.selftest:
         return selftest()
+    hold.refuse("exp_readout.py", "RQ2's main hypothesis: BNN CVaR against its comparators, and the H3 gate")
     import wandb
     _argv, sys.argv = sys.argv, [sys.argv[0]]
     import phase2_sweeps as P

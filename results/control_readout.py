@@ -27,6 +27,11 @@ THE QUESTIONS, fixed before the results
      lowest index), beside the index the seeds 1-10 control used.  Where they
      differ, the seeds 1-10 cell is re-run at the grid's winner.
 
+THE HOLD (HANDOFF §14.1, 2026-10-20): covered families (BNN CVaR, BNN mean,
+ensemble CVaR) are dropped at collection and from every section; section B,
+which is BNN CVaR - MR throughout, is not printed.  --include-held restores
+them, only once the author has lifted the hold.
+
 Run from the repo root:
     python results/control_readout.py
 """
@@ -43,6 +48,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, ROOT)
 
 import eval_readout as R                                   # noqa: E402
+import hold                                                # noqa: E402
 
 VARIANTS = R.VARIANTS
 SEEDS = R.SEEDS
@@ -108,6 +114,8 @@ def collect_controls(api, P, winners, gwin=None):
         if missing:
             cell["incomplete"].append(f"seeds not started: {missing}")
         key = (v, kind)
+        if not hold.shown_kind(kind):
+            continue                                   # covered by the hold (§14.1)
         if key in cells:
             notes.append(f"{key}: two sweeps ({cells[key]['sweep']}, {sw.id}) -- cell NOT read")
             cells[key]["audit"].append(f"second sweep {sw.id}")
@@ -133,6 +141,8 @@ def collect_grids(api, P):
         if flat.get("seed") != 0 or flat.get("normalize_reward") != list(P.grid_of(anchor)):
             continue                                   # a seeds 1-10 control, not a grid
         key = (_short(P.dataset_of(anchor)), "noterm_" + P.method_of(anchor))
+        if not hold.shown_kind(key[1]):
+            continue                                   # covered by the hold (§14.1)
         g = {"sweep": sw.id, "anchor": anchor, "grid": list(P.grid_of(anchor)), "runs": [],
              "notes": []}
         for r in sw.runs:
@@ -154,7 +164,8 @@ def grid_section(grids, winners, ctrl, out):
     found = {}
     out("\nE. NO-TERMINALS NORMALIZATION GRIDS  (seed 0; stage-4 rule; the index the seeds 1-10 control used)")
     for v in VARIANTS:
-        for kind in ("noterm_task_reward", "noterm_MR", "noterm_BNN_MEAN", "noterm_BNN_CVAR"):
+        for kind in [k for k in ("noterm_task_reward", "noterm_MR", "noterm_BNN_MEAN", "noterm_BNN_CVAR")
+                     if hold.shown_kind(k)]:
             g = grids.get((v, kind))
             tag = f"  {v:15s} {kind:19s}"
             if g is None:
@@ -195,9 +206,11 @@ def at_winner(ctrl, gwin, winners, v, m):
 def rerun_section(ctrl, A, gwin, winners, out):
     out("\nF. AT THE NO-TERMINALS WINNER  (each reward at its own no-terminals grid winner; §13.14.7)")
     for v in VARIANTS:
-        for m in ("task_reward", "MR", "BNN_MEAN", "BNN_CVAR"):
+        for m in hold.show(("task_reward", "MR", "BNN_MEAN", "BNN_CVAR")):
             line(A[v][m], at_winner(ctrl, gwin, winners, v, m), out,
                  f"  {v:15s} {m:9s} with terminals - without, at its winner")
+        if not hold.shown("BNN_CVAR"):
+            continue
         line(at_winner(ctrl, gwin, winners, v, "BNN_CVAR"), at_winner(ctrl, gwin, winners, v, "MR"), out,
              f"  {v:15s} BNN CVaR - MR, no terminals, each at its winner")
         line(at_winner(ctrl, gwin, winners, v, "BNN_CVAR"), at_winner(ctrl, gwin, winners, v, "BNN_MEAN"), out,
@@ -217,18 +230,23 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
     out("IQL CONTROLS (handoff §13.13-§13.14): terminals, and motion shaping.  DESCRIPTIVE.")
     out("last-10 statistic; paired by seed; exact bootstrap over seeds, paired-t beside it")
     out("=" * 100)
+    if not hold.INCLUDE:
+        out("  BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not shown; "
+            "section B is omitted")
     for n in notes:
-        out(f"  note: {n}")
-    A = {v: {m: anchor.get((f"antmaze-{v}-v2", m)) for m in ANCHOR_METHODS} for v in VARIANTS}
+        if hold.INCLUDE or not any(x in n for x in ("BNN", "ENS_CVAR", "bnn", "ensemble CVaR")):
+            out(f"  note: {n}")
+    A = {v: {m: anchor.get((f"antmaze-{v}-v2", m)) for m in hold.show(ANCHOR_METHODS)} for v in VARIANTS}
 
     out("\nA. WHAT THE TERMINALS CARRY  (anchor, with terminals - the same reward without them)")
     for v in VARIANTS:
-        for m in ("task_reward", "MR", "BNN_MEAN", "BNN_CVAR"):
+        for m in hold.show(("task_reward", "MR", "BNN_MEAN", "BNN_CVAR")):
             line(A[v][m], ctrl.get((v, f"noterm_{m}")), out,
                  f"  {v:15s} {m:9s} with - without terminals   ")
 
-    out("\nB. DO THE REWARDS SEPARATE WITHOUT TERMINALS?  (BNN CVaR - MR)")
-    for v in VARIANTS:
+    out("\nB. DO THE REWARDS SEPARATE WITHOUT TERMINALS?  (BNN CVaR - MR)"
+        + ("" if hold.INCLUDE else "  -- omitted: covered by the hold (§14.1)"))
+    for v in (VARIANTS if hold.INCLUDE else ()):
         line(ctrl.get((v, "noterm_BNN_CVAR")), ctrl.get((v, "noterm_MR")), out,
              f"  {v:15s} without terminals              ")
         line(A[v]["BNN_CVAR"], A[v]["MR"], out,
@@ -239,20 +257,20 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
     out("\nB2. WITHOUT TERMINALS, DOES A LEARNED REWARD CARRY MORE GOAL INFORMATION THAN THE TASK REWARD?"
         "  (learned - task reward, both without terminals)")
     for v in VARIANTS:
-        for m in ("MR", "BNN_MEAN", "BNN_CVAR"):
+        for m in hold.show(("MR", "BNN_MEAN", "BNN_CVAR")):
             line(ctrl.get((v, f"noterm_{m}")), ctrl.get((v, "noterm_task_reward")), out,
                  f"  {v:15s} {m:9s} - task reward, no terminals")
 
     out("\nC. LEARNED REWARDS AGAINST MOTION SHAPING  (each method - path-length heuristic, both with terminals)")
     for v in VARIANTS:
         h = ctrl.get((v, "heuristic"))
-        for m in ANCHOR_METHODS:
+        for m in hold.show(ANCHOR_METHODS):
             line(A[v][m], h, out, f"  {v:15s} {m:11s} - heuristic          ")
 
     out("\nD. THE CONTROL CELLS  (last-10 mean ± sd over seeds 1-10)")
     for v in VARIANTS:
-        for kind in ("noterm_task_reward", "noterm_MR", "noterm_BNN_MEAN", "noterm_BNN_CVAR",
-                     "heuristic"):
+        for kind in [k for k in ("noterm_task_reward", "noterm_MR", "noterm_BNN_MEAN", "noterm_BNN_CVAR",
+                                 "heuristic") if hold.shown_kind(k)]:
             c = ctrl.get((v, kind))
             r = R.cell_ready(c)
             if r:
@@ -266,7 +284,7 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
         found = grid_section(grids, winners or {}, ctrl, out)
         rerun_section(ctrl, A, found, winners or {}, out)
         for v in VARIANTS:
-            for m in ("MR", "BNN_MEAN", "BNN_CVAR", "task_reward"):
+            for m in hold.show(("MR", "BNN_MEAN", "BNN_CVAR", "task_reward")):
                 c = ctrl.get((v, f"rerun_{m}"))
                 if c is not None:
                     r = R.cell_ready(c)
@@ -277,6 +295,7 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
 
 
 def selftest():
+    hold.INCLUDE = True
     rng = np.random.default_rng(0)
 
     def cell(vals):
@@ -335,6 +354,19 @@ def selftest():
     txt = "\n".join(lines)
     fl = [x for x in txt.splitlines() if "medium-play     BNN CVaR - MR, no terminals, each at its winner" in x]
     assert len(fl) == 1 and "diff -0.200" in fl[0], txt                # re-run MR vs original BNN CVaR
+    # --- the hold (§14.1): nothing covered is printed by default ---
+    hold.INCLUDE = False
+    lines = []
+    report(ctrl, anchor, ["sweep x: BNN_CVAR cell", "sweep y: MR cell"], out=lines.append, grids=grids,
+           winners={"bnn_sweeps/a": 2, "mr_sweeps/a": 3, "mr_sweeps/b": 3})
+    rerun_section(ct, An, g, w, lines.append)
+    txt = "\n".join(lines)
+    body = [x for x in txt.splitlines() if "HOLD" not in x and "omitted" not in x]
+    assert not any(k in x for x in body for k in ("BNN", "ENS_CVAR", "bnn_sweeps")), txt
+    assert "sweep y: MR cell" in txt and "sweep x" not in txt
+    assert txt.count("diff +0.250") == 4 and txt.count("diff +0.350") == 4    # A: MR and task reward stay
+    assert "medium-play     MR        with terminals - without, at its winner" in txt
+    assert txt.count("- heuristic") == 16                                     # C: 4 variants x 4 methods
     print("selftest OK")
     return 0
 
@@ -342,6 +374,7 @@ def selftest():
 def main():
     if "--selftest" in sys.argv:
         return selftest()
+    hold.parse()
     import wandb
     _argv, sys.argv = sys.argv, [sys.argv[0]]
     import phase2_sweeps as P
