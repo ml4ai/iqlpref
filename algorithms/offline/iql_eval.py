@@ -45,6 +45,7 @@ import reward_label_cache as _rlc
 
 from optbnn.bnn.nets.mlp import MLP as RewardMLP
 from optbnn.bnn.nets.pref_trans import PT as RewardPT
+from optbnn.bnn.nets.nmr import NMR as RewardNMR
 
 TensorBatch = List[torch.Tensor]
 
@@ -167,6 +168,10 @@ class TrainConfig:
     seq_labeller: Optional[int] = None
     # set True when reward_model_path points to a BNN (fSGHMC) posterior save dir
     bnn_reward_model: bool = False
+    # NMR (LSTM) sequence reward model (handoff §14.2 item 1): labelled through the
+    # same fixed window labeller as PT (qlearning_dataset_pt, last step of each
+    # query_length window), as the PT repository labels its NMR.
+    nmr_reward_model: bool = False
     # CVaR risk level α ∈ [0,1): r̃(s,a) = mean of worst (1-α) fraction of posterior samples
     # higher α = more conservative; α=0.95 averages the worst 5% (recommended starting point)
     # α=0.0 disables conservatism entirely and returns the plain posterior mean reward
@@ -213,6 +218,9 @@ class TrainConfig:
                 raise ValueError(f"heuristic_reward must be 'path_length', got {self.heuristic_reward!r}")
             if self.reward_model_path:
                 raise ValueError("heuristic_reward and a reward model are mutually exclusive")
+        if self.nmr_reward_model and (self.query_length <= 1 or self.bnn_reward_model or self.mr_ensemble):
+            raise ValueError("nmr_reward_model needs query_length > 1 (its window) and excludes "
+                             "bnn_reward_model and mr_ensemble")
         if self.query_length > 1 and self.seq_labeller != 2:
             raise ValueError("a sequence reward model (query_length > 1) needs seq_labeller 2, "
                              f"the fixed labeller (HANDOFF §14.10); got {self.seq_labeller!r}")
@@ -1650,6 +1658,30 @@ def load_mlp_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     return model
 
 
+def load_nmr_reward_model(model_dir: str, state_dim: int, action_dim: int,
+                          device: str = "cpu") -> nn.Module:
+    """The NMR (LSTM) reward model of scripts_nmr/run_nmr_training_antmaze_eval.py."""
+    with open(os.path.join(model_dir, "config.yaml")) as f:
+        cfg = yaml.safe_load(f)
+    ckpt = torch.load(
+        os.path.join(model_dir, "best_model.pt"), map_location=device, weights_only=False
+    )
+    state = _strip_compile_prefix(ckpt["net"])
+    in_dim = state["pre.0.weight"].shape[1]
+    if in_dim != state_dim + action_dim:
+        raise ValueError(f"NMR input dim {in_dim} != state {state_dim} + action {action_dim}")
+    model = RewardNMR(
+        state_dim=state_dim,
+        action_dim=action_dim,
+        embd_dim=state["pre.0.weight"].shape[0],
+        embd_dropout=cfg.get("embd_dropout", 0.1),
+        activations=cfg.get("activations", "relu"),
+    ).to(device)
+    model.load_state_dict(state)
+    model.eval()
+    return model
+
+
 def load_pt_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     with open(os.path.join(model_dir, "config.yaml")) as f:
         cfg = yaml.safe_load(f)
@@ -1718,6 +1750,11 @@ def train(config: TrainConfig):
                 device=config.device,
                 centre_draws=config.centre_draws,
             )
+        elif config.nmr_reward_model:
+            reward_model = load_nmr_reward_model(reward_model_path, state_dim, action_dim,
+                                                 device=config.device)
+            dataset = qlearning_dataset_pt(env, reward_model, config.query_length)
+            del reward_model
         elif config.query_length > 1:
             reward_model = load_pt_reward_model(reward_model_path, device=config.device)
             dataset = qlearning_dataset_pt(env, reward_model, config.query_length)
