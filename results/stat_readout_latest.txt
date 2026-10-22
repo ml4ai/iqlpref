@@ -4,42 +4,45 @@ Flags: ranking of cell means changes; a paired difference changes sign; its inte
 changes between excluding and including zero.
 BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not fetched.
 ====================================================================================================
+  note: ('antmaze-medium-diverse-v2', 'PT_TIMEONLY'): two sweeps (qdbtemcq, qdbtemcq) -- cell NOT read
 
 A. THE ANCHOR, WITH TERMINALS
 
   medium-play: the anchor, with terminals
-    PT                       not read -- INCOMPLETE (9/10 seeds scored)
     task_reward              last-10 0.519 ± 0.086   max 0.658 ± 0.051   max - last-10 +0.139
     task_reward_r1           last-10 0.648 ± 0.048   max 0.802 ± 0.030   max - last-10 +0.154
     MR                       last-10 0.642 ± 0.042   max 0.772 ± 0.043   max - last-10 +0.130
+    PT                       last-10 0.673 ± 0.086   max 0.815 ± 0.030   max - last-10 +0.142
     ENS_MEAN                 last-10 0.711 ± 0.025   max 0.836 ± 0.025   max - last-10 +0.125
     PT_TIMEONLY              last-10 0.690 ± 0.060   max 0.803 ± 0.047   max - last-10 +0.114
-    ranking  last-10: ENS_MEAN > PT_TIMEONLY > task_reward_r1 > MR > task_reward
-             max:     ENS_MEAN > PT_TIMEONLY > task_reward_r1 > MR > task_reward   (same)
+    ranking  last-10: ENS_MEAN > PT_TIMEONLY > PT > task_reward_r1 > MR > task_reward
+             max:     ENS_MEAN > PT > PT_TIMEONLY > task_reward_r1 > MR > task_reward   ** RANKING CHANGES
     task_reward - task_reward_r1:  last-10 -0.129 [-0.184, -0.072]   max -0.144 [-0.177, -0.112]
     task_reward - MR:  last-10 -0.123 [-0.184, -0.062]   max -0.114 [-0.160, -0.070]
+    task_reward - PT:  last-10 -0.154 [-0.213, -0.083]   max -0.157 [-0.192, -0.117]
     task_reward - ENS_MEAN:  last-10 -0.192 [-0.253, -0.136]   max -0.178 [-0.211, -0.144]
     task_reward - PT_TIMEONLY:  last-10 -0.171 [-0.216, -0.126]   max -0.145 [-0.183, -0.109]
     task_reward_r1 - MR:  last-10 +0.006 [-0.029, +0.040]   max +0.030 [-0.005, +0.069]
+    task_reward_r1 - PT:  last-10 -0.026 [-0.079, +0.037]   max -0.013 [-0.039, +0.015]
     task_reward_r1 - ENS_MEAN:  last-10 -0.064 [-0.086, -0.043]   max -0.034 [-0.046, -0.021]
     task_reward_r1 - PT_TIMEONLY:  last-10 -0.042 [-0.075, -0.004]   max -0.001 [-0.024, +0.020]   ** SEPARATION CHANGES
+    MR - PT:  last-10 -0.031 [-0.087, +0.026]   max -0.043 [-0.072, -0.013]   ** SEPARATION CHANGES
     MR - ENS_MEAN:  last-10 -0.069 [-0.099, -0.039]   max -0.064 [-0.096, -0.035]
     MR - PT_TIMEONLY:  last-10 -0.047 [-0.089, -0.001]   max -0.031 [-0.073, +0.011]   ** SEPARATION CHANGES
+    PT - ENS_MEAN:  last-10 -0.038 [-0.100, +0.016]   max -0.021 [-0.052, +0.005]
+    PT - PT_TIMEONLY:  last-10 -0.016 [-0.086, +0.046]   max +0.012 [-0.029, +0.051]   ** SIGN FLIPS
     ENS_MEAN - PT_TIMEONLY:  last-10 +0.022 [-0.013, +0.061]   max +0.033 [+0.013, +0.055]   ** SEPARATION CHANGES
 
   medium-diverse: the anchor, with terminals
+    PT_TIMEONLY              not read -- CONFIG AUDIT FAILED (1): second sweep qdbtemcq for this cell
     task_reward              last-10 0.607 ± 0.055   max 0.808 ± 0.034   max - last-10 +0.201
     MR                       last-10 0.647 ± 0.057   max 0.813 ± 0.048   max - last-10 +0.166
     ENS_MEAN                 last-10 0.683 ± 0.037   max 0.772 ± 0.038   max - last-10 +0.089
-    PT_TIMEONLY              last-10 0.550 ± 0.172   max 0.712 ± 0.173   max - last-10 +0.162
-    ranking  last-10: ENS_MEAN > MR > task_reward > PT_TIMEONLY
-             max:     MR > task_reward > ENS_MEAN > PT_TIMEONLY   ** RANKING CHANGES
+    ranking  last-10: ENS_MEAN > MR > task_reward
+             max:     MR > task_reward > ENS_MEAN   ** RANKING CHANGES
     task_reward - MR:  last-10 -0.040 [-0.096, +0.017]   max -0.005 [-0.048, +0.035]
     task_reward - ENS_MEAN:  last-10 -0.076 [-0.122, -0.032]   max +0.036 [+0.007, +0.063]   ** SIGN FLIPS
-    task_reward - PT_TIMEONLY:  last-10 +0.056 [-0.032, +0.173]   max +0.096 [+0.020, +0.211]   ** SEPARATION CHANGES
     MR - ENS_MEAN:  last-10 -0.036 [-0.079, +0.002]   max +0.041 [-0.002, +0.087]   ** SIGN FLIPS
-    MR - PT_TIMEONLY:  last-10 +0.096 [+0.004, +0.206]   max +0.101 [+0.005, +0.222]
-    ENS_MEAN - PT_TIMEONLY:  last-10 +0.132 [+0.048, +0.237]   max +0.060 [-0.020, +0.177]   ** SEPARATION CHANGES
 
   large-play: the anchor, with terminals
     task_reward              last-10 0.367 ± 0.079   max 0.540 ± 0.066   max - last-10 +0.173
@@ -72,6 +75,7 @@ A. THE ANCHOR, WITH TERMINALS
 B. THE CONTROLS
 
   medium-play: the controls
+    heuristic                not read -- INCOMPLETE (0/10 seeds scored)
     rerun_task_reward        not read -- INCOMPLETE (0/10 seeds scored)
     noterm_MR                last-10 0.636 ± 0.071   max 0.795 ± 0.047   max - last-10 +0.159
     rerun_MR                 last-10 0.652 ± 0.067   max 0.789 ± 0.085   max - last-10 +0.137
@@ -123,4 +127,4 @@ C. DEGRADATION LADDERS
              max:     r16 > full   (same)
     full - r16:  last-10 -0.076 [-0.147, -0.008]   max -0.065 [-0.149, +0.012]   ** SEPARATION CHANGES
 
-SUMMARY: 10 groups read; ranking changes in 6; 34 paired comparisons, sign flips 7, separation changes 9.
+SUMMARY: 10 groups read; ranking changes in 7; 36 paired comparisons, sign flips 8, separation changes 8.
