@@ -182,8 +182,12 @@ def audit_run(cfg, name, seed, fixed, winner, oracle):
     return probs
 
 
-def collect(api, P, winners):
+def collect(api, P, winners, sp=None, method_as=None):
     """{(dataset, method): cell} for every evaluation sweep at a registered index.
+
+    sp / method_as (handoff 14.24): read another spec under another method name,
+    accepting the index the sweep ran at (method_as given).  Used for the pre-fix
+    PT cells, read deliberately as the time-only reward (collect_timeonly).
 
     cell = dict(sweep, index, scores {seed: last-10}, robust {seed: last-20},
                 incomplete [reasons], audit [problems])
@@ -191,7 +195,7 @@ def collect(api, P, winners):
     conventional index when stage 4 chose another.
     """
     import iql_score
-    sp = P.spec()
+    sp = sp or P.spec()
     cells, notes = {}, []
     for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
         params = sw.config.get("parameters")
@@ -204,8 +208,10 @@ def collect(api, P, winners):
             continue
         index, win = flat["normalize_reward"], winners.get(name)
         oracle = P.is_oracle(name)
-        method = P.method_of(name)
-        if index != win:
+        method = method_as or P.method_of(name)
+        if method_as:
+            pass                                       # the index it ran at (pre-fix PT: its own stage 4)
+        elif index != win:
             if oracle and index == P.ORACLE_CONVENTIONAL:
                 method = "task_reward_r1"
             else:
@@ -247,6 +253,16 @@ def collect(api, P, winners):
             continue
         cells[key] = cell
     return cells, notes
+
+
+def collect_timeonly(api, P):
+    """The pre-fix PT evaluation cells (handoff §14.10), read deliberately as the
+    TIME-ONLY reward, "PT_TIMEONLY": a PT model applied to windows from the
+    dataset's first episode, so a reward of time since the episode start.  Matched
+    on PT's spec WITHOUT seq_labeller, at the index each ran (its own pre-fix stage 4)."""
+    prefix = {n: {k: v for k, v in f.items() if k != "seq_labeller"}
+              for n, f in P.spec().items() if n.startswith("pt_sweeps/")}
+    return collect(api, P, {}, sp=prefix, method_as="PT_TIMEONLY")
 
 
 def cell_ready(cell):

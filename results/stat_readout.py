@@ -43,7 +43,9 @@ import hold                                                # noqa: E402
 VARIANTS = R.VARIANTS
 SEEDS = R.SEEDS
 STATS = (("scores", "last-10"), ("max", "max"))
-ANCHOR_METHODS = ("task_reward", "task_reward_r1", "MR", "PT", "NMR", "ENS_MEAN")
+ANCHOR_METHODS = ("task_reward", "task_reward_r1", "MR", "PT", "NMR", "ENS_MEAN",
+                  "PT_TIMEONLY")              # the pre-fix PT cells as a control (§14.10, §14.24)
+LADDER_FAMILIES = ("MR", "PT", "NMR", "ENS_MEAN")
 
 
 def ready(cell):
@@ -206,6 +208,9 @@ def main():
     winners = json.load(open(os.path.join(ROOT, "phase2_winners.json")))
     api = wandb.Api(timeout=120)
     anchor, notes = R.collect(api, P, winners)
+    t_cells, t_notes = R.collect_timeonly(api, P)
+    anchor.update(t_cells)
+    notes += t_notes
     gpath = os.path.join(ROOT, P.GRID_WINNERS)
     gwin = json.load(open(gpath)) if os.path.exists(gpath) else {}
     ctrl, cnotes = C.collect_controls(api, P, winners, gwin)
@@ -214,7 +219,7 @@ def main():
         cells, xnotes = X.collect_exp(api, P, winners, axis)
         notes += xnotes
         for (dataset, m), c in anchor.items():          # the anchor is every ladder's full level
-            if m in ANCHOR_METHODS[2:]:
+            if m in LADDER_FAMILIES:
                 cells[(dataset.replace("antmaze-", "").replace("-v2", ""), m, "full")] = c
         exp[axis] = cells
     report(groups(anchor, ctrl, exp), notes + cnotes)
