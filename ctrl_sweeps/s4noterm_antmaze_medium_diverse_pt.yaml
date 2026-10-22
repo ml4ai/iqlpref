@@ -12,7 +12,7 @@ parameters:
   query_length:
     value: 100
   seq_labeller:
-    value: 2
+    value: 3
   drop_terminals:
     value: true
   seed:

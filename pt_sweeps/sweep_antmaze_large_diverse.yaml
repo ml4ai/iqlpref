@@ -11,7 +11,7 @@ parameters:
   query_length:
     value: 100
   seq_labeller:
-    value: 2
+    value: 3
   seed:
     value: 0
   normalize_reward:

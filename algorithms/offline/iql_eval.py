@@ -221,9 +221,13 @@ class TrainConfig:
         if self.nmr_reward_model and (self.query_length <= 1 or self.bnn_reward_model or self.mr_ensemble):
             raise ValueError("nmr_reward_model needs query_length > 1 (its window) and excludes "
                              "bnn_reward_model and mr_ensemble")
-        if self.query_length > 1 and self.seq_labeller != 2:
-            raise ValueError("a sequence reward model (query_length > 1) needs seq_labeller 2, "
-                             f"the fixed labeller (HANDOFF §14.10); got {self.seq_labeller!r}")
+        # seq_labeller 2: the fixed windows (§14.10), loader assuming 4 PT heads;
+        # seq_labeller 3: also the PT head count read correctly (§14.28).  2 stays
+        # valid for a 4-head PT (and for NMR, which has no heads); train() refuses it
+        # for any other PT.
+        if self.query_length > 1 and self.seq_labeller not in (2, 3):
+            raise ValueError("a sequence reward model (query_length > 1) needs seq_labeller 2 or 3, "
+                             f"the fixed labeller (HANDOFF §14.10, §14.28); got {self.seq_labeller!r}")
         if self.trivial_reward is not None:
             if self.trivial_reward not in ("zero", "mean"):
                 raise ValueError(f"trivial_reward must be 'zero' or 'mean', got {self.trivial_reward!r}")
@@ -1682,6 +1686,24 @@ def load_nmr_reward_model(model_dir: str, state_dim: int, action_dim: int,
     return model
 
 
+def _pt_num_heads(cfg: Dict[str, Any], embd_dim: int) -> int:
+    """The number of attention heads the training script used (handoff §14.28).
+
+    run_pt_training_antmaze_eval.py derives num_heads = embd_dim // min(head_dim,
+    embd_dim) in __post_init__, so it is not a dataclass field and is never written
+    to config.yaml.  Reading cfg["num_heads"] with a default of 4 rebuilt every
+    1-head PT (the medium_diverse and large_diverse winners) with 4 heads.
+    head_dim in config.yaml is the expanded value (>= 8); a hand-written file may
+    hold the log2 exponent (<= 7)."""
+    if cfg.get("num_heads"):
+        return int(cfg["num_heads"])
+    hd = cfg.get("head_dim")
+    if hd is None:
+        raise ValueError("config.yaml has neither num_heads nor head_dim: cannot rebuild the PT")
+    hd = 2 ** int(hd) if int(hd) <= 7 else int(hd)
+    return embd_dim // min(hd, embd_dim)
+
+
 def load_pt_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     with open(os.path.join(model_dir, "config.yaml")) as f:
         cfg = yaml.safe_load(f)
@@ -1705,7 +1727,7 @@ def load_pt_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
         max_episode_steps=max_episode_steps,
         embd_dim=embd_dim,
         pref_attn_embd_dim=pref_attn_embd_dim,
-        num_heads=cfg.get("num_heads", 4),
+        num_heads=_pt_num_heads(cfg, embd_dim),
         attn_dropout=cfg.get("attn_dropout", 0.1),
         resid_dropout=cfg.get("resid_dropout", 0.1),
         intermediate_dim=intermediate_dim,
@@ -1716,6 +1738,7 @@ def load_pt_reward_model(model_dir: str, device: str = "cpu") -> nn.Module:
     ).to(device)
     model.load_state_dict(state)
     model.eval()
+    model.num_heads_loaded = _pt_num_heads(cfg, embd_dim)   # checked against seq_labeller in train()
     return model
 
 
@@ -1757,6 +1780,10 @@ def train(config: TrainConfig):
             del reward_model
         elif config.query_length > 1:
             reward_model = load_pt_reward_model(reward_model_path, device=config.device)
+            if config.seq_labeller == 2 and reward_model.num_heads_loaded != 4:
+                raise ValueError(
+                    f"seq_labeller 2 assumed a 4-head PT; this model has {reward_model.num_heads_loaded} "
+                    "head(s).  Use seq_labeller 3 (HANDOFF §14.28).")
             dataset = qlearning_dataset_pt(env, reward_model, config.query_length)
             del reward_model
         else:

@@ -83,6 +83,11 @@ EVAL_SEEDS = list(range(1, 11))
 LINEAGE_KEYS = ("seed", "normalize_reward")    # the ONLY keys that may differ
 
 
+# The PT winners with one attention head (embd_dim // min(head_dim, embd_dim) == 1);
+# their IQL labels under seq_labeller 2 came from a 4-head rebuild (handoff §14.28).
+PT_ONE_HEAD = ("medium_diverse", "large_diverse")
+
+
 def spec():
     """{relative_path_without_.yaml: ordered {param: value}} for all 32 files
     (24 learned-reward sweeps + 4 oracle + 4 NMR, added 2026-10-22, handoff 14.17)."""
@@ -105,7 +110,10 @@ def spec():
             base, reward_model_root=root("mr"), query_length=1)
         out[f"pt_sweeps/sweep_antmaze_{v}"] = dict(
             base, reward_model_root=root("pt"), query_length=100,
-            seq_labeller=2)            # the fixed PT labeller (§14.10); older PT sweeps match nothing
+            # the fixed PT labeller (§14.10); older PT sweeps match nothing.  3 where the
+            # winner has ONE attention head (§14.28: the loader rebuilt it with 4 under 2);
+            # 2 stays where the winner has 4 heads, so those correct runs remain matched.
+            seq_labeller=3 if v in PT_ONE_HEAD else 2)
         out[f"nmr_sweeps/sweep_antmaze_{v}"] = dict(
             base, reward_model_root=root("nmr"), nmr_reward_model=True, query_length=100,
             seq_labeller=2)            # NMR (§14.14): PT's fixed sequence labeller, same window
@@ -1316,7 +1324,7 @@ def selftest():
         assert not match_entry(gp, sp)
     # §14.10: PT carries the fixed-labeller key; an older PT sweep matches nothing
     for v in VARIANTS:
-        assert sp[f"pt_sweeps/sweep_antmaze_{v}"]["seq_labeller"] == 2
+        assert sp[f"pt_sweeps/sweep_antmaze_{v}"]["seq_labeller"] == (3 if v in PT_ONE_HEAD else 2)   # §14.28
     old_pt = {k: x for k, x in sp["pt_sweeps/sweep_antmaze_large_play"].items() if k != "seq_labeller"}
     assert not match_entry(lineage_params(old_pt, "eval", 3), sp)
     assert is_pre_fix_seq(flat(lineage_params(old_pt, "eval", 3)))
