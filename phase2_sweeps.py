@@ -657,7 +657,7 @@ def is_condition_root(root):
     .../antmaze_<variant>_<family>_<cond>_eval (§13.2)."""
     import re
     return bool(re.search(r"/antmaze_(medium_play|medium_diverse|large_play|large_diverse)_"
-                          r"(bnn|mr|pt|nmr)_(r\d+|n\d+o?)_eval$", str(root or "")))
+                          r"(bnn|mr|pt|nmr)_(r\d+|n\d+o?|ties)_eval$", str(root or "")))
 
 
 def variant_of_name(name):
@@ -689,6 +689,9 @@ def exp_spec(sp, cond, E=None):
             continue
         sweep_fam = name.split("/")[0]
         fam, v = _MODEL_FAMILY[sweep_fam], variant_of_name(name)
+        if c["kind"] == "ties":                       # §14.20: MR, PT, NMR on two variants
+            if sweep_fam not in ("mr_sweeps", "pt_sweeps", "nmr_sweeps") or v not in E.TIES_VARIANTS:
+                continue
         if c["arm"] == "oracle":
             # the sensitivity arm's families (MR, PT, NMR since 14.18), medium_play only
             if sweep_fam not in ("mr_sweeps", "pt_sweeps", "nmr_sweeps") or v not in E.ORACLE_VARIANTS:
@@ -1246,6 +1249,10 @@ def selftest():
         .endswith("/antmaze_medium_play_pt_r32_eval")
     # every condition's roots are distinct from each other and from the anchor's
     roots = {f["reward_model_root"] for c in ("r16", "r32", "n01") for _, f in exp_spec(sp, c, E).values()}
+    et = exp_spec(sp, "ties", E)
+    assert sorted(et) == sorted(f"{f}_sweeps/ties/sweep_antmaze_{v}" for f in ("mr", "pt", "nmr")
+                                for v in ("large_play", "medium_diverse")), sorted(et)
+    assert all(is_condition_root(f["reward_model_root"]) for _, f in et.values())
     assert len(roots) == 3 * 16 and not roots & {f.get("reward_model_root") for f in sp.values()}
     # the sensitivity arm: MR best-model, PT and NMR (14.18) on medium_play, nothing else
     assert sorted(exp_spec(sp, "n02o", E)) == ["mr_sweeps/n02o/sweep_antmaze_medium_play",
