@@ -52,7 +52,7 @@ import hold                                                # noqa: E402
 
 VARIANTS = R.VARIANTS
 SEEDS = R.SEEDS
-ANCHOR_METHODS = ("task_reward", "MR", "PT", "ENS_MEAN", "ENS_CVAR", "BNN_MEAN", "BNN_CVAR")
+ANCHOR_METHODS = ("task_reward", "MR", "PT", "NMR", "ENS_MEAN", "ENS_CVAR", "BNN_MEAN", "BNN_CVAR")
 
 
 def _short(dataset):
@@ -180,7 +180,7 @@ def collect_grids(api, P):
 
 # Grids added 2026-10-21 (§14.2 item 5) with no anchor-index no-terminals cell:
 # their seeds 1-10 cell runs at the grid winner directly.
-GRID_ONLY = ("noterm_PT", "noterm_ENS_MEAN", "noterm_heuristic")   # heuristic: §14.7 decision 2
+GRID_ONLY = ("noterm_PT", "noterm_NMR", "noterm_ENS_MEAN", "noterm_heuristic")   # heuristic: §14.7; NMR: §14.17
 
 
 def grid_section(grids, winners, ctrl, out):
@@ -189,7 +189,7 @@ def grid_section(grids, winners, ctrl, out):
     found = {}
     out("\nE. NO-TERMINALS NORMALIZATION GRIDS  (seed 0; stage-4 rule; the index the seeds 1-10 control used)")
     for v in VARIANTS:
-        for kind in [k for k in ("noterm_task_reward", "noterm_MR", "noterm_PT", "noterm_ENS_MEAN",
+        for kind in [k for k in ("noterm_task_reward", "noterm_MR", "noterm_PT", "noterm_NMR", "noterm_ENS_MEAN",
                                  "noterm_heuristic", "noterm_BNN_MEAN", "noterm_BNN_CVAR")
                      if hold.shown_kind(k)]:
             g = grids.get((v, kind))
@@ -239,7 +239,7 @@ def rerun_section(ctrl, A, gwin, winners, out):
             line(A[v][m], at_winner(ctrl, gwin, winners, v, m), out,
                  f"  {v:15s} {m:9s} with terminals - without, at its winner")
         # §14.16: grid-only families, whose first no-terminals cell is at the winner
-        for m in ("PT", "ENS_MEAN"):
+        for m in ("PT", "NMR", "ENS_MEAN"):
             if (v, f"atwin_{m}") in ctrl:
                 line(A[v].get(m), ctrl[(v, f"atwin_{m}")], out,
                      f"  {v:15s} {m:9s} with terminals - without, at its winner")
@@ -322,7 +322,7 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
         rerun_section(ctrl, A, found, winners or {}, out)
         for v in VARIANTS:
             for k in [f"rerun_{m}" for m in hold.show(("MR", "BNN_MEAN", "BNN_CVAR", "task_reward"))] + \
-                    ["atwin_PT", "atwin_ENS_MEAN", "atwin_heuristic"]:
+                    ["atwin_PT", "atwin_NMR", "atwin_ENS_MEAN", "atwin_heuristic"]:
                 c = ctrl.get((v, k))
                 if c is not None:
                     r = R.cell_ready(c)
@@ -360,7 +360,7 @@ def selftest():
     assert txt.count("diff +0.100") == 8                    # B without (4) + B2 MR (4)
     assert txt.count("diff +0.200") == 4                    # B2 BNN CVaR
     assert "large-play      MR          - heuristic           NOT READ" in txt
-    assert txt.count("diff +0.050") == 21                                       # C, 3 variants x 7
+    assert txt.count("diff +0.050") == 24                                       # C, 3 variants x 8 (NMR: 14.17)
     # --- section E: winner by the stage-4 rule, ties to the lowest index ---
     def runs(scores):
         return [{"id": f"r{i}", "normalize_reward": i, "score": s, "error": None}
@@ -420,7 +420,7 @@ def selftest():
     assert "sweep y: MR cell" in txt and "sweep x" not in txt
     assert txt.count("diff +0.250") == 4 and txt.count("diff +0.350") == 4    # A: MR and task reward stay
     assert "medium-play     MR        with terminals - without, at its winner" in txt
-    assert txt.count("- heuristic") == 16                                     # C: 4 variants x 4 methods
+    assert txt.count("- heuristic") == 20                                     # C: 4 variants x 5 methods (NMR: 14.17)
     print("selftest OK")
     return 0
 

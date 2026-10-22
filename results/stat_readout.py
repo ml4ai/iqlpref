@@ -43,7 +43,7 @@ import hold                                                # noqa: E402
 VARIANTS = R.VARIANTS
 SEEDS = R.SEEDS
 STATS = (("scores", "last-10"), ("max", "max"))
-ANCHOR_METHODS = ("task_reward", "task_reward_r1", "MR", "PT", "ENS_MEAN")
+ANCHOR_METHODS = ("task_reward", "task_reward_r1", "MR", "PT", "NMR", "ENS_MEAN")
 
 
 def ready(cell):

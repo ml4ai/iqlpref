@@ -84,8 +84,8 @@ LINEAGE_KEYS = ("seed", "normalize_reward")    # the ONLY keys that may differ
 
 
 def spec():
-    """{relative_path_without_.yaml: ordered {param: value}} for all 28 files
-    (24 learned-reward sweeps + 4 oracle)."""
+    """{relative_path_without_.yaml: ordered {param: value}} for all 32 files
+    (24 learned-reward sweeps + 4 oracle + 4 NMR, added 2026-10-22, handoff 14.17)."""
     out = {}
     for v in VARIANTS:
         base = {"config_path": f"configs/offline/iql/antmaze/{v}_v2.yaml"}
@@ -106,6 +106,9 @@ def spec():
         out[f"pt_sweeps/sweep_antmaze_{v}"] = dict(
             base, reward_model_root=root("pt"), query_length=100,
             seq_labeller=2)            # the fixed PT labeller (§14.10); older PT sweeps match nothing
+        out[f"nmr_sweeps/sweep_antmaze_{v}"] = dict(
+            base, reward_model_root=root("nmr"), nmr_reward_model=True, query_length=100,
+            seq_labeller=2)            # NMR (§14.14): PT's fixed sequence labeller, same window
         out[f"tr_sweeps/sweep_antmaze_{v}"] = dict(base)     # oracle: nothing else
     return out
 
@@ -283,6 +286,7 @@ COLUMNS = [
     ("task_reward", ("IQL with task reward", "")),
     ("MR", ("IQL with preference learning", "MR")),
     ("PT", ("IQL with preference learning", "PT")),
+    ("NMR", ("IQL with preference learning", "NMR")),           # added 2026-10-22 (handoff 14.17)
     ("ENS_MEAN", ("IQL with preference learning", "ENS w/ MEAN")),
     ("ENS_CVAR", ("IQL with preference learning", "ENS w/ CVaR")),
     ("BNN_MEAN", ("IQL with preference learning", "BNN w/ MEAN")),
@@ -296,6 +300,8 @@ def method_of(name):
         return "task_reward"
     if fam in ("mr_sweeps", "pt_sweeps"):
         return fam[:2].upper()
+    if fam == "nmr_sweeps":
+        return "NMR"
     return ("BNN" if fam == "bnn_sweeps" else "ENS") + \
         ("_CVAR" if base.endswith("_cvar") else "_MEAN")
 
@@ -636,7 +642,8 @@ def cmd_register(sp, winners_path, do_write, notebook=NOTEBOOK):
 # re-selected under a condition (§11.1).  The oracle has no reward model, so it
 # has no condition sweeps: its anchor result is the reference at every level.
 MODEL_PARENT = "~/iqlpref/exp/reward_learning"
-_MODEL_FAMILY = {"bnn_sweeps": "bnn", "ensemble_sweeps": "mr", "mr_sweeps": "mr", "pt_sweeps": "pt"}
+_MODEL_FAMILY = {"bnn_sweeps": "bnn", "ensemble_sweeps": "mr", "mr_sweeps": "mr", "pt_sweeps": "pt",
+                 "nmr_sweeps": "nmr"}
 
 
 def _conditions():
@@ -649,7 +656,8 @@ def is_condition_root(root):
     """True for a reward_model_root that names an experiment condition's models:
     .../antmaze_<variant>_<family>_<cond>_eval (§13.2)."""
     import re
-    return bool(re.search(r"/antmaze_[a-z_]+_(bnn|mr|pt)_(r\d+|n\d+o?)_eval$", str(root or "")))
+    return bool(re.search(r"/antmaze_(medium_play|medium_diverse|large_play|large_diverse)_"
+                          r"(bnn|mr|pt|nmr)_(r\d+|n\d+o?)_eval$", str(root or "")))
 
 
 def variant_of_name(name):
@@ -759,7 +767,8 @@ CONTROL_NOTERM = ("mr_sweeps/sweep_antmaze_{v}", "bnn_sweeps/sweep_antmaze_{v}_c
 # PT and the ensemble's mean added 2026-10-21 (§14.2 item 5: the candidate protocol
 # re-selects every family's index without terminals).  Grids only: their seeds 1-10
 # cells run at the grid winner, not at the anchor's index.
-CONTROL_GRID = CONTROL_NOTERM + ("pt_sweeps/sweep_antmaze_{v}", "ensemble_sweeps/sweep_antmaze_{v}_mean")
+CONTROL_GRID = CONTROL_NOTERM + ("pt_sweeps/sweep_antmaze_{v}", "ensemble_sweeps/sweep_antmaze_{v}_mean",
+                                 "nmr_sweeps/sweep_antmaze_{v}")      # NMR: §14.17
 HEURISTIC_INDEX = 3
 # Trivial rewards (§14.2 item 2): zero and the task reward's mean, at index 0, not
 # gauged, with and without terminals; seeds 1-10.
@@ -797,6 +806,8 @@ def _control_fam(anchor):
         return "bnn_cvar" if anchor.endswith("_cvar") else "bnn_mean"
     if anchor.startswith("ensemble_"):
         return "ens_cvar" if anchor.endswith("_cvar") else "ens_mean"
+    if anchor.startswith("nmr_"):
+        return "nmr"
     return {"mr": "mr", "tr": "task", "pt": "pt"}[anchor[:2]]
 
 
@@ -875,7 +886,7 @@ def control_atwin_spec(sp, gwin):
     out = {}
     for name, (anchor, fixed) in control_grid_spec(sp).items():
         heur = is_heuristic_anchor(anchor)
-        if anchor not in gwin or not (heur or anchor.startswith(("pt_sweeps/", "ensemble_sweeps/"))):
+        if anchor not in gwin or not (heur or anchor.startswith(("pt_sweeps/", "ensemble_sweeps/", "nmr_sweeps/"))):
             continue
         fam = "heuristic" if heur else _control_fam(anchor)
         v = name[len(f"{CONTROL_DIR}/s4noterm_antmaze_"):-len(f"_{fam}")]
@@ -1078,7 +1089,15 @@ def cmd_control(sp, winners, do_write):
 
 def selftest():
     sp = spec()
-    assert len(sp) == 28, len(sp)
+    assert len(sp) == 32, len(sp)
+    assert sum(1 for n in sp if n.startswith("nmr_")) == 4
+    nf = sp["nmr_sweeps/sweep_antmaze_large_play"]
+    assert nf["nmr_reward_model"] is True and nf["query_length"] == 100 and nf["seq_labeller"] == 2
+    assert nf["reward_model_root"].endswith("antmaze_large_play_nmr_eval")
+    assert method_of("nmr_sweeps/sweep_antmaze_large_play") == "NMR"
+    assert match_entry(lineage_params(nf, "stage4"), sp) == ["nmr_sweeps/sweep_antmaze_large_play"]
+    assert match_entry(lineage_params(sp["pt_sweeps/sweep_antmaze_large_play"], "stage4"), sp) == \
+        ["pt_sweeps/sweep_antmaze_large_play"]
     assert sum(1 for n in sp if n.startswith("tr_")) == 4
     assert sum(1 for n in sp if n.startswith("bnn_")) == 8
     for n, f in sp.items():
@@ -1180,7 +1199,7 @@ def selftest():
     ns = {}
     exec(registry_cell(reg, notes, conv, {L: 2, M: 1}), ns)      # valid Python
     assert ns["SWEEPS"][L]["task_reward"] == "nnn" and ns["SWEEPS"][L]["MR"] is None
-    assert len(ns["SWEEPS"]) == 4 and len(ns["METHOD_COLUMNS"]) == 7   # never an r1 column
+    assert len(ns["SWEEPS"]) == 4 and len(ns["METHOD_COLUMNS"]) == 8   # never an r1 column; NMR since 14.17
     assert [m for m, _ in ns["METHOD_COLUMNS"]].count("task_reward") == 1
     assert ns["ORACLE_CONVENTIONAL"][L] == "ooo" and ns["ORACLE_CONVENTIONAL"][M] == "ppp"
     assert ns["ORACLE_INDEX"][L] == 2 and ns["ORACLE_INDEX"][M] == 1
@@ -1213,7 +1232,7 @@ def selftest():
     assert exp_name("bnn_sweeps/sweep_antmaze_large_play_cvar", "r32") == \
         "bnn_sweeps/r32/sweep_antmaze_large_play_cvar"
     es = exp_spec(sp, "r32", E)
-    assert len(es) == 24 and not any(n.startswith("tr_") for n in es)        # no oracle
+    assert len(es) == 28 and not any(n.startswith("tr_") for n in es)        # no oracle; + NMR (14.17)
     a, f = es["bnn_sweeps/r32/sweep_antmaze_large_play_cvar"]
     assert a == "bnn_sweeps/sweep_antmaze_large_play_cvar"
     assert f["reward_model_root"] == "~/iqlpref/exp/reward_learning/antmaze_large_play_bnn_r32_eval"
@@ -1226,7 +1245,7 @@ def selftest():
         .endswith("/antmaze_medium_play_pt_r32_eval")
     # every condition's roots are distinct from each other and from the anchor's
     roots = {f["reward_model_root"] for c in ("r16", "r32", "n01") for _, f in exp_spec(sp, c, E).values()}
-    assert len(roots) == 3 * 12 and not roots & {f.get("reward_model_root") for f in sp.values()}
+    assert len(roots) == 3 * 16 and not roots & {f.get("reward_model_root") for f in sp.values()}
     # the sensitivity arm: MR best-model and PT on medium_play, nothing else
     assert sorted(exp_spec(sp, "n02o", E)) == ["mr_sweeps/n02o/sweep_antmaze_medium_play",
                                                "pt_sweeps/n02o/sweep_antmaze_medium_play"]
@@ -1257,7 +1276,8 @@ def selftest():
     assert list(rs) == ["ctrl_sweeps/rerun_noterm_antmaze_medium_play_mr"]      # only where it differs
     assert rs["ctrl_sweeps/rerun_noterm_antmaze_medium_play_mr"][2] == 1
     gs = control_grid_spec(sp)
-    assert len(gs) == 28                     # + PT and ensemble mean (§14.2 item 5), motion reward (§14.7)
+    assert len(gs) == 32                     # + PT, ensemble mean (§14.2 item 5), motion (§14.7), NMR (§14.17)
+    assert gs["ctrl_sweeps/s4noterm_antmaze_large_play_nmr"][0] == "nmr_sweeps/sweep_antmaze_large_play"
     ha, hf = gs["ctrl_sweeps/s4noterm_antmaze_large_play_heuristic"]
     assert ha == "ctrl_sweeps/heuristic_antmaze_large_play" and is_heuristic_anchor(ha)
     assert hf == {"config_path": sp["tr_sweeps/sweep_antmaze_large_play"]["config_path"],
