@@ -690,7 +690,8 @@ def exp_spec(sp, cond, E=None):
         sweep_fam = name.split("/")[0]
         fam, v = _MODEL_FAMILY[sweep_fam], variant_of_name(name)
         if c["arm"] == "oracle":
-            if sweep_fam not in ("mr_sweeps", "pt_sweeps") or v not in E.ORACLE_VARIANTS:
+            # the sensitivity arm's families (MR, PT, NMR since 14.18), medium_play only
+            if sweep_fam not in ("mr_sweeps", "pt_sweeps", "nmr_sweeps") or v not in E.ORACLE_VARIANTS:
                 continue
         f = dict(fixed)
         f["reward_model_root"] = f"{MODEL_PARENT}/{E.model_base(v, fam, cond)}"
@@ -1246,8 +1247,9 @@ def selftest():
     # every condition's roots are distinct from each other and from the anchor's
     roots = {f["reward_model_root"] for c in ("r16", "r32", "n01") for _, f in exp_spec(sp, c, E).values()}
     assert len(roots) == 3 * 16 and not roots & {f.get("reward_model_root") for f in sp.values()}
-    # the sensitivity arm: MR best-model and PT on medium_play, nothing else
+    # the sensitivity arm: MR best-model, PT and NMR (14.18) on medium_play, nothing else
     assert sorted(exp_spec(sp, "n02o", E)) == ["mr_sweeps/n02o/sweep_antmaze_medium_play",
+                                               "nmr_sweeps/n02o/sweep_antmaze_medium_play",
                                                "pt_sweeps/n02o/sweep_antmaze_medium_play"]
     tx = render_exp("bnn_sweeps/r32/sweep_antmaze_large_play_cvar", a, f, "r32", 3)
     d = yaml.safe_load(tx)
