@@ -414,6 +414,15 @@ def registry_cell(reg, notes, conventional=None, oracle_index=None):
         sid = conventional.get(d)
         out.append(f'    "{d}": ' + (f'"{sid}"' if sid else "None") + ",")
     out.append("}")
+    out += ["",
+            "# The BNN/CVaR hold (gp_reward-priors HANDOFF §14.1): covered methods are",
+            "# dropped from every table and chart.  Set INCLUDE_HELD = True only once the",
+            "# author has lifted the hold.",
+            "INCLUDE_HELD = False",
+            "HELD = (\"BNN_CVAR\", \"BNN_MEAN\", \"ENS_CVAR\")",
+            "if not INCLUDE_HELD:",
+            "    METHOD_COLUMNS = [c for c in METHOD_COLUMNS if c[0] not in HELD]",
+            "    SWEEPS = {d: {m: s for m, s in row.items() if m not in HELD} for d, row in SWEEPS.items()}"]
     return "\n".join(out)
 
 
@@ -1203,7 +1212,9 @@ def selftest():
     ns = {}
     exec(registry_cell(reg, notes, conv, {L: 2, M: 1}), ns)      # valid Python
     assert ns["SWEEPS"][L]["task_reward"] == "nnn" and ns["SWEEPS"][L]["MR"] is None
-    assert len(ns["SWEEPS"]) == 4 and len(ns["METHOD_COLUMNS"]) == 8   # never an r1 column; NMR since 14.17
+    assert len(ns["SWEEPS"]) == 4 and len(ns["METHOD_COLUMNS"]) == 5   # 8 less the 3 held (14.26); no r1 column
+    assert not any(m in ("BNN_CVAR", "BNN_MEAN", "ENS_CVAR") for m, _ in ns["METHOD_COLUMNS"])
+    assert all(set(row) == {m for m, _ in ns["METHOD_COLUMNS"]} for row in ns["SWEEPS"].values())
     assert [m for m, _ in ns["METHOD_COLUMNS"]].count("task_reward") == 1
     assert ns["ORACLE_CONVENTIONAL"][L] == "ooo" and ns["ORACLE_CONVENTIONAL"][M] == "ppp"
     assert ns["ORACLE_INDEX"][L] == 2 and ns["ORACLE_INDEX"][M] == 1
