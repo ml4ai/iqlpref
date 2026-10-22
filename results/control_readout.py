@@ -65,6 +65,7 @@ def collect_controls(api, P, winners, gwin=None):
     sp = P.spec()
     cspec = P.control_spec(sp)
     atw = P.control_atwin_spec(sp, gwin or {})          # §14.16: grid-only families' cells
+    atw.update(P.control_ties_spec(sp, gwin or {}))     # §14.30: the ties arm without terminals
     fixed_of = {n: f for n, (_, f, _) in cspec.items()}
     fixed_of.update({n: f for n, (_, f, _, _, _) in atw.items()})
     cells, notes = {}, []
@@ -84,7 +85,8 @@ def collect_controls(api, P, winners, gwin=None):
                              f"(winner {index}) -- ignored")
                 continue
             v = vv.replace("_", "-")
-            kind = "atwin_" + ("heuristic" if fam == "heuristic" else P.method_of(anchor))
+            pre = "tiesnt_" if "/ties_noterm_" in name else "atwin_"
+            kind = pre + ("heuristic" if fam == "heuristic" else P.method_of(anchor))
             no_model = fam == "heuristic"
         else:
             anchor, fixed, index = cspec[name]
@@ -254,6 +256,20 @@ def rerun_section(ctrl, A, gwin, winners, out):
              f"  {v:15s} BNN CVaR - BNN mean, no terminals, each at its winner")
 
 
+def ties_section(ctrl, gwin, winners, out):
+    """G (§14.30): the ties arm against the tie-free arm, both WITHOUT terminals at the
+    family's frozen no-terminals index, paired by seed."""
+    out("\nG. TIES UNDER THE CANDIDATE PROTOCOL  (ties-kept - tie-free models, both without terminals, same index)")
+    for v in ("medium-diverse", "large-play"):
+        for m in ("MR", "PT", "NMR"):
+            t = ctrl.get((v, f"tiesnt_{m}"))
+            if t is None:
+                out(f"  {v:15s} {m:4s} no ties sweep yet")
+                continue
+            base = at_winner(ctrl, gwin, winners, v, m) if m == "MR" else ctrl.get((v, f"atwin_{m}"))
+            line(t, base, out, f"  {v:15s} {m:4s} ties - tie-free, no terminals, idx {t['index']}")
+
+
 def line(a, b, out, tag):
     ra, rb = R.cell_ready(a), R.cell_ready(b)
     if ra or rb:
@@ -320,6 +336,7 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
     if grids is not None:
         found = grid_section(grids, winners or {}, ctrl, out)
         rerun_section(ctrl, A, found, winners or {}, out)
+        ties_section(ctrl, found, winners or {}, out)
         for v in VARIANTS:
             for k in [f"rerun_{m}" for m in hold.show(("MR", "BNN_MEAN", "BNN_CVAR", "task_reward"))] + \
                     ["atwin_PT", "atwin_NMR", "atwin_ENS_MEAN", "atwin_heuristic"]:
@@ -421,6 +438,14 @@ def selftest():
     assert txt.count("diff +0.250") == 4 and txt.count("diff +0.350") == 4    # A: MR and task reward stay
     assert "medium-play     MR        with terminals - without, at its winner" in txt
     assert txt.count("- heuristic") == 20                                     # C: 4 variants x 5 methods (NMR: 14.17)
+    # --- section G: ties arm against the tie-free arm at the same index ---
+    ctg = {("large-play", "tiesnt_MR"): {**cell(base + 0.25), "index": 6},
+           ("large-play", "rerun_MR"): cell(base + 0.05)}
+    lines = []
+    ties_section(ctg, {"mr_sweeps/sweep_antmaze_large_play": 6}, {"mr_sweeps/sweep_antmaze_large_play": 3},
+                 lines.append)
+    fl = [x for x in lines if "large-play      MR   ties - tie-free, no terminals, idx 6" in x]
+    assert len(fl) == 1 and "diff +0.200" in fl[0], lines
     print("selftest OK")
     return 0
 
