@@ -5,8 +5,10 @@
  "bnn_sweeps/sweep_antmaze_medium_diverse_cvar": 2,
  "bnn_sweeps/sweep_antmaze_medium_play_cvar": 0,
  "bnn_sweeps/sweep_antmaze_medium_play_mean": 0,
+ "ensemble_sweeps/sweep_antmaze_medium_play_mean": 1,
  "mr_sweeps/sweep_antmaze_large_diverse": 6,
  "mr_sweeps/sweep_antmaze_large_play": 6,
  "mr_sweeps/sweep_antmaze_medium_diverse": 7,
- "mr_sweeps/sweep_antmaze_medium_play": 1
+ "mr_sweeps/sweep_antmaze_medium_play": 1,
+ "tr_sweeps/sweep_antmaze_large_play": 2
 }

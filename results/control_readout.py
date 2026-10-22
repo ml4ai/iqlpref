@@ -64,7 +64,9 @@ def collect_controls(api, P, winners, gwin=None):
     import iql_score
     sp = P.spec()
     cspec = P.control_spec(sp)
+    atw = P.control_atwin_spec(sp, gwin or {})          # §14.16: grid-only families' cells
     fixed_of = {n: f for n, (_, f, _) in cspec.items()}
+    fixed_of.update({n: f for n, (_, f, _, _, _) in atw.items()})
     cells, notes = {}, []
     for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
         params = sw.config.get("parameters")
@@ -72,21 +74,35 @@ def collect_controls(api, P, winners, gwin=None):
         if len(hits) != 1:
             continue
         name = hits[0]
-        anchor, fixed, index = cspec[name]
-        index = winners.get(anchor) if anchor else index
         flat = P.flat(params)
         if flat.get("seed") == 0 and isinstance(flat.get("normalize_reward"), list):
             continue                                   # a no-terminals grid: section E reads it
+        if name in atw:                                # PT / ensemble mean / motion at the winner
+            anchor, fixed, index, vv, fam = atw[name]
+            if flat.get("seed") != P.EVAL_SEEDS or flat.get("normalize_reward") != index:
+                notes.append(f"{sw.id}: {name} at index {flat.get('normalize_reward')} "
+                             f"(winner {index}) -- ignored")
+                continue
+            v = vv.replace("_", "-")
+            kind = "atwin_" + ("heuristic" if fam == "heuristic" else P.method_of(anchor))
+            no_model = fam == "heuristic"
+        else:
+            anchor, fixed, index = cspec[name]
+            no_model = anchor is None or anchor.startswith("tr_")   # heuristic, task reward
+        index = winners.get(anchor) if (anchor and name not in atw) else index
         prefix = "noterm_"
-        if (anchor and flat.get("seed") == P.EVAL_SEEDS and gwin and gwin.get(anchor) is not None
+        if name in atw:
+            pass
+        elif (anchor and flat.get("seed") == P.EVAL_SEEDS and gwin and gwin.get(anchor) is not None
                 and flat.get("normalize_reward") == gwin[anchor] != index):
             prefix, index = "rerun_", gwin[anchor]      # the re-run at the grid winner (§13.14.7)
         elif flat.get("seed") != P.EVAL_SEEDS or flat.get("normalize_reward") != index:
             notes.append(f"{sw.id}: {name} at seed {flat.get('seed')} index "
                          f"{flat.get('normalize_reward')} (expected {index}) -- ignored")
             continue
-        v = _short(P.dataset_of(anchor)) if anchor else name.split("heuristic_antmaze_")[1].replace("_", "-")
-        kind = (prefix + P.method_of(anchor)) if anchor else "heuristic"
+        if name not in atw:
+            v = _short(P.dataset_of(anchor)) if anchor else name.split("heuristic_antmaze_")[1].replace("_", "-")
+            kind = (prefix + P.method_of(anchor)) if anchor else "heuristic"
         if not hold.shown_kind(kind):
             continue                                   # covered by the hold (§14.1): not fetched
         cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
@@ -99,7 +115,6 @@ def collect_controls(api, P, winners, gwin=None):
             if s in seen:
                 cell["audit"].append(f"seed {s} appears twice")
             seen.add(s)
-            no_model = anchor is None or anchor.startswith("tr_")   # heuristic, task reward
             cell["audit"] += [f"run {r.id}: {x}" for x in
                               R.audit_run(r.config or {}, name, s, fixed, index, no_model)]
             if r.state != "finished":
@@ -223,6 +238,14 @@ def rerun_section(ctrl, A, gwin, winners, out):
         for m in hold.show(("task_reward", "MR", "BNN_MEAN", "BNN_CVAR")):
             line(A[v][m], at_winner(ctrl, gwin, winners, v, m), out,
                  f"  {v:15s} {m:9s} with terminals - without, at its winner")
+        # §14.16: grid-only families, whose first no-terminals cell is at the winner
+        for m in ("PT", "ENS_MEAN"):
+            if (v, f"atwin_{m}") in ctrl:
+                line(A[v].get(m), ctrl[(v, f"atwin_{m}")], out,
+                     f"  {v:15s} {m:9s} with terminals - without, at its winner")
+        if (v, "atwin_heuristic") in ctrl:
+            line(ctrl.get((v, "heuristic")), ctrl[(v, "atwin_heuristic")], out,
+                 f"  {v:15s} motion    with terminals - without, at its winner")
         if not hold.shown("BNN_CVAR"):
             continue
         line(at_winner(ctrl, gwin, winners, v, "BNN_CVAR"), at_winner(ctrl, gwin, winners, v, "MR"), out,
@@ -298,11 +321,12 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
         found = grid_section(grids, winners or {}, ctrl, out)
         rerun_section(ctrl, A, found, winners or {}, out)
         for v in VARIANTS:
-            for m in hold.show(("MR", "BNN_MEAN", "BNN_CVAR", "task_reward")):
-                c = ctrl.get((v, f"rerun_{m}"))
+            for k in [f"rerun_{m}" for m in hold.show(("MR", "BNN_MEAN", "BNN_CVAR", "task_reward"))] + \
+                    ["atwin_PT", "atwin_ENS_MEAN", "atwin_heuristic"]:
+                c = ctrl.get((v, k))
                 if c is not None:
                     r = R.cell_ready(c)
-                    out(f"  {v:15s} rerun_{m:12s} {c['sweep']}  idx {c['index']}  "
+                    out(f"  {v:15s} {k:18s} {c['sweep']}  idx {c['index']}  "
                         + (r if r else "{:.3f} ± {:.3f}".format(
                             *(lambda x: (x.mean(), x.std(ddof=1)))(np.array([c["scores"][s] for s in SEEDS])))))
     return found
@@ -379,6 +403,11 @@ def selftest():
     txt = "\n".join(lines)
     fl = [x for x in txt.splitlines() if "medium-play     BNN CVaR - MR, no terminals, each at its winner" in x]
     assert len(fl) == 1 and "diff -0.200" in fl[0], txt                # re-run MR vs original BNN CVaR
+    ct2 = {**ct, ("medium-play", "atwin_ENS_MEAN"): cell(base + 0.2)}
+    lines = []
+    rerun_section(ct2, An, g, w, lines.append)
+    fl = [x for x in lines if "medium-play     ENS_MEAN  with terminals - without, at its winner" in x]
+    assert len(fl) == 1 and "diff +0.300" in fl[0], lines             # anchor (base+0.5) - atwin (base+0.2)
     # --- the hold (§14.1): nothing covered is printed by default ---
     hold.INCLUDE = False
     lines = []
