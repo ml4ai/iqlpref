@@ -66,6 +66,7 @@ def collect_controls(api, P, winners, gwin=None):
     cspec = P.control_spec(sp)
     atw = P.control_atwin_spec(sp, gwin or {})          # §14.16: grid-only families' cells
     atw.update(P.control_ties_spec(sp, gwin or {}))     # §14.30: the ties arm without terminals
+    atw.update(P.leveling_spec(sp, winners, gwin or {}))  # §14.40: the leveling ablation
     fixed_of = {n: f for n, (_, f, _) in cspec.items()}
     fixed_of.update({n: f for n, (_, f, _, _, _) in atw.items()})
     cells, notes = {}, []
@@ -85,7 +86,8 @@ def collect_controls(api, P, winners, gwin=None):
                              f"(winner {index}) -- ignored")
                 continue
             v = vv.replace("_", "-")
-            pre = "tiesnt_" if "/ties_noterm_" in name else "atwin_"
+            pre = ("tiesnt_" if "/ties_noterm_" in name else
+                   f"lev{name.split('/lev_')[1].split('_')[0]}_" if "/lev_" in name else "atwin_")
             kind = pre + ("heuristic" if fam == "heuristic" else P.method_of(anchor))
             no_model = fam == "heuristic"
         else:
