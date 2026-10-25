@@ -17,8 +17,8 @@ PT
   m / s                                              tiefree -0.7027   ties -0.8032   ties - tie-free -0.1005 [-0.4175, +0.2155]
   return range                                       tiefree +7138   ties +3257   ties - tie-free -3881 [-5165, -2740]
   mean after the with-terminals index, unleveled     tiefree -1.354   ties -1.394   ties - tie-free -0.03963 [-0.1938, +0.1077]
-  mean after the no-terminals index, unleveled       tiefree --   ties --
-  mean/sd after the no-terminals index, unleveled    tiefree --   ties --
+  mean after the no-terminals index, unleveled       tiefree +2.098   ties +2.16   ties - tie-free +0.06237 [-0.179, +0.2771]
+  mean/sd after the no-terminals index, unleveled    tiefree +0.06022   ties +0.0591   ties - tie-free -0.001124 [-0.005249, +0.002701]
 
 NMR
   raw mean m                                         tiefree +7.686   ties +1.737   ties - tie-free -5.95 [-7.964, -4.321]
