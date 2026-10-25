@@ -177,8 +177,11 @@ def audit_run(cfg, name, seed, fixed, winner, oracle):
         want = f"{fixed['reward_model_root']}_{seed}"
         if cfg.get("reward_model_path") != want:
             probs.append(f"reward_model_path {cfg.get('reward_model_path')!r}, expected {want!r}")
-        if cfg.get("gauge_reward") != "max0":
-            probs.append(f"gauge_reward {cfg.get('gauge_reward')!r}")
+        # The shift (gauge) is max0 for every learned reward, except where the cell's
+        # spec declares otherwise: the leveling ablation's unshifted cells, "none" (§14.40).
+        want_gauge = fixed.get("gauge_reward", "max0")
+        if cfg.get("gauge_reward") != want_gauge:
+            probs.append(f"gauge_reward {cfg.get('gauge_reward')!r}, spec {want_gauge!r}")
     return probs
 
 
@@ -486,6 +489,14 @@ def selftest():
     assert "NOT A BLIND CELL" in txt and "2 of 8 verdict cells read" in txt
     c = compare(cells[(D, PROPOSED)], cells[(D, "MR")])
     assert abs(c["mean"] - 0.05) < 1e-12 and c["ahead"] == 10
+    # audit_run: the shift is max0 unless the cell's spec declares another (§14.40)
+    base = {"config_path": "c", "reward_model_root": "~/r", "query_length": 1}
+    cfg = {"seed": 3, "normalize_reward": 2, "config_path": "c", "query_length": 1,
+           "reward_model_path": "~/r_3", "gauge_reward": "max0"}
+    assert audit_run(cfg, "n", 3, base, 2, False) == []
+    assert audit_run(dict(cfg, gauge_reward="none"), "n", 3, base, 2, False)          # unshifted, not declared
+    assert audit_run(dict(cfg, gauge_reward="none"), "n", 3, dict(base, gauge_reward="none"), 2, False) == []
+    assert audit_run(cfg, "n", 3, dict(base, gauge_reward="none"), 2, False)           # declared none, ran max0
     print("selftest OK")
     return 0
 

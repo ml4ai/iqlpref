@@ -1,0 +1,63 @@
+====================================================================================================
+LEVELING ABLATION, medium_diverse (handoff §14.40).  DESCRIPTIVE.  Paired by seed; 95% exact bootstrap.
+====================================================================================================
+
+MR
+  A1  nr1ceqlk  idx 2  0.647 ± 0.057
+  A2  4i34hel6  idx 2  0.354 ± 0.064
+  A3  9z9wf8rz  idx 7  0.318 ± 0.067
+  A4  no sweep  no evaluation sweep
+  R   r2tephsx  INCOMPLETE (5/10 seeds scored)
+  B3  u3vw5o40  idx 7  0.321 ± 0.063
+  B4  no sweep  no evaluation sweep
+  A2 - A1  (P1: leveling, with terminals)      0.354 ± 0.064  vs  0.647 ± 0.057   diff -0.293   95% exact bootstrap [-0.328, -0.264]   paired-t [-0.332, -0.254]   ahead on 0/10
+  A4 - A3  (P2: leveling, without terminals)   NOT READ -- no evaluation sweep
+  R  - A1  (PT pipeline vs anchor)             NOT READ -- INCOMPLETE (5/10 seeds scored)
+  B3 - B1  (ties, leveled, no terminals)       0.321 ± 0.063  vs  0.318 ± 0.067   diff +0.003   95% exact bootstrap [-0.037, +0.042]   paired-t [-0.045, +0.051]   ahead on 6/10
+  B4 - B2  (ties, not leveled, no terminals)   NOT READ -- no evaluation sweep; no evaluation sweep
+  (B4 - B2) - (B3 - B1)  (P3: ties x leveling) NOT READ -- a B cell is not complete
+
+PT
+  A1  agqg3efy  idx 3  0.612 ± 0.114
+  A2  n1u8oe4q  idx 3  0.447 ± 0.126
+  A3  no sweep  no evaluation sweep
+  A4  no sweep  no evaluation sweep
+  R   3jkhx1yv  INCOMPLETE (5/10 seeds scored)
+  B3  no sweep  no evaluation sweep
+  B4  no sweep  no evaluation sweep
+  A2 - A1  (P1: leveling, with terminals)      0.447 ± 0.126  vs  0.612 ± 0.114   diff -0.166   95% exact bootstrap [-0.229, -0.101]   paired-t [-0.244, -0.088]   ahead on 1/10
+  A4 - A3  (P2: leveling, without terminals)   NOT READ -- no evaluation sweep; no evaluation sweep
+  R  - A1  (PT pipeline vs anchor)             NOT READ -- INCOMPLETE (5/10 seeds scored)
+  B3 - B1  (ties, leveled, no terminals)       NOT READ -- no evaluation sweep; no evaluation sweep
+  B4 - B2  (ties, not leveled, no terminals)   NOT READ -- no evaluation sweep; no evaluation sweep
+  (B4 - B2) - (B3 - B1)  (P3: ties x leveling) NOT READ -- a B cell is not complete
+
+NMR
+  A1  5st7zcei  idx 2  0.651 ± 0.056
+  A2  no sweep  no evaluation sweep
+  A3  ggbud1p3  idx 0  0.374 ± 0.142
+  A4  no sweep  no evaluation sweep
+  R   no sweep  no evaluation sweep
+  B3  eoxb5br7  idx 0  0.338 ± 0.073
+  B4  no sweep  no evaluation sweep
+  A2 - A1  (P1: leveling, with terminals)      NOT READ -- no evaluation sweep
+  A4 - A3  (P2: leveling, without terminals)   NOT READ -- no evaluation sweep
+  R  - A1  (PT pipeline vs anchor)             NOT READ -- no evaluation sweep
+  B3 - B1  (ties, leveled, no terminals)       0.338 ± 0.073  vs  0.374 ± 0.142   diff -0.036   95% exact bootstrap [-0.126, +0.071]   paired-t [-0.157, +0.085]   ahead on 2/10
+  B4 - B2  (ties, not leveled, no terminals)   NOT READ -- no evaluation sweep; no evaluation sweep
+  (B4 - B2) - (B3 - B1)  (P3: ties x leveling) NOT READ -- a B cell is not complete
+
+ENS_MEAN
+  A1  75dkk4js  idx 3  0.683 ± 0.037
+  A2  no sweep  no evaluation sweep
+  A3  i6yim3dp  idx 7  0.287 ± 0.068
+  A4  no sweep  no evaluation sweep
+  R   no sweep  no evaluation sweep
+  B3  no sweep  no evaluation sweep
+  B4  no sweep  no evaluation sweep
+  A2 - A1  (P1: leveling, with terminals)      NOT READ -- no evaluation sweep
+  A4 - A3  (P2: leveling, without terminals)   NOT READ -- no evaluation sweep
+  R  - A1  (PT pipeline vs anchor)             NOT READ -- no evaluation sweep
+  B3 - B1  (ties, leveled, no terminals)       NOT READ -- no evaluation sweep
+  B4 - B2  (ties, not leveled, no terminals)   NOT READ -- no evaluation sweep; no evaluation sweep
+  (B4 - B2) - (B3 - B1)  (P3: ties x leveling) NOT READ -- a B cell is not complete

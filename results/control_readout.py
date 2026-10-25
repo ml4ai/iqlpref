@@ -59,6 +59,16 @@ def _short(dataset):
     return dataset.replace("antmaze-", "").replace("-v2", "")
 
 
+def disambiguate(hits, flat, atw):
+    """Entries whose FIXED params are identical and differ only in their index (the
+    leveling ablation's A2 and R, §14.40) all match one sweep; keep the one whose
+    index is the sweep's own.  Any other ambiguity is left ambiguous."""
+    if len(hits) <= 1:
+        return hits
+    by_idx = [h for h in hits if h in atw and atw[h][2] == flat.get("normalize_reward")]
+    return by_idx if len(by_idx) == 1 and all(h in atw for h in hits) else hits
+
+
 def collect_controls(api, P, winners, gwin=None):
     """{(variant, kind): cell}, kind in noterm_MR, noterm_BNN_CVAR, heuristic."""
     import iql_score
@@ -74,7 +84,7 @@ def collect_controls(api, P, winners, gwin=None):
     cells, notes = {}, []
     for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
         params = sw.config.get("parameters")
-        hits = P.match_entry(params, fixed_of)
+        hits = disambiguate(P.match_entry(params, fixed_of), P.flat(params), atw)
         if len(hits) != 1:
             continue
         name = hits[0]
@@ -483,6 +493,12 @@ def selftest():
                  lines.append)
     fl = [x for x in lines if "large-play      MR   ties - tie-free, no terminals, idx 6" in x]
     assert len(fl) == 1 and "diff +0.200" in fl[0], lines
+    # --- disambiguation of same-fixed entries by index (§14.40's A2 and R) ---
+    atw_t = {"lev_A2": ("a", {}, 2, "medium_diverse", "mr"), "lev_R": ("a", {}, 7, "medium_diverse", "mr")}
+    assert disambiguate(["lev_A2", "lev_R"], {"normalize_reward": 7}, atw_t) == ["lev_R"]
+    assert disambiguate(["lev_A2", "lev_R"], {"normalize_reward": 2}, atw_t) == ["lev_A2"]
+    assert disambiguate(["lev_A2", "lev_R"], {"normalize_reward": 3}, atw_t) == ["lev_A2", "lev_R"]
+    assert disambiguate(["x", "lev_R"], {"normalize_reward": 7}, atw_t) == ["x", "lev_R"]   # not both atw
     # --- section H: trivial rewards ---
     cth = {("large-play", "trivial_zero"): cell(base - 0.2), ("large-play", "trivial_mean"): cell(base - 0.1),
            ("large-play", "trivial_zero_noterm"): cell(base - 0.3)}
