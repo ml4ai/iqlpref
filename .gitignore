@@ -148,3 +148,6 @@ dmypy.json
 *.pt
 wandb
 #assets/
+
+# Box-written outputs copied over by hand (models, measurements); never tracked (handoff 14.21, 14.42).
+exp/
