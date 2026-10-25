@@ -67,8 +67,10 @@ def collect_controls(api, P, winners, gwin=None):
     atw = P.control_atwin_spec(sp, gwin or {})          # §14.16: grid-only families' cells
     atw.update(P.control_ties_spec(sp, gwin or {}))     # §14.30: the ties arm without terminals
     atw.update(P.leveling_spec(sp, winners, gwin or {}))  # §14.40: the leveling ablation
+    triv = P.trivial_spec(sp)                           # §14.2 item 2: the trivial rewards
     fixed_of = {n: f for n, (_, f, _) in cspec.items()}
     fixed_of.update({n: f for n, (_, f, _, _, _) in atw.items()})
+    fixed_of.update(triv)
     cells, notes = {}, []
     for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
         params = sw.config.get("parameters")
@@ -79,7 +81,17 @@ def collect_controls(api, P, winners, gwin=None):
         flat = P.flat(params)
         if flat.get("seed") == 0 and isinstance(flat.get("normalize_reward"), list):
             continue                                   # a no-terminals grid: section E reads it
-        if name in atw:                                # PT / ensemble mean / motion at the winner
+        if name in triv:                               # zero / mean-constant, index 0, with or without terminals
+            anchor, fixed, index = None, triv[name], P.TRIVIAL_INDEX
+            if flat.get("seed") != P.EVAL_SEEDS or flat.get("normalize_reward") != index:
+                notes.append(f"{sw.id}: {name} at index {flat.get('normalize_reward')} -- ignored")
+                continue
+            rest = name.split("/trivial_")[1]                  # zero_antmaze_<v> or zero_noterm_antmaze_<v>
+            mode = rest.split("_")[0]
+            v = rest.split("antmaze_")[1].replace("_", "-")
+            kind = f"trivial_{mode}" + ("_noterm" if "_noterm_" in rest else "")
+            no_model = True
+        elif name in atw:                                # PT / ensemble mean / motion at the winner
             anchor, fixed, index, vv, fam = atw[name]
             if flat.get("seed") != P.EVAL_SEEDS or flat.get("normalize_reward") != index:
                 notes.append(f"{sw.id}: {name} at index {flat.get('normalize_reward')} "
@@ -93,9 +105,9 @@ def collect_controls(api, P, winners, gwin=None):
         else:
             anchor, fixed, index = cspec[name]
             no_model = anchor is None or anchor.startswith("tr_")   # heuristic, task reward
-        index = winners.get(anchor) if (anchor and name not in atw) else index
+        index = winners.get(anchor) if (anchor and name not in atw and name not in triv) else index
         prefix = "noterm_"
-        if name in atw:
+        if name in atw or name in triv:
             pass
         elif (anchor and flat.get("seed") == P.EVAL_SEEDS and gwin and gwin.get(anchor) is not None
                 and flat.get("normalize_reward") == gwin[anchor] != index):
@@ -104,7 +116,7 @@ def collect_controls(api, P, winners, gwin=None):
             notes.append(f"{sw.id}: {name} at seed {flat.get('seed')} index "
                          f"{flat.get('normalize_reward')} (expected {index}) -- ignored")
             continue
-        if name not in atw:
+        if name not in atw and name not in triv:
             v = _short(P.dataset_of(anchor)) if anchor else name.split("heuristic_antmaze_")[1].replace("_", "-")
             kind = (prefix + P.method_of(anchor)) if anchor else "heuristic"
         if not hold.shown_kind(kind):
@@ -272,6 +284,28 @@ def ties_section(ctrl, gwin, winners, out):
             line(t, base, out, f"  {v:15s} {m:4s} ties - tie-free, no terminals, idx {t['index']}")
 
 
+def trivial_section(ctrl, A, gwin, winners, out):
+    """H (§14.2 item 2, §14.5's references): the trivial rewards.  DESCRIPTIVE here; the
+    registered usability check and test (c) belong to the §14.5 readout."""
+    out("\nH. TRIVIAL REWARDS  (zero / mean-constant, index 0; each reward - trivial, paired by seed)")
+    for v in VARIANTS:
+        z, mc = ctrl.get((v, "trivial_zero")), ctrl.get((v, "trivial_mean"))
+        zn, mn = ctrl.get((v, "trivial_zero_noterm")), ctrl.get((v, "trivial_mean_noterm"))
+        for kind, c in (("zero, terminals", z), ("mean, terminals", mc), ("zero, no terminals", zn),
+                        ("mean, no terminals", mn)):
+            r = R.cell_ready(c)
+            out(f"  {v:15s} {kind:20s} " + (("no sweep" if c is None else c["sweep"] + "  " + r) if r else
+                f"{c['sweep']}  {np.mean([c['scores'][s] for s in SEEDS]):.3f} ± {np.std([c['scores'][s] for s in SEEDS], ddof=1):.3f}"))
+        for m in [x for x in ("task_reward", "MR", "PT", "NMR", "ENS_MEAN") if x in A[v]]:
+            for tv, cell in (("zero", z), ("mean", mc)):
+                if R.cell_ready(cell) is None and R.cell_ready(A[v][m]) is None:
+                    line(A[v][m], cell, out, f"  {v:15s} {m:11s} - {tv}, with terminals   ")
+            win = (at_winner(ctrl, gwin, winners, v, m) if m in ("task_reward", "MR") else ctrl.get((v, f"atwin_{m}")))
+            for tv, cell in (("zero", zn), ("mean", mn)):
+                if R.cell_ready(cell) is None and R.cell_ready(win) is None:
+                    line(win, cell, out, f"  {v:15s} {m:11s} - {tv}, no terminals (own winner)")
+
+
 def line(a, b, out, tag):
     ra, rb = R.cell_ready(a), R.cell_ready(b)
     if ra or rb:
@@ -339,6 +373,7 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
         found = grid_section(grids, winners or {}, ctrl, out)
         rerun_section(ctrl, A, found, winners or {}, out)
         ties_section(ctrl, found, winners or {}, out)
+        trivial_section(ctrl, A, found, winners or {}, out)
         for v in VARIANTS:
             for k in [f"rerun_{m}" for m in hold.show(("MR", "BNN_MEAN", "BNN_CVAR", "task_reward"))] + \
                     ["atwin_PT", "atwin_NMR", "atwin_ENS_MEAN", "atwin_heuristic"]:
@@ -448,6 +483,15 @@ def selftest():
                  lines.append)
     fl = [x for x in lines if "large-play      MR   ties - tie-free, no terminals, idx 6" in x]
     assert len(fl) == 1 and "diff +0.200" in fl[0], lines
+    # --- section H: trivial rewards ---
+    cth = {("large-play", "trivial_zero"): cell(base - 0.2), ("large-play", "trivial_mean"): cell(base - 0.1),
+           ("large-play", "trivial_zero_noterm"): cell(base - 0.3)}
+    Ah = {v: {"MR": cell(base)} for v in VARIANTS}
+    lines = []
+    trivial_section(cth, Ah, {}, {}, lines.append)
+    txt = "\n".join(lines)
+    assert "large-play      MR          - zero, with terminals    " in txt and "diff +0.200" in txt, txt
+    assert "diff +0.100" in txt and "no terminals (own winner)" not in txt     # MR has no no-terminals winner here
     print("selftest OK")
     return 0
 

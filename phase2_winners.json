@@ -19,6 +19,7 @@
   "mr_sweeps/sweep_antmaze_large_play": 3,
   "mr_sweeps/sweep_antmaze_medium_diverse": 2,
   "mr_sweeps/sweep_antmaze_medium_play": 0,
+  "nmr_sweeps/sweep_antmaze_large_diverse": 2,
   "nmr_sweeps/sweep_antmaze_large_play": 3,
   "nmr_sweeps/sweep_antmaze_medium_diverse": 2,
   "nmr_sweeps/sweep_antmaze_medium_play": 2,
