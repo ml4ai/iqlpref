@@ -1,0 +1,39 @@
+====================================================================================================
+OFFSET MEASUREMENT, medium_diverse (handoff §14.40, P4).  DESCRIPTIVE.  ties - tie-free, paired by seed.
+====================================================================================================
+
+MR
+  raw mean m                                         tiefree +5.104   ties +1.648   ties - tie-free -3.456 [-4.799, -2.355]
+  raw sd s                                           tiefree +6.795   ties +3.944   ties - tie-free -2.851 [-4.054, -1.362]
+  m / s                                              tiefree +0.8399   ties +0.518   ties - tie-free -0.3219 [-0.5454, -0.108]
+  return range                                       tiefree +1.287e+04   ties +6124   ties - tie-free -6749 [-8442, -5100]
+  mean after the with-terminals index, unleveled     tiefree +0.4011   ties +0.2735   ties - tie-free -0.1276 [-0.2115, -0.04075]
+  mean after the no-terminals index, unleveled       tiefree +0.2063   ties +0.2845   ties - tie-free +0.07824 [-0.06424, +0.2145]
+  mean/sd after the no-terminals index, unleveled    tiefree -0.08033   ties -0.07423   ties - tie-free +0.0061 [-0.007888, +0.02198]
+
+PT
+  raw mean m                                         tiefree -2.164   ties -1.194   ties - tie-free +0.9701 [-0.0333, +1.835]
+  raw sd s                                           tiefree +3.702   ties +1.667   ties - tie-free -2.035 [-2.611, -1.471]
+  m / s                                              tiefree -0.7027   ties -0.8032   ties - tie-free -0.1005 [-0.4175, +0.2155]
+  return range                                       tiefree +7138   ties +3257   ties - tie-free -3881 [-5165, -2740]
+  mean after the with-terminals index, unleveled     tiefree -1.354   ties -1.394   ties - tie-free -0.03963 [-0.1938, +0.1077]
+  mean after the no-terminals index, unleveled       tiefree --   ties --
+  mean/sd after the no-terminals index, unleveled    tiefree --   ties --
+
+NMR
+  raw mean m                                         tiefree +7.686   ties +1.737   ties - tie-free -5.95 [-7.964, -4.321]
+  raw sd s                                           tiefree +6.796   ties +2.984   ties - tie-free -3.812 [-5.354, -2.266]
+  m / s                                              tiefree +1.171   ties +0.5838   ties - tie-free -0.5874 [-0.7928, -0.4016]
+  return range                                       tiefree +1.456e+04   ties +5287   ties - tie-free -9273 [-1.199e+04, -6607]
+  mean after the with-terminals index, unleveled     tiefree +0.5336   ties +0.327   ties - tie-free -0.2066 [-0.2975, -0.1255]
+  mean after the no-terminals index, unleveled       tiefree +7.686   ties +1.737   ties - tie-free -5.95 [-7.964, -4.321]
+  mean/sd after the no-terminals index, unleveled    tiefree +1.171   ties +0.5838   ties - tie-free -0.5874 [-0.7928, -0.4016]
+
+ENS_MEAN
+  raw mean m                                         tiefree +0.002985   ties +0.001083   ties - tie-free -0.001901 [-0.002131, -0.001653]
+  raw sd s                                           tiefree +17.68   ties +8.338   ties - tie-free -9.343 [-10.69, -7.919]
+  m / s                                              tiefree +0.000172   ties +0.0001317   ties - tie-free -4.028e-05 [-5.885e-05, -2.33e-05]
+  return range                                       tiefree +2.637e+04   ties +8244   ties - tie-free -1.812e+04 [-1.931e+04, -1.697e+04]
+  mean after the with-terminals index, unleveled     tiefree -0.9999   ties -0.9999   ties - tie-free +2.091e-05 [+1.103e-05, +2.993e-05]
+  mean after the no-terminals index, unleveled       tiefree +1.07   ties +0.8793   ties - tie-free -0.1907 [-0.2461, -0.1383]
+  mean/sd after the no-terminals index, unleveled    tiefree +0.0355   ties +0.03202   ties - tie-free -0.003488 [-0.004453, -0.002507]
