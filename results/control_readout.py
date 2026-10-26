@@ -82,7 +82,7 @@ def collect_controls(api, P, winners, gwin=None):
     fixed_of.update({n: f for n, (_, f, _, _, _) in atw.items()})
     fixed_of.update(triv)
     cells, notes = {}, []
-    for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
+    for sw in P.iql_sweeps(api):
         params = sw.config.get("parameters")
         hits = disambiguate(P.match_entry(params, fixed_of), P.flat(params), atw)
         if len(hits) != 1:
@@ -173,7 +173,7 @@ def collect_grids(api, P):
     gspec = P.control_grid_spec(sp)
     fixed_of = {n: f for n, (_, f) in gspec.items()}
     grids = {}
-    for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
+    for sw in P.iql_sweeps(api):
         params = sw.config.get("parameters")
         hits = P.match_entry(params, fixed_of)
         if len(hits) != 1:

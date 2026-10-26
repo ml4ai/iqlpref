@@ -203,7 +203,7 @@ def collect(api, P, winners, sp=None, method_as=None, program=None):
     import iql_score
     sp = sp or P.spec()
     cells, notes = {}, []
-    for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
+    for sw in P.iql_sweeps(api):
         params = sw.config.get("parameters")
         hits = P.match_entry(params, sp)
         if len(hits) != 1:

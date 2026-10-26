@@ -263,7 +263,7 @@ def collect_exp(api, P, winners, axis="sparsity", protocol="standard"):
             by_params[name] = (cond, anchor, fixed)
     expsp = {n: f for n, (_, _, f) in by_params.items()}
     cells, notes = {}, []
-    for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
+    for sw in P.iql_sweeps(api):
         params = sw.config.get("parameters")
         hits = P.match_entry(params, expsp)
         if len(hits) != 1:

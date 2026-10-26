@@ -54,7 +54,7 @@ def collect(api, P):
     gspec = P.control_grid_spec(sp)
     gfixed = {n: f for n, (a, f) in gspec.items()}
     out = {}
-    for sw in api.project(P.IQL_PROJECT, entity=P.ENTITY).sweeps():
+    for sw in P.iql_sweeps(api):
         params = sw.config.get("parameters")
         flat = P.flat(params)
         for table, proto in ((want, "with"), (prefix, "prefix"), (gfixed, "without")):
