@@ -185,12 +185,15 @@ def audit_run(cfg, name, seed, fixed, winner, oracle):
     return probs
 
 
-def collect(api, P, winners, sp=None, method_as=None):
+def collect(api, P, winners, sp=None, method_as=None, program=None):
     """{(dataset, method): cell} for every evaluation sweep at a registered index.
 
     sp / method_as (handoff 14.24): read another spec under another method name,
     accepting the index the sweep ran at (method_as given).  Used for the pre-fix
     PT cells, read deliberately as the time-only reward (collect_timeonly).
+    program: the program every sweep must run, instead of the anchor's.  The
+    no-terminals cells (sp = P.noterm_spec, winners = the no-terminals grid winners)
+    all run iql_eval.py, the task reward's included.
 
     cell = dict(sweep, index, scores {seed: last-10}, robust {seed: last-20},
                 incomplete [reasons], audit [problems])
@@ -225,7 +228,7 @@ def collect(api, P, winners, sp=None, method_as=None):
         key = (P.dataset_of(name), method)
         cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
                 "incomplete": [], "audit": [], "name": name}
-        if sw.config.get("program") != P.program_of(name):
+        if sw.config.get("program") != (program or P.program_of(name)):
             cell["audit"].append(f"program {sw.config.get('program')!r}")
         runs = list(sw.runs)
         seen = set()
