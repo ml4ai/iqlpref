@@ -7,6 +7,7 @@
  "bnn_sweeps/sweep_antmaze_medium_play_mean": 0,
  "ctrl_sweeps/heuristic_antmaze_large_diverse": 7,
  "ctrl_sweeps/heuristic_antmaze_large_play": 6,
+ "ctrl_sweeps/heuristic_antmaze_medium_diverse": 7,
  "ctrl_sweeps/heuristic_antmaze_medium_play": 7,
  "ensemble_sweeps/sweep_antmaze_large_diverse_mean": 6,
  "ensemble_sweeps/sweep_antmaze_large_play_mean": 6,
