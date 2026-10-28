@@ -12,6 +12,8 @@ parameters:
     value: ~/iqlpref/exp/reward_learning/antmaze_medium_play_pt_r128_eval
   query_length:
     value: 100
+  seq_labeller:
+    value: 2
   seed:
     values:
     - 1
