@@ -120,18 +120,23 @@ G. TIES UNDER THE CANDIDATE PROTOCOL  (ties-kept - tie-free models, both without
 
 H. TRIVIAL REWARDS  (zero / mean-constant, index 0; each reward - trivial, paired by seed)
   medium-play     zero, terminals      am20sjts  0.002 ± 0.002
-  medium-play     mean, terminals      8ylk32xr  INCOMPLETE (8/10 seeds scored)
-  medium-play     zero, no terminals   r175teff  INCOMPLETE (0/10 seeds scored)
-  medium-play     mean, no terminals   no sweep
+  medium-play     mean, terminals      8ylk32xr  0.002 ± 0.003
+  medium-play     zero, no terminals   r175teff  INCOMPLETE (6/10 seeds scored)
+  medium-play     mean, no terminals   u5eljk82  INCOMPLETE (5/10 seeds scored)
   medium-play     task_reward - zero, with terminals    0.519 ± 0.086  vs  0.002 ± 0.002   diff +0.517   95% exact bootstrap [+0.465, +0.565]   paired-t [+0.456, +0.579]   ahead on 10/10
+  medium-play     task_reward - mean, with terminals    0.519 ± 0.086  vs  0.002 ± 0.003   diff +0.517   95% exact bootstrap [+0.465, +0.565]   paired-t [+0.456, +0.578]   ahead on 10/10
   medium-play     MR          - zero, with terminals    0.642 ± 0.042  vs  0.002 ± 0.002   diff +0.640   95% exact bootstrap [+0.614, +0.663]   paired-t [+0.611, +0.670]   ahead on 10/10
+  medium-play     MR          - mean, with terminals    0.642 ± 0.042  vs  0.002 ± 0.003   diff +0.640   95% exact bootstrap [+0.615, +0.662]   paired-t [+0.611, +0.669]   ahead on 10/10
   medium-play     PT          - zero, with terminals    0.673 ± 0.086  vs  0.002 ± 0.002   diff +0.672   95% exact bootstrap [+0.618, +0.718]   paired-t [+0.610, +0.733]   ahead on 10/10
+  medium-play     PT          - mean, with terminals    0.673 ± 0.086  vs  0.002 ± 0.003   diff +0.671   95% exact bootstrap [+0.617, +0.718]   paired-t [+0.609, +0.734]   ahead on 10/10
   medium-play     NMR         - zero, with terminals    0.741 ± 0.040  vs  0.002 ± 0.002   diff +0.739   95% exact bootstrap [+0.717, +0.763]   paired-t [+0.711, +0.767]   ahead on 10/10
+  medium-play     NMR         - mean, with terminals    0.741 ± 0.040  vs  0.002 ± 0.003   diff +0.739   95% exact bootstrap [+0.717, +0.763]   paired-t [+0.711, +0.767]   ahead on 10/10
   medium-play     ENS_MEAN    - zero, with terminals    0.711 ± 0.025  vs  0.002 ± 0.002   diff +0.710   95% exact bootstrap [+0.694, +0.723]   paired-t [+0.692, +0.727]   ahead on 10/10
+  medium-play     ENS_MEAN    - mean, with terminals    0.711 ± 0.025  vs  0.002 ± 0.003   diff +0.709   95% exact bootstrap [+0.691, +0.724]   paired-t [+0.690, +0.729]   ahead on 10/10
   medium-diverse  zero, terminals      ufsyy1k0  0.013 ± 0.027
   medium-diverse  mean, terminals      gbwm1skm  0.012 ± 0.009
-  medium-diverse  zero, no terminals   vv9zfl1l  INCOMPLETE (0/10 seeds scored)
-  medium-diverse  mean, no terminals   no sweep
+  medium-diverse  zero, no terminals   vv9zfl1l  INCOMPLETE (6/10 seeds scored)
+  medium-diverse  mean, no terminals   0anbbzh4  INCOMPLETE (5/10 seeds scored)
   medium-diverse  task_reward - zero, with terminals    0.607 ± 0.055  vs  0.013 ± 0.027   diff +0.593   95% exact bootstrap [+0.552, +0.630]   paired-t [+0.545, +0.641]   ahead on 10/10
   medium-diverse  task_reward - mean, with terminals    0.607 ± 0.055  vs  0.012 ± 0.009   diff +0.595   95% exact bootstrap [+0.561, +0.625]   paired-t [+0.555, +0.634]   ahead on 10/10
   medium-diverse  MR          - zero, with terminals    0.647 ± 0.057  vs  0.013 ± 0.027   diff +0.633   95% exact bootstrap [+0.599, +0.666]   paired-t [+0.592, +0.675]   ahead on 10/10
@@ -169,22 +174,27 @@ H. TRIVIAL REWARDS  (zero / mean-constant, index 0; each reward - trivial, paire
   large-diverse   zero, terminals      h44i8z5q  0.013 ± 0.010
   large-diverse   mean, terminals      ssvhx21l  0.022 ± 0.016
   large-diverse   zero, no terminals   ol4wvc5t  0.000 ± 0.000
-  large-diverse   mean, no terminals   c2gkswl0  INCOMPLETE (0/10 seeds scored)
+  large-diverse   mean, no terminals   c2gkswl0  0.000 ± 0.000
   large-diverse   task_reward - zero, with terminals    0.272 ± 0.045  vs  0.013 ± 0.010   diff +0.259   95% exact bootstrap [+0.230, +0.286]   paired-t [+0.225, +0.293]   ahead on 10/10
   large-diverse   task_reward - mean, with terminals    0.272 ± 0.045  vs  0.022 ± 0.016   diff +0.250   95% exact bootstrap [+0.220, +0.278]   paired-t [+0.215, +0.285]   ahead on 10/10
   large-diverse   task_reward - zero, no terminals (own winner) 0.100 ± 0.044  vs  0.000 ± 0.000   diff +0.100   95% exact bootstrap [+0.075, +0.127]   paired-t [+0.068, +0.131]   ahead on 10/10
+  large-diverse   task_reward - mean, no terminals (own winner) 0.100 ± 0.044  vs  0.000 ± 0.000   diff +0.100   95% exact bootstrap [+0.075, +0.127]   paired-t [+0.068, +0.131]   ahead on 10/10
   large-diverse   MR          - zero, with terminals    0.241 ± 0.098  vs  0.013 ± 0.010   diff +0.228   95% exact bootstrap [+0.174, +0.282]   paired-t [+0.161, +0.294]   ahead on 10/10
   large-diverse   MR          - mean, with terminals    0.241 ± 0.098  vs  0.022 ± 0.016   diff +0.219   95% exact bootstrap [+0.160, +0.278]   paired-t [+0.147, +0.290]   ahead on 10/10
   large-diverse   MR          - zero, no terminals (own winner) 0.114 ± 0.029  vs  0.000 ± 0.000   diff +0.114   95% exact bootstrap [+0.097, +0.131]   paired-t [+0.093, +0.135]   ahead on 10/10
+  large-diverse   MR          - mean, no terminals (own winner) 0.114 ± 0.029  vs  0.000 ± 0.000   diff +0.114   95% exact bootstrap [+0.096, +0.130]   paired-t [+0.093, +0.134]   ahead on 10/10
   large-diverse   PT          - zero, with terminals    0.209 ± 0.133  vs  0.013 ± 0.010   diff +0.195   95% exact bootstrap [+0.114, +0.270]   paired-t [+0.099, +0.291]   ahead on 9/10
   large-diverse   PT          - mean, with terminals    0.209 ± 0.133  vs  0.022 ± 0.016   diff +0.186   95% exact bootstrap [+0.103, +0.261]   paired-t [+0.089, +0.283]   ahead on 8/10
   large-diverse   PT          - zero, no terminals (own winner) 0.136 ± 0.042  vs  0.000 ± 0.000   diff +0.136   95% exact bootstrap [+0.113, +0.161]   paired-t [+0.106, +0.166]   ahead on 10/10
+  large-diverse   PT          - mean, no terminals (own winner) 0.136 ± 0.042  vs  0.000 ± 0.000   diff +0.136   95% exact bootstrap [+0.113, +0.161]   paired-t [+0.106, +0.166]   ahead on 10/10
   large-diverse   NMR         - zero, with terminals    0.207 ± 0.108  vs  0.013 ± 0.010   diff +0.193   95% exact bootstrap [+0.131, +0.255]   paired-t [+0.117, +0.269]   ahead on 10/10
   large-diverse   NMR         - mean, with terminals    0.207 ± 0.108  vs  0.022 ± 0.016   diff +0.184   95% exact bootstrap [+0.123, +0.244]   paired-t [+0.110, +0.258]   ahead on 10/10
   large-diverse   NMR         - zero, no terminals (own winner) 0.139 ± 0.015  vs  0.000 ± 0.000   diff +0.139   95% exact bootstrap [+0.131, +0.148]   paired-t [+0.128, +0.149]   ahead on 10/10
+  large-diverse   NMR         - mean, no terminals (own winner) 0.139 ± 0.015  vs  0.000 ± 0.000   diff +0.139   95% exact bootstrap [+0.131, +0.148]   paired-t [+0.128, +0.149]   ahead on 10/10
   large-diverse   ENS_MEAN    - zero, with terminals    0.283 ± 0.078  vs  0.013 ± 0.010   diff +0.269   95% exact bootstrap [+0.224, +0.312]   paired-t [+0.216, +0.323]   ahead on 10/10
   large-diverse   ENS_MEAN    - mean, with terminals    0.283 ± 0.078  vs  0.022 ± 0.016   diff +0.260   95% exact bootstrap [+0.213, +0.307]   paired-t [+0.203, +0.317]   ahead on 10/10
   large-diverse   ENS_MEAN    - zero, no terminals (own winner) 0.123 ± 0.027  vs  0.000 ± 0.000   diff +0.123   95% exact bootstrap [+0.107, +0.138]   paired-t [+0.104, +0.142]   ahead on 10/10
+  large-diverse   ENS_MEAN    - mean, no terminals (own winner) 0.123 ± 0.027  vs  0.000 ± 0.000   diff +0.123   95% exact bootstrap [+0.107, +0.138]   paired-t [+0.103, +0.142]   ahead on 10/10
   medium-play     rerun_MR           6s1jp7am  idx 1  0.652 ± 0.067
   medium-play     rerun_task_reward  aqszat8y  idx 0  0.672 ± 0.037
   medium-play     atwin_PT           8emcmxe7  idx 1  0.409 ± 0.267
