@@ -39,13 +39,13 @@ NMR
   A4  ekufbalq  idx 0  0.301 ± 0.117
   R   0lzynpif  idx 7  0.495 ± 0.105
   B3  eoxb5br7  idx 0  0.338 ± 0.073
-  B4  97e6xdjx  INCOMPLETE (6/10 seeds scored)
+  B4  97e6xdjx  idx 0  0.435 ± 0.129
   A2 - A1  (P1: leveling, with terminals)      0.299 ± 0.104  vs  0.651 ± 0.056   diff -0.352   95% exact bootstrap [-0.418, -0.284]   paired-t [-0.434, -0.270]   ahead on 0/10
   A4 - A3  (P2: leveling, without terminals)   0.301 ± 0.117  vs  0.374 ± 0.142   diff -0.072   95% exact bootstrap [-0.146, -0.001]   paired-t [-0.161, +0.016]   ahead on 3/10
   R  - A1  (PT pipeline vs anchor)             0.495 ± 0.105  vs  0.651 ± 0.056   diff -0.156   95% exact bootstrap [-0.238, -0.083]   paired-t [-0.251, -0.061]   ahead on 0/10
   B3 - B1  (ties, leveled, no terminals)       0.338 ± 0.073  vs  0.374 ± 0.142   diff -0.036   95% exact bootstrap [-0.126, +0.071]   paired-t [-0.157, +0.085]   ahead on 2/10
-  B4 - B2  (ties, not leveled, no terminals)   NOT READ -- INCOMPLETE (6/10 seeds scored)
-  (B4 - B2) - (B3 - B1)  (P3: ties x leveling) NOT READ -- a B cell is not complete
+  B4 - B2  (ties, not leveled, no terminals)   0.435 ± 0.129  vs  0.301 ± 0.117   diff +0.133   95% exact bootstrap [+0.034, +0.234]   paired-t [+0.012, +0.255]   ahead on 8/10
+  (B4 - B2) - (B3 - B1)  (P3: ties x leveling) +0.169   95% exact bootstrap [+0.080, +0.261]
 
 ENS_MEAN
   A1  75dkk4js  idx 3  0.683 ± 0.037
