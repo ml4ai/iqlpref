@@ -191,14 +191,27 @@ def match_entry(sweep_params, sp):
     return [n for n, fixed in sp.items() if p == fixed]
 
 
-def iql_sweeps(api):
+# Sweeps damaged beyond repair and replaced by a fresh sweep of the SAME file (handoff §14.73):
+# {sweep id: {"file": ..., "reason": ...}}.  A grid sweep never retries a failed seed, so a
+# cell whose sweep lost seeds is re-run whole; skipping the old sweep here keeps every
+# collector at one sweep per cell.
+SUPERSEDED = os.path.join("results", "superseded_sweeps.json")
+
+
+def superseded(path=None):
+    path = path or os.path.join(ROOT, SUPERSEDED)
+    return json.load(open(path)) if os.path.exists(path) else {}
+
+
+def iql_sweeps(api, skip=None):
     """The IQL project's sweeps, each ONCE.  wandb pages the listing, and a sweep created
     while it is being read shifts the pages, so one sweep can come back twice (seen
     2026-10-26: g68x036g, as NMR's A2 sweep started) and be taken for a second sweep of
-    its own cell."""
+    its own cell.  Superseded sweeps (SUPERSEDED, §14.73) are not returned at all."""
+    skip = set(superseded()) if skip is None else set(skip)
     seen = set()
     for sw in api.project(IQL_PROJECT, entity=ENTITY).sweeps():
-        if sw.id not in seen:
+        if sw.id not in seen and sw.id not in skip:
             seen.add(sw.id)
             yield sw
 
@@ -1806,6 +1819,21 @@ def selftest():
     assert not match_entry(yaml.safe_load(tx)["parameters"], sp)
     assert is_control(flat(yaml.safe_load(tx)["parameters"]))
     assert not any(is_control(fx) for fx in sp.values())
+    # ---- superseded sweeps (§14.73): skipped, as are listing duplicates ----
+    class _Sw:
+        def __init__(self, i):
+            self.id = i
+
+    class _Api:
+        def project(self, *a, **k):
+            return self
+
+        def sweeps(self):
+            return [_Sw("a"), _Sw("old"), _Sw("b"), _Sw("a")]
+    assert [s.id for s in iql_sweeps(_Api(), skip={"old"})] == ["a", "b"]
+    assert [s.id for s in iql_sweeps(_Api(), skip=())] == ["a", "old", "b"]
+    sup = superseded()
+    assert all(set(v) >= {"file", "reason"} for v in sup.values()), "superseded entries need file and reason"
     print("selftest OK")
     return 0
 

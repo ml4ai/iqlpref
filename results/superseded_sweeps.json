@@ -1,0 +1,67 @@
+{
+ "0z3wtvu6": {
+  "file": "ensemble_sweeps/r64/sweep_antmaze_large_diverse_mean",
+  "reason": "2 failed while running: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "10ks43ow": {
+  "file": "ensemble_sweeps/r16/noterm_sweep_antmaze_large_play_mean",
+  "reason": "8/10 finished, 2 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "7i1x9ee7": {
+  "file": "ensemble_sweeps/r32/noterm_sweep_antmaze_large_diverse_mean",
+  "reason": "4 failed while running: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "aqrhjapv": {
+  "file": "ensemble_sweeps/r16/noterm_sweep_antmaze_medium_play_mean",
+  "reason": "9/10 finished, 1 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "dfre1vv2": {
+  "file": "ensemble_sweeps/r32/sweep_antmaze_large_play_mean",
+  "reason": "8/10 finished, 2 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "ezctg0wz": {
+  "file": "ensemble_sweeps/r64/sweep_antmaze_medium_play_mean",
+  "reason": "5/10 finished, 5 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "j3msevwg": {
+  "file": "ensemble_sweeps/r32/noterm_sweep_antmaze_medium_play_mean",
+  "reason": "7 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "l3dlys23": {
+  "file": "ensemble_sweeps/r64/sweep_antmaze_large_play_mean",
+  "reason": "7 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "m6czjebu": {
+  "file": "ensemble_sweeps/r32/noterm_sweep_antmaze_large_play_mean",
+  "reason": "6 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "mdvzpsad": {
+  "file": "ensemble_sweeps/r16/noterm_sweep_antmaze_large_diverse_mean",
+  "reason": "9/10 finished, 1 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "mizb7nol": {
+  "file": "ensemble_sweeps/r32/sweep_antmaze_large_diverse_mean",
+  "reason": "8/10 finished, 2 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "r42lv3v0": {
+  "file": "ensemble_sweeps/r32/noterm_sweep_antmaze_medium_diverse_mean",
+  "reason": "3/10 finished, 7 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ },
+ "tqxsdetl": {
+  "file": "ensemble_sweeps/r64/sweep_antmaze_medium_diverse_mean",
+  "reason": "3/10 finished, 7 failed: eval workers died, root fs full of D4RL maze XMLs (handoff \u00a714.72); re-run whole (\u00a714.73)",
+  "date": "2026-10-31"
+ }
+}
