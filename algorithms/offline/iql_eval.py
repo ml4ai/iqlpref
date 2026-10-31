@@ -39,7 +39,10 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../gp_reward-priors")
 )
+import contextlib
 import glob as _glob
+import shutil
+import tempfile
 
 import reward_label_cache as _rlc
 
@@ -376,6 +379,27 @@ def _make_eval_env(
     return e
 
 
+@contextlib.contextmanager
+def _private_tempdir(prefix: str = "iql_eval_env_"):
+    """Route ``tempfile`` into a private directory while the eval envs are built.
+
+    D4RL's maze envs write each maze layout to ``tempfile.mkstemp(...)``'s ``.xml`` and
+    never delete it.  Every eval builds 25 envs, so the files piled up in /tmp until the
+    box's root filesystem filled and every eval worker died at start (handoff §14.72:
+    16.8M files, 221 GB, 2026-10-31).  The worker processes fork INSIDE this block and
+    inherit ``tempfile.tempdir``, so their files land here too.  The parent's setting is
+    restored as soon as the block ends, and the directory is returned for removal once
+    the envs are closed.  Only where a throwaway file lives changes; results do not.
+    """
+    d = tempfile.mkdtemp(prefix=prefix)
+    old = tempfile.tempdir
+    tempfile.tempdir = d
+    try:
+        yield d
+    finally:
+        tempfile.tempdir = old
+
+
 @torch.inference_mode()
 def eval_actor(
     env_name: str,
@@ -411,7 +435,12 @@ def eval_actor(
         partial(_make_eval_env, env_name, state_mean, state_std, seed + i)
         for i in range(n_envs)
     ]
-    vec_env = gym.vector.AsyncVectorEnv(env_fns)
+    with _private_tempdir() as env_tmp:          # the maze XMLs (see _private_tempdir)
+        try:
+            vec_env = gym.vector.AsyncVectorEnv(env_fns)
+        except BaseException:
+            shutil.rmtree(env_tmp, ignore_errors=True)
+            raise
     actor.eval()
 
     obs = vec_env.reset()  # (n_envs, obs_dim)
@@ -476,6 +505,7 @@ def eval_actor(
                         break
     finally:
         vec_env.close()
+        shutil.rmtree(env_tmp, ignore_errors=True)
 
     actor.train()
     if return_final:
