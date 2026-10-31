@@ -1,0 +1,63 @@
+====================================================================================================
+RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  SPARSITY (16, 32, 64, 128 pairs + the full train-pool)
+one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
+====================================================================================================
+  BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: 1 accuracy record(s) failed the logged-accuracy cross-check
+
+USABILITY CHECK  (candidate protocol, full data: task reward at its own index - zero, per variant)
+  medium-play     +0.6717 [+0.6506, +0.6942]   p = 0.0009766 (W+ 55, n 10, 0 zero)   USABLE
+  medium-diverse  +0.2886 [+0.2378, +0.3335]   p = 0.0009766 (W+ 55, n 10, 0 zero)   USABLE
+  large-play      +0.2070 [+0.1786, +0.2380]   p = 0.0009766 (W+ 55, n 10, 0 zero)   USABLE
+  large-diverse   +0.0998 [+0.0754, +0.1270]   p = 0.0009766 (W+ 55, n 10, 0 zero)   USABLE
+
+MR
+  manipulation check, slope of A (all 4 variants): pooled +0.0311 [+0.0264, +0.0359]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      medium-play     +0.0167 [+0.0133, +0.0200]
+      medium-diverse  +0.0287 [+0.0211, +0.0363]
+      large-play      +0.0447 [+0.0312, +0.0587]
+      large-diverse   +0.0341 [+0.0249, +0.0451]
+  usable variants: medium-play, medium-diverse, large-play, large-diverse
+  (a) candidate slope of S           pooled +0.0212 [+0.0135, +0.0286]   p = 0.03109 (W+ 549, n 40, 0 zero)   does NOT reject
+      medium-play     +0.0864 [+0.0573, +0.1144]
+      medium-diverse  -0.0034 [-0.0092, +0.0027]
+      large-play      +0.0029 [-0.0033, +0.0092]
+      large-diverse   -0.0011 [-0.0048, +0.0019]
+  (b) candidate - standard slope     pooled +0.0275 [+0.0190, +0.0361]   p = 7.02e-05 (W+ 681, n 40, 0 zero)   REJECTS
+      medium-play     +0.0816 [+0.0559, +0.1069]
+      medium-diverse  -0.0045 [-0.0173, +0.0073]
+      large-play      +0.0208 [+0.0095, +0.0331]
+      large-diverse   +0.0123 [-0.0019, +0.0275]
+  (c) family - zero                  pooled +0.3234 [+0.3036, +0.3430]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      family - mean-constant         pooled +0.3255 [+0.3081, +0.3426]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+  VERDICT: NOT SENSITIVE ((a) the candidate protocol does not respond)
+
+PT
+  NOT READ -- 32 reason(s): standard medium-play r16: no evaluation sweep; candidate medium-play r16: no evaluation sweep; standard medium-play r32: no evaluation sweep; candidate medium-play r32: no evaluation sweep ...
+
+NMR
+  NOT READ -- 33 reason(s): standard medium-play r16: no evaluation sweep; candidate medium-play r16: no evaluation sweep; standard medium-play r32: no evaluation sweep; candidate medium-play r32: no evaluation sweep ...
+
+ENS_MEAN
+  NOT READ -- 175 reason(s): candidate medium-play r16: INCOMPLETE (0/10 seeds scored); standard medium-play r32: INCOMPLETE (5/10 seeds scored); candidate medium-play r32: no evaluation sweep; A medium-play r32 seed 1: not measured ...
+
+RQ1 ON THIS LADDER
+  not yet: 1 of 4 families read (MR NOT SENSITIVE)
+
+BESIDE, NO TEST
+  MR        zero - MR, with terminals, full data: pooled -0.4810 [-0.4999, -0.4620] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
+  MR        mean - MR, with terminals, full data: pooled -0.4788 [-0.4986, -0.4589] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
+  MR        MR - motion, with terminals, full data: medium-play -0.0724 [-0.0970, -0.0517], medium-diverse -0.0366 [-0.0718, -0.0021], large-play +0.0272 [-0.0245, +0.0926], large-diverse -0.0466 [-0.1163, +0.0260]
+  MR        MR - motion, without terminals, full data: medium-play +0.3490 [+0.3125, +0.3802], medium-diverse -0.0102 [-0.0565, +0.0345], large-play +0.0103 [-0.0263, +0.0445], large-diverse -0.0204 [-0.0499, +0.0089]
+  PT        zero - PT, with terminals, full data: pooled -0.4522 [-0.4830, -0.4200] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
+  PT        mean - PT, with terminals, full data: pooled -0.4500 [-0.4815, -0.4168] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
+  PT        PT - motion, with terminals, full data: medium-play -0.0412 [-0.0989, +0.0082], medium-diverse -0.0711 [-0.1360, -0.0129], large-play -0.0520 [-0.0908, -0.0089], large-diverse -0.0791 [-0.1534, -0.0040]
+  PT        PT - motion, without terminals, full data: medium-play +0.1055 [-0.0636, +0.2718], medium-diverse -0.0519 [-0.1140, +0.0105], large-play -0.0103 [-0.0563, +0.0378], large-diverse +0.0021 [-0.0168, +0.0206]
+  NMR       zero - NMR, with terminals, full data: pooled -0.4838 [-0.5072, -0.4600] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
+  NMR       mean - NMR, with terminals, full data: pooled -0.4816 [-0.5040, -0.4588] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
+  NMR       NMR - motion, with terminals, full data: medium-play +0.0265 [+0.0041, +0.0498], medium-diverse -0.0326 [-0.0633, -0.0002], large-play -0.0300 [-0.0830, +0.0234], large-diverse -0.0811 [-0.1672, +0.0008]
+  NMR       NMR - motion, without terminals, full data: medium-play +0.2902 [+0.1938, +0.3634], medium-diverse +0.0453 [-0.0394, +0.1269], large-play +0.0012 [-0.0328, +0.0361], large-diverse +0.0046 [-0.0156, +0.0257]
+  ENS_MEAN  zero - ENS_MEAN, with terminals, full data: pooled -0.5214 [-0.5371, -0.5050] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
+  ENS_MEAN  mean - ENS_MEAN, with terminals, full data: pooled -0.5192 [-0.5356, -0.5023] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
+  ENS_MEAN  ENS_MEAN - motion, with terminals, full data: medium-play -0.0032 [-0.0222, +0.0134], medium-diverse -0.0008 [-0.0262, +0.0278], large-play +0.0424 [-0.0075, +0.1052], large-diverse -0.0051 [-0.0581, +0.0477]
+  ENS_MEAN  ENS_MEAN - motion, without terminals, full data: medium-play +0.2868 [+0.2356, +0.3296], medium-diverse -0.0419 [-0.1089, +0.0180], large-play -0.0044 [-0.0352, +0.0283], large-diverse -0.0115 [-0.0315, +0.0100]
