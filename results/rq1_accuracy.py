@@ -80,13 +80,15 @@ def batches(ds, size):
     return DataLoader(ds, batch_size=size, shuffle=False)
 
 
-def trainer_scores(trainer, ds):
-    """(per-pair correct count, batch mean over batches of 64) with the trainer's own evaluation."""
+def trainer_scores(trainer, ds, device="cpu"):
+    """(per-pair correct count, batch mean over batches of 64) with the trainer's own evaluation.
+    Batches go to `device` first, as the training scripts' _evaluate does."""
+    to = lambda b: [x.to(device) for x in b]
     (one,) = list(batches(ds, len(ds)))
-    acc = trainer.evaluation(one)["eval_acc"]
+    acc = trainer.evaluation(to(one))["eval_acc"]
     correct = int(round(acc * len(ds)))
     assert abs(correct / len(ds) - acc) < 1e-6, (acc, len(ds))
-    bm = float(np.mean([trainer.evaluation(b)["eval_acc"] for b in batches(ds, BATCH)]))
+    bm = float(np.mean([trainer.evaluation(to(b))["eval_acc"] for b in batches(ds, BATCH)]))
     return correct, bm
 
 
@@ -122,6 +124,7 @@ def cmd_measure(a):
     res = json.load(open(a.out)) if os.path.exists(a.out) else {}
     levels = a.levels.split() if a.levels else LEVELS
     fams = a.fams.split() if a.fams else FAMS
+    only = set(a.only.split(",")) if a.only else None     # re-measure exactly these records
     data = {}
     for v in VARIANTS:
         for s in SEEDS:
@@ -132,7 +135,9 @@ def cmd_measure(a):
             for v in VARIANTS:
                 for s in SEEDS:
                     k = key(fam, lv, v, s)
-                    if k in res and not a.force:
+                    if only is not None and k not in only:
+                        continue
+                    if k in res and not a.force and only is None:
                         continue
                     d = model_dir(a.models_root, fam, lv, v, s)
                     if not os.path.isdir(d):
@@ -141,16 +146,18 @@ def cmd_measure(a):
                     ds = data[(v, s)]
                     bt_pool = (yaml.safe_load(open(os.path.join(d, "config.yaml"))) or {}).get("bt_pool", "mean")
                     try:
+                        dev = a.device
                         if fam == "mr":
-                            net = Q.load_mlp_reward_model(d, device="cpu")
-                            c, bm = trainer_scores(MRTrainer(net, None, 1, "cpu", bt_pool), ds)
-                            (one,) = list(batches(ds, len(ds)))           # the ensemble path's scoring, checked
-                            assert correct_from_logits(pooled_logits_mlp(net, one, bt_pool), ds.labels) == c, k
+                            net = Q.load_mlp_reward_model(d, device=dev)
+                            c, bm = trainer_scores(MRTrainer(net, None, 1, dev, bt_pool), ds, dev)
+                            if dev == "cpu":                               # the ensemble path's scoring, checked
+                                (one,) = list(batches(ds, len(ds)))
+                                assert correct_from_logits(pooled_logits_mlp(net, one, bt_pool), ds.labels) == c, k
                             rec = {"correct": c, "batch_mean": bm}
                         elif fam in ("pt", "nmr"):
-                            net = (Q.load_pt_reward_model(d, device="cpu") if fam == "pt"
-                                   else Q.load_nmr_reward_model(d, sdim, adim, device="cpu"))
-                            c, bm = trainer_scores(PTTrainer(net, None, "cpu", bt_pool), ds)
+                            net = (Q.load_pt_reward_model(d, device=dev) if fam == "pt"
+                                   else Q.load_nmr_reward_model(d, sdim, adim, device=dev))
+                            c, bm = trainer_scores(PTTrainer(net, None, dev, bt_pool), ds, dev)
                             rec = {"correct": c, "batch_mean": bm}
                         else:
                             (one,) = list(batches(ds, len(ds)))
@@ -170,6 +177,8 @@ def cmd_measure(a):
                         print(f"  {k}: FAILED ({type(e).__name__}: {str(e)[:120]}) -- not recorded")
                         continue
                     rec.update(n=len(ds), dir=d)
+                    if fam != "ens_mean":
+                        rec["device"] = a.device                  # absent = cpu (the first run)
                     res[k] = rec
                     print(f"  {k}: {rec['correct']}/{rec['n']}" +
                           (f"  batch mean {rec['batch_mean']:.6f}" if "batch_mean" in rec else
@@ -249,6 +258,9 @@ def main():
     m.add_argument("--levels", default=None, help='e.g. "anchor r16 r32 r64 r128" (default: all)')
     m.add_argument("--fams", default=None, help='e.g. "ens_mean" (default: mr pt nmr ens_mean)')
     m.add_argument("--threads", type=int, default=1, help="torch CPU threads (default 1)")
+    m.add_argument("--device", default="cpu", help='best models only; "cuda" scores as training did')
+    m.add_argument("--only", default=None,
+                   help='comma-separated record keys to re-measure (overwrites them), e.g. "nmr|r128|large_play|7"')
     m.add_argument("--force", action="store_true")
     a = ap.parse_args()
     if a.selftest:
