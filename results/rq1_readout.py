@@ -50,7 +50,10 @@ THE THREE TESTS, per family and ladder, on the usable variants only
            part that did not.  An intersection of tests each at 0.025: no correction.
   RQ1's second part holds in full on a ladder iff every family is SENSITIVE; partial
   support is reported as partial.  RQ1 is refuted on a ladder if (a) or (b) fails on the
-  usable variants, or if no variant passes the usability check.
+  usable variants, or if no variant passes the usability check -- read PER FAMILY: one read
+  family whose (a) or (b) does not reject refutes the ladder; a FLAGGED family does not
+  (author, 2026-10-31, §14.70; decided AFTER MR's sparsity reading had been seen, and so
+  disclosed).
 
 REPORTED BESIDE, NO TEST
   - the motion reward at full data under both protocols, against each family
@@ -214,6 +217,31 @@ def ni_verdict(e):
     return "NOT BEHIND" if e["lower"] > -MARGIN else "TOO FAR BEHIND" if e["upper"] < -MARGIN else "INCONCLUSIVE"
 
 
+def ladder_verdict(verdicts, res):
+    """RQ1's second part on the ladder.  §14.5's refutation clause ("refuted on a ladder if (a)
+    or (b) fails on the usable variants") is read PER FAMILY (author, 2026-10-31, §14.70): one
+    read family whose (a) or (b) does not reject refutes the ladder.  A FLAGGED family (failed
+    manipulation check) is not a sensitivity test and does not refute.  Holds in full only when
+    every family is read and SENSITIVE."""
+    tag = ", ".join(f"{f} {v.split(' (')[0].split(':')[0]}" for f, v in verdicts.items()) or "none"
+    refuting = [f for f, r in res.items() if r.get("status") == "READ" and not r["verdict"].startswith("FLAGGED")
+                and ("a" not in r or not r["a"]["rejects"] or not r["b"]["rejects"])]
+    def fails(r):
+        if "a" not in r:                                   # no usable variant
+            return r["verdict"]
+        return " and ".join(x for x, ok in (("(a)", r["a"]["rejects"]), ("(b)", r["b"]["rejects"])) if not ok) + \
+            " did not reject"
+    if refuting:
+        why = "; ".join(f"{f}: {fails(res[f])}" for f in refuting)
+        return (f"  REFUTED on this ladder (per-family reading, §14.70): {why}.  "
+                f"{len(verdicts)} of {len(FAMILIES)} families read ({tag})")
+    if len(verdicts) < len(FAMILIES):
+        return f"  not yet: {len(verdicts)} of {len(FAMILIES)} families read ({tag})"
+    if all(v == "SENSITIVE" for v in verdicts.values()):
+        return "  HOLDS IN FULL: SENSITIVE for every family"
+    return f"  PARTIAL: {tag}"
+
+
 def non_inferior(triv, fam, variants=VARIANTS):
     """S_trivial - S_family, full data, with terminals, in §12's form."""
     if any(R.cell_ready(triv.get(v)) or R.cell_ready(fam.get(v)) for v in variants):
@@ -337,13 +365,7 @@ def report(axis, res, use, uwhy, beside, notes, out=print):
         out(f"  VERDICT: {r['verdict']}")
         verdicts[fam] = r["verdict"]
     out("\nRQ1 ON THIS LADDER")
-    if len(verdicts) < len(FAMILIES):
-        out(f"  not yet: {len(verdicts)} of {len(FAMILIES)} families read "
-            f"({', '.join(f'{f} {v.split(" (")[0]}' for f, v in verdicts.items()) or 'none'})")
-    elif all(v == "SENSITIVE" for v in verdicts.values()):
-        out("  HOLDS IN FULL: SENSITIVE for every family")
-    else:
-        out("  PARTIAL: " + ", ".join(f"{f} {v.split(' (')[0]}" for f, v in verdicts.items()))
+    out(ladder_verdict(verdicts, res))
     out("\nBESIDE, NO TEST")
     for fam in FAMILIES:
         b = beside.get(fam, {})
@@ -450,16 +472,22 @@ def selftest():
         assert verdicts == {"MR": "SENSITIVE"} and any("not yet: 1 of 4" in x for x in lines)
     # (b): the standard protocol responds as much as the candidate
     std, cand, full, ctrl, acc = build("sparsity", std_slope=0.2)
-    r = run("sparsity", std, cand, full, ctrl, acc)[0]["MR"]
+    res = run("sparsity", std, cand, full, ctrl, acc)[0]
+    r = res["MR"]
     assert r["verdict"].startswith("NOT SENSITIVE") and "(b)" in r["verdict"] and "(a)" not in r["verdict"]
+    # the per-family reading (§14.70): one read family failing (a) or (b) refutes the ladder
+    lv = ladder_verdict({"MR": r["verdict"]}, res)
+    assert "REFUTED" in lv and "MR: (b) did not reject" in lv and "1 of 4" in lv, lv
     # (c): the family no better than zero
     std, cand, full, ctrl, acc = build("sparsity", fam_minus_zero=0.0)
     r = run("sparsity", std, cand, full, ctrl, acc)[0]["MR"]
     assert "(c)" in r["verdict"], r["verdict"]
     # the manipulation check fails: FLAGGED, not a sensitivity verdict
     std, cand, full, ctrl, acc = build("sparsity", acc_slope=-0.1)
-    r = run("sparsity", std, cand, full, ctrl, acc)[0]["MR"]
+    res = run("sparsity", std, cand, full, ctrl, acc)[0]
+    r = res["MR"]
     assert r["verdict"].startswith("FLAGGED") and not r["manip"]["rejects"]
+    assert ladder_verdict({"MR": r["verdict"]}, res).startswith("  not yet")      # FLAGGED does not refute
     # an unusable variant is left out of (a)-(c) but kept in the manipulation check
     std, cand, full, ctrl, acc = build("sparsity", bad_variant="large-diverse")
     res, use, _, _ = run("sparsity", std, cand, full, ctrl, acc)
@@ -467,8 +495,10 @@ def selftest():
     assert res["MR"]["a"]["n_units"] == 30 and res["MR"]["manip"]["n_units"] == 40
     # no usable variant: refuted
     std, cand, full, ctrl, acc = build("sparsity", task_minus_zero=-0.1)
-    r = run("sparsity", std, cand, full, ctrl, acc)[0]["MR"]
+    res = run("sparsity", std, cand, full, ctrl, acc)[0]
+    r = res["MR"]
     assert "no variant passes the usability check" in r["verdict"]
+    assert "REFUTED" in ladder_verdict({"MR": r["verdict"]}, res)
     # the gate: one incomplete candidate cell, or one missing A, and nothing is read
     std, cand, full, ctrl, acc = build("sparsity")
     cand[("large-play", "MR", "r64")]["incomplete"] = ["seed 3 running"]

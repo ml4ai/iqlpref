@@ -39,10 +39,10 @@ NMR
   NOT READ -- 33 reason(s): standard medium-play r16: no evaluation sweep; candidate medium-play r16: no evaluation sweep; standard medium-play r32: no evaluation sweep; candidate medium-play r32: no evaluation sweep ...
 
 ENS_MEAN
-  NOT READ -- 175 reason(s): candidate medium-play r16: INCOMPLETE (0/10 seeds scored); standard medium-play r32: INCOMPLETE (5/10 seeds scored); candidate medium-play r32: no evaluation sweep; A medium-play r32 seed 1: not measured ...
+  NOT READ -- 175 reason(s): candidate medium-play r16: INCOMPLETE (5/10 seeds scored); standard medium-play r32: INCOMPLETE (5/10 seeds scored); candidate medium-play r32: no evaluation sweep; A medium-play r32 seed 1: not measured ...
 
 RQ1 ON THIS LADDER
-  not yet: 1 of 4 families read (MR NOT SENSITIVE)
+  REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject.  1 of 4 families read (MR NOT SENSITIVE)
 
 BESIDE, NO TEST
   MR        zero - MR, with terminals, full data: pooled -0.4810 [-0.4999, -0.4620] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
