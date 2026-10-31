@@ -25,8 +25,13 @@ HOW
 - Ties of the two logits go to the first segment, as torch.argmax does in training.
 
     measure (on the box; needs d4rl and the models; resumable):
-        cd ~/iqlpref && python results/rq1_accuracy.py measure
+        cd ~/iqlpref && python results/rq1_accuracy.py measure [--fams ...] [--levels ...]
         -> exp/rq1_accuracy.json   (exp/ is gitignored; copy it over by hand)
+    The ensemble mean dominates the cost: each MR run keeps ~980 snapshots past the burn-in
+    (5,000 epochs, a checkpoint every 5), so its 400 model sets are ~390k checkpoint loads.
+    Single-threaded torch by default (--threads), so the script does not take cores from the
+    IQL agents; the output is rewritten atomically after every record, so it can be copied
+    at any time, and a restart resumes where it stopped.
     python results/rq1_accuracy.py --selftest
 """
 
@@ -113,14 +118,16 @@ def cmd_measure(a):
     import iql_eval as Q
     from optbnn.training.training import MRTrainer, PTTrainer
     from optbnn.utils import util
+    torch.set_num_threads(a.threads)          # tiny forwards; do not compete with the IQL agents for cores
     res = json.load(open(a.out)) if os.path.exists(a.out) else {}
     levels = a.levels.split() if a.levels else LEVELS
+    fams = a.fams.split() if a.fams else FAMS
     data = {}
     for v in VARIANTS:
         for s in SEEDS:
             data[(v, s)] = util.Pref_H5Dataset(val_file(v, s), -1)
     sdim, adim = data[(VARIANTS[0], 1)].states.shape[2], data[(VARIANTS[0], 1)].actions.shape[2]
-    for fam in FAMS:
+    for fam in fams:
         for lv in levels:
             for v in VARIANTS:
                 for s in SEEDS:
@@ -168,7 +175,9 @@ def cmd_measure(a):
                           (f"  batch mean {rec['batch_mean']:.6f}" if "batch_mean" in rec else
                            f"  ({rec['n_snapshots']} snapshots)"))
                     os.makedirs(os.path.dirname(a.out), exist_ok=True)
-                    json.dump(res, open(a.out, "w"), indent=1, sort_keys=True)
+                    tmp = a.out + ".tmp"                      # atomic: a copy taken mid-run is always whole
+                    json.dump(res, open(tmp, "w"), indent=1, sort_keys=True)
+                    os.replace(tmp, a.out)
     print(f"\n  {len(res)} measurement(s) in {a.out}")
     return 0
 
@@ -238,6 +247,8 @@ def main():
     m.add_argument("--out", default=OUT)
     m.add_argument("--models-root", default=os.path.join(ROOT, "exp", "reward_learning"))
     m.add_argument("--levels", default=None, help='e.g. "anchor r16 r32 r64 r128" (default: all)')
+    m.add_argument("--fams", default=None, help='e.g. "ens_mean" (default: mr pt nmr ens_mean)')
+    m.add_argument("--threads", type=int, default=1, help="torch CPU threads (default 1)")
     m.add_argument("--force", action="store_true")
     a = ap.parse_args()
     if a.selftest:
