@@ -1398,14 +1398,16 @@ RESCALE_ARM = {                       # anchor: companion index  (seed-0 grid, i
 
 
 def rescale_arm_spec(sp, gwin, E=None):
-    """{file name: (anchor, fixed, companion index, cond)}: full data (cond None) and r16-r128."""
+    """{file name: (anchor, fixed, companion index, cond)}: full data (cond None), the sparsity
+    ladder, and (author, 2026-11-01, before any noise-ladder IQL cell ran) the noise ladder's
+    primary and sensitivity arms (the sensitivity arm exists for MR, PT and NMR on medium_play)."""
     E = E or _conditions()
     out = {}
     for anchor, k in RESCALE_ARM.items():
         assert gwin.get(anchor) in (0, 1) and 2 <= k <= 7 and not _held(anchor), anchor
         fam, v = _control_fam(anchor), variant_of_name(anchor)
         out[f"{CONTROL_DIR}/rescale_noterm_antmaze_{v}_{fam}"] = (anchor, dict(sp[anchor], drop_terminals=True), k, None)
-        for cond in E.SPARSITY:
+        for cond in E.SPARSITY + E.NOISE_PRIMARY + E.NOISE_ORACLE:
             for name, (a, fixed, _) in exp_noterm_spec(sp, cond, gwin, E).items():
                 if a == anchor:
                     out[name.replace("/noterm_", "/rescale_noterm_")] = (anchor, fixed, k, cond)
@@ -1926,7 +1928,9 @@ def selftest():
     gw2 = {a: 1 for a in RESCALE_ARM}
     gw2["nmr_sweeps/sweep_antmaze_medium_diverse"] = 0
     rs = rescale_arm_spec(sp, gw2, E)
-    assert len(rs) == len(RESCALE_ARM) * 5                     # full data + r16-r128
+    # full data + r16-r128 + n01-n045 per cell, and n01o-n045o for MR, PT, NMR on medium_play
+    assert len(rs) == len(RESCALE_ARM) * 10 + 3 * 5, len(rs)
+    assert not any("/n01o/" in n_ and ("ensemble" in n_ or "medium_diverse" in n_) for n_ in rs)
     for n_, (a_, f_, k_, c_) in rs.items():
         assert "rescale_noterm" in n_ and f_["drop_terminals"] is True and k_ == RESCALE_ARM[a_]
         # the companion matches its frozen cell's spec entry, so collectors separate them by the
