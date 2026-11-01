@@ -205,9 +205,12 @@ def run(a):
                     cm = cell_means(np.asarray(ds["rewards"], dtype=float), r_, c_)
                     rho, rank, k = goal_rho(cm, dist)
                     ro, top = map_detail(cm, dist, occ)
+                    rw = np.asarray(ds["rewards"], dtype=float)
+                    p5, p95 = np.percentile(rw, [5, 95])
                     print(f"  {tag}   {len(ds['rewards']):,} transitions   rho {rho:+.3f}   "
                           f"goal cell's reward rank {rank} of {k}   rho vs occupancy {ro:+.3f}   "
-                          f"top cell {top[0]} at distance {top[1]}, {top[2]:,} transitions")
+                          f"top cell {top[0]} at distance {top[1]}, {top[2]:,} transitions   "
+                          f"raw sd {rw.std():.4g}   p95-p5 {p95 - p5:.4g}")   # the scale IQL sees at indices 0-1 (§14.77)
     return 0
 
 
