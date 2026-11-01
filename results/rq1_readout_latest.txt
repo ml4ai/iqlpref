@@ -3,7 +3,6 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  SPARSITY (16, 32, 64, 128 
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
-  note: 1 accuracy record(s) failed the logged-accuracy cross-check
 
 USABILITY CHECK  (candidate protocol, full data: task reward at its own index - zero, per variant)
   medium-play     +0.6717 [+0.6506, +0.6942]   p = 0.0009766 (W+ 55, n 10, 0 zero)   USABLE
@@ -36,10 +35,10 @@ PT
   NOT READ -- 32 reason(s): standard medium-play r16: no evaluation sweep; candidate medium-play r16: no evaluation sweep; standard medium-play r32: no evaluation sweep; candidate medium-play r32: no evaluation sweep ...
 
 NMR
-  NOT READ -- 33 reason(s): standard medium-play r16: no evaluation sweep; candidate medium-play r16: no evaluation sweep; standard medium-play r32: no evaluation sweep; candidate medium-play r32: no evaluation sweep ...
+  NOT READ -- 32 reason(s): standard medium-play r16: no evaluation sweep; candidate medium-play r16: no evaluation sweep; standard medium-play r32: no evaluation sweep; candidate medium-play r32: no evaluation sweep ...
 
 ENS_MEAN
-  NOT READ -- 175 reason(s): candidate medium-play r16: INCOMPLETE (5/10 seeds scored); standard medium-play r32: INCOMPLETE (5/10 seeds scored); candidate medium-play r32: no evaluation sweep; A medium-play r32 seed 1: not measured ...
+  NOT READ -- 25 reason(s): candidate medium-play r16: INCOMPLETE (0/10 seeds scored); candidate medium-play r32: no evaluation sweep; standard medium-play r64: no evaluation sweep; candidate medium-play r64: INCOMPLETE (0/10 seeds scored) ...
 
 RQ1 ON THIS LADDER
   REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject.  1 of 4 families read (MR NOT SENSITIVE)
