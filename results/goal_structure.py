@@ -17,6 +17,8 @@ joints).  Without terminals, any goal-directedness must come from:
      the evaluation goal: infos/goal per transition, mapped to its cell.
 
     python results/goal_structure.py --variants "medium_play medium_diverse large_play large_diverse" --seeds "1 2 3" > exp/goal_structure.txt 2>&1
+    MR along its sparsity ladder (handoff §14.75, check 1):
+    python results/goal_structure.py --kinds MR --conds "anchor r128 r64 r32 r16" --seeds "1 2 3 4 5 6 7 8 9 10" > exp/goal_structure_mr_ladder.txt 2>&1
     python results/goal_structure.py --selftest
 """
 
@@ -108,11 +110,18 @@ def goal_rho(means, dist):
 # --------------------------------------------------------------------------
 # The box part
 # --------------------------------------------------------------------------
-def rewards_for(kind, env, variant, seed, device):
+def model_root(variant, seed, cond=None):
+    """The model directory pattern ({} = family): the anchor's, or an experiment
+    condition's (experiment_conditions.model_base: ..._<family>_<cond>_eval_<seed>)."""
+    mid = "" if cond in (None, "anchor") else f"_{cond}"
+    return os.path.join(MODELS, f"antmaze_{variant}_{{}}{mid}_eval_{seed}")
+
+
+def rewards_for(kind, env, variant, seed, device, cond=None):
     """Per-transition reward exactly as iql_eval builds it (before gauge and
     normalization, which cannot change rho), and the matching dataset."""
     import iql_eval as Q                                   # algorithms/offline/iql_eval.py
-    root = os.path.join(MODELS, f"antmaze_{variant}_{{}}_eval_{seed}")
+    root = model_root(variant, seed, cond)
     if kind == "MR":
         m = Q.load_mlp_reward_model(root.format("mr"), device=device)
         return Q.qlearning_dataset_mr(env, m)
@@ -184,19 +193,21 @@ def run(a):
                   f"rho vs occupancy {ro:+.3f}   top cell {top[0]} at distance {top[1]}, {top[2]:,} transitions")
         for kind in a.kinds.split(","):
             kind = kind.strip()
-            for s in [int(x) for x in a.seeds.split()]:
-                try:
-                    ds = rewards_for(kind, env, v, s, a.device)
-                except Exception as e:                       # report, do not stop the sweep
-                    print(f"  {kind:9s} seed {s:2d}  FAILED: {type(e).__name__}: {e}")
-                    continue
-                r_, c_ = cells_of(np.asarray(ds["observations"])[:, :2], scaling, offset)
-                cm = cell_means(np.asarray(ds["rewards"], dtype=float), r_, c_)
-                rho, rank, k = goal_rho(cm, dist)
-                ro, top = map_detail(cm, dist, occ)
-                print(f"  {kind:9s} seed {s:2d}   {len(ds['rewards']):,} transitions   rho {rho:+.3f}   "
-                      f"goal cell's reward rank {rank} of {k}   rho vs occupancy {ro:+.3f}   "
-                      f"top cell {top[0]} at distance {top[1]}, {top[2]:,} transitions")
+            for cond in a.conds.split():
+                for s in [int(x) for x in a.seeds.split()]:
+                    tag = f"{kind:9s} {cond:6s} seed {s:2d}"
+                    try:
+                        ds = rewards_for(kind, env, v, s, a.device, cond)
+                    except Exception as e:                       # report, do not stop the sweep
+                        print(f"  {tag}  FAILED: {type(e).__name__}: {e}")
+                        continue
+                    r_, c_ = cells_of(np.asarray(ds["observations"])[:, :2], scaling, offset)
+                    cm = cell_means(np.asarray(ds["rewards"], dtype=float), r_, c_)
+                    rho, rank, k = goal_rho(cm, dist)
+                    ro, top = map_detail(cm, dist, occ)
+                    print(f"  {tag}   {len(ds['rewards']):,} transitions   rho {rho:+.3f}   "
+                          f"goal cell's reward rank {rank} of {k}   rho vs occupancy {ro:+.3f}   "
+                          f"top cell {top[0]} at distance {top[1]}, {top[2]:,} transitions")
     return 0
 
 
@@ -223,6 +234,10 @@ def selftest():
     m = cell_means(np.array(vals), np.array(rows), np.array(cols))
     rho, rank, k = goal_rho(m, dist)
     assert abs(rho + 1) < 1e-12 and rank == 1 and k == len(dist)
+    # the condition models' directories (§14.75 check 1)
+    assert model_root("medium_play", 3).endswith("antmaze_medium_play_{}_eval_3")
+    assert model_root("medium_play", 3, "anchor") == model_root("medium_play", 3)
+    assert model_root("large_diverse", 10, "r16").format("mr").endswith("antmaze_large_diverse_mr_r16_eval_10")
     # map_detail: a reward equal to occupancy has rho_occ = +1; the top cell is reported
     occ = {c: (1.0, 100 + 10 * d) for c, d in dist.items()}
     ro, top = map_detail({c: (float(occ[c][1]), 60) for c in dist}, dist, occ)
@@ -238,6 +253,9 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--variants", default="medium_play medium_diverse large_play large_diverse")
     ap.add_argument("--seeds", default="1 2 3")
+    ap.add_argument("--conds", default="anchor",
+                    help='model sets: "anchor" and/or experiment conditions, e.g. "anchor r128 r64 r32 r16" '
+                         "(handoff §14.75 check 1)")
     # BNN kinds are covered by the BNN/CVaR hold (HANDOFF §14.1): not by default,
     # and refused without --include-held.
     ap.add_argument("--kinds", default="MR,PT")
