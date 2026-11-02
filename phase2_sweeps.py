@@ -1520,6 +1520,25 @@ def cmd_control_leakfree(do_write):
     return 0
 
 
+def leakfree_spec():
+    """{file name: (anchor, fixed, index, variant, family)} for the leak control's cells
+    (§14.82), read off their generated files so the readout matches what was launched.
+    `fixed` keeps return_range_split "length", which is what keeps them apart from the
+    cells they copy (match_entry is exact)."""
+    out = {}
+    for src in LEAKFREE:
+        name = f"{CONTROL_DIR}/leakfree_{src.split('/')[-1]}"
+        path = os.path.join(ROOT, name + ".yaml")
+        if not os.path.exists(path):
+            continue
+        f = flat(yaml.safe_load(open(path))["parameters"])
+        fam = src.rsplit("_", 1)[1]                              # heuristic | mr
+        v = src.split("antmaze_")[1][:-len(fam) - 1]
+        anchor = None if fam == "heuristic" else f"{fam}_sweeps/sweep_antmaze_{v}"
+        out[name] = (anchor, {k: x for k, x in f.items() if k not in LINEAGE_KEYS}, f["normalize_reward"], v, fam)
+    return out
+
+
 def trivial_spec(sp):
     """{file name: fixed params}: every variant x mode x (with, without terminals)."""
     out = {}

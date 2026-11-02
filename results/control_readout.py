@@ -77,6 +77,7 @@ def collect_controls(api, P, winners, gwin=None):
     atw = P.control_atwin_spec(sp, gwin or {})          # §14.16: grid-only families' cells
     atw.update(P.control_ties_spec(sp, gwin or {}))     # §14.30: the ties arm without terminals
     atw.update(P.leveling_spec(sp, winners, gwin or {}))  # §14.40: the leveling ablation
+    atw.update(P.leakfree_spec())                       # §14.82: the index-6/7 leak control
     triv = P.trivial_spec(sp)                           # §14.2 item 2: the trivial rewards
     fixed_of = {n: f for n, (_, f, _) in cspec.items()}
     fixed_of.update({n: f for n, (_, f, _, _, _) in atw.items()})
@@ -108,7 +109,7 @@ def collect_controls(api, P, winners, gwin=None):
                              f"(winner {index}) -- ignored")
                 continue
             v = vv.replace("_", "-")
-            pre = ("tiesnt_" if "/ties_noterm_" in name else
+            pre = ("tiesnt_" if "/ties_noterm_" in name else "leakfree_" if "/leakfree_" in name else
                    f"lev{name.split('/lev_')[1].split('_')[0]}_" if "/lev_" in name else "atwin_")
             kind = pre + ("heuristic" if fam == "heuristic" else P.method_of(anchor))
             no_model = fam == "heuristic"
@@ -316,6 +317,24 @@ def trivial_section(ctrl, A, gwin, winners, out):
                     line(win, cell, out, f"  {v:15s} {m:11s} - {tv}, no terminals (own winner)")
 
 
+def leak_section(ctrl, gwin, winners, out):
+    """I (§14.82): the index-6/7 leak control.  Each cell as it ran (trajectories cut at
+    the terminals) - the same cell with return_range_split "length", paired by seed.
+    The prediction, written before the runs: the leak-free cells fall to about 0."""
+    out("\nI. THE INDEX-6/7 LEAK  (as run - leak-free, both without terminals, same index; §14.82)")
+    for v in VARIANTS:
+        for m, orig in (("heuristic", ctrl.get((v, "atwin_heuristic"))),
+                        ("MR", at_winner(ctrl, gwin, winners, v, "MR"))):
+            lf = ctrl.get((v, f"leakfree_{m}"))
+            if lf is None:
+                continue
+            r = R.cell_ready(lf)
+            x = None if r else np.array([lf["scores"][s] for s in SEEDS])
+            out(f"  {v:15s} {m:9s} leak-free {lf['sweep']}  idx {lf['index']}  "
+                + (r if r else f"{x.mean():.3f} ± {x.std(ddof=1):.3f}"))
+            line(orig, lf, out, f"  {v:15s} {m:9s} as run - leak-free          ")
+
+
 def line(a, b, out, tag):
     ra, rb = R.cell_ready(a), R.cell_ready(b)
     if ra or rb:
@@ -384,6 +403,7 @@ def report(ctrl, anchor, notes, out=print, grids=None, winners=None):
         rerun_section(ctrl, A, found, winners or {}, out)
         ties_section(ctrl, found, winners or {}, out)
         trivial_section(ctrl, A, found, winners or {}, out)
+        leak_section(ctrl, found, winners or {}, out)
         for v in VARIANTS:
             for k in [f"rerun_{m}" for m in hold.show(("MR", "BNN_MEAN", "BNN_CVAR", "task_reward"))] + \
                     ["atwin_PT", "atwin_NMR", "atwin_ENS_MEAN", "atwin_heuristic"]:
@@ -508,6 +528,22 @@ def selftest():
     txt = "\n".join(lines)
     assert "large-play      MR          - zero, with terminals    " in txt and "diff +0.200" in txt, txt
     assert "diff +0.100" in txt and "no terminals (own winner)" not in txt     # MR has no no-terminals winner here
+    # --- section I: as run - leak-free, MR at its winner (the re-run where it moved) ---
+    cti = {("medium-play", "rerun_MR"): cell(base + 0.12), ("medium-play", "leakfree_MR"): cell(base),
+           ("medium-play", "atwin_heuristic"): cell(base + 0.13)}
+    lines = []
+    leak_section(cti, g, w, lines.append)
+    fl = [x for x in lines if "medium-play     MR        as run - leak-free" in x]
+    assert len(fl) == 1 and "diff +0.120" in fl[0], lines
+    assert not any("heuristic as run" in x for x in lines)                    # no leak-free motion cell yet
+    _argv, sys.argv = sys.argv, [sys.argv[0]]
+    import phase2_sweeps as P
+    sys.argv = _argv
+    lf = P.leakfree_spec()
+    assert sorted(k for _, _, _, _, k in lf.values()) == ["heuristic", "mr"], lf
+    for n, (a, fixed, idx, v, fam) in lf.items():
+        assert fixed["return_range_split"] == "length" and fixed["drop_terminals"] is True and idx in (6, 7), n
+        assert v == "large_diverse" and (a is None) == (fam == "heuristic"), n
     print("selftest OK")
     return 0
 
