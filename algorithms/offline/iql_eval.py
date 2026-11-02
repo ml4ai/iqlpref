@@ -89,6 +89,14 @@ class TrainConfig:
     normalize: bool = True
     # whether to normalize reward (like in IQL) (0 is none, other integers lead to different types of normalizations)
     normalize_reward: int = 0
+    # How return_reward_range cuts the dataset into "trajectories" for normalization
+    # indices 2-7 (handoff §14.82).  "terminals" (the original; every run before §14.82):
+    # at every terminal or every 1000 steps.  On antmaze the terminals ARE the goal
+    # arrivals, so at indices 6-7 -- whose per-transition offset is min_ret / trajectory
+    # length -- consecutive goal steps become length-1 segments with a large bonus, and
+    # the goal leaks into the reward even under drop_terminals.  "length": cut every 1000
+    # steps only (no terminal information; leak-free).
+    return_range_split: str = "terminals"
     # Gauge fixing for LEARNED reward models (handoff HANDOFF_HP_SELECTION.md
     # section 5.1).  A preference-trained reward is only identified up to an
     # additive constant -- Bradley-Terry depends on Phi_1 - Phi_2, so f and
@@ -513,7 +521,9 @@ def eval_actor(
     return np.asarray(completed[:n_episodes]), steps_to_goal
 
 
-def return_reward_range(dataset, max_episode_steps):
+def return_reward_range(dataset, max_episode_steps, cut_at_terminals=True):
+    """cut_at_terminals=False (return_range_split "length", §14.82): segments end every
+    max_episode_steps steps only, so no terminal (goal) information enters trj_lens."""
     returns, lengths = [], []
     ep_ret, ep_len = 0.0, 0
     i = 0
@@ -522,7 +532,7 @@ def return_reward_range(dataset, max_episode_steps):
         ep_ret += float(r)
         ep_len += 1
         trj_lens[i : j + 1] = ep_len
-        if d or ep_len == max_episode_steps:
+        if (d and cut_at_terminals) or ep_len == max_episode_steps:
             i = j + 1
             returns.append(ep_ret)
             lengths.append(ep_len)
@@ -584,7 +594,14 @@ def trivial_rewards(dataset, mode):
     return np.full_like(r, c, dtype=np.float32), c
 
 
-def modify_reward(dataset, env_name, normalize_reward, max_episode_steps=1000):
+_return_reward_range = return_reward_range
+
+
+def modify_reward(dataset, env_name, normalize_reward, max_episode_steps=1000, split="terminals"):
+    if split not in ("terminals", "length"):
+        raise ValueError(f"return_range_split must be 'terminals' or 'length', got {split!r}")
+    # every return_reward_range below cuts at terminals unless split == "length" (§14.82)
+    return_reward_range = partial(_return_reward_range, cut_at_terminals=(split == "terminals"))
     if any(s in env_name for s in ("halfcheetah", "hopper", "walker2d")):
         min_ret, max_ret, _ = return_reward_range(dataset, max_episode_steps)
         dataset["rewards"] /= max_ret - min_ret
@@ -1853,7 +1870,8 @@ def train(config: TrainConfig):
         dataset = d4rl.qlearning_dataset(env)
 
     if config.normalize_reward:
-        modify_reward(dataset, config.env, config.normalize_reward)
+        modify_reward(dataset, config.env, config.normalize_reward,
+                      split=config.return_range_split)
 
     if config.drop_terminals:
         # AFTER modify_reward, whose return range is computed over trajectories
