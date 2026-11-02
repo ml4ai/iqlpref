@@ -27,6 +27,7 @@ HOW
     measure (on the box; needs d4rl and the models; resumable):
         cd ~/iqlpref && python results/rq1_accuracy.py measure [--fams ...] [--levels ...]
         -> exp/rq1_accuracy.json   (exp/ is gitignored; copy it over by hand)
+    The replication (§14.83): measure --repl, seeds 101-110 -> exp/rq1_accuracy_repl.json.
     The ensemble mean dominates the cost: each MR run keeps ~980 snapshots past the burn-in
     (5,000 epochs, a checkpoint every 5), so its 400 model sets are ~390k checkpoint loads.
     Single-threaded torch by default (--threads), so the script does not take cores from the
@@ -51,10 +52,12 @@ sys.path.insert(0, GPR)
 sys.path.insert(0, os.path.join(GPR, "scripts_bnn"))
 
 OUT = os.path.join(ROOT, "exp", "rq1_accuracy.json")
+OUT_REPL = os.path.join(ROOT, "exp", "rq1_accuracy_repl.json")   # --repl (handoff §14.83)
 FAMS = ("mr", "pt", "nmr", "ens_mean")
 LEVELS = ("anchor", "r16", "r32", "r64", "r128", "n01", "n02", "n03", "n04", "n045")
 VARIANTS = ("medium_play", "medium_diverse", "large_play", "large_diverse")
 SEEDS = tuple(range(1, 11))
+REPL_SEEDS = tuple(range(101, 111))  # the replication's evaluation seeds (§14.83): its own file
 BURN_IN = 100                       # ensemble_sweeps/*_mean.yaml mr_burn_in
 BATCH = 64                          # the trainers' validation loader (batch_size 64, shuffle=False)
 
@@ -125,15 +128,16 @@ def cmd_measure(a):
     levels = a.levels.split() if a.levels else LEVELS
     fams = a.fams.split() if a.fams else FAMS
     only = set(a.only.split(",")) if a.only else None     # re-measure exactly these records
+    seeds = REPL_SEEDS if a.repl else SEEDS
     data = {}
     for v in VARIANTS:
-        for s in SEEDS:
+        for s in seeds:
             data[(v, s)] = util.Pref_H5Dataset(val_file(v, s), -1)
-    sdim, adim = data[(VARIANTS[0], 1)].states.shape[2], data[(VARIANTS[0], 1)].actions.shape[2]
+    sdim, adim = data[(VARIANTS[0], seeds[0])].states.shape[2], data[(VARIANTS[0], seeds[0])].actions.shape[2]
     for fam in fams:
         for lv in levels:
             for v in VARIANTS:
-                for s in SEEDS:
+                for s in seeds:
                     k = key(fam, lv, v, s)
                     if only is not None and k not in only:
                         continue
@@ -253,7 +257,9 @@ def main():
     ap.add_argument("--selftest", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
     m = sub.add_parser("measure")
-    m.add_argument("--out", default=OUT)
+    m.add_argument("--out", default=None, help="default exp/rq1_accuracy.json (exp/rq1_accuracy_repl.json with --repl)")
+    m.add_argument("--repl", action="store_true",
+                   help="the replication's models, seeds 101-110 (handoff §14.83)")
     m.add_argument("--models-root", default=os.path.join(ROOT, "exp", "reward_learning"))
     m.add_argument("--levels", default=None, help='e.g. "anchor r16 r32 r64 r128" (default: all)')
     m.add_argument("--fams", default=None, help='e.g. "ens_mean" (default: mr pt nmr ens_mean)')
@@ -266,6 +272,9 @@ def main():
     if a.selftest:
         return selftest()
     if a.cmd == "measure":
+        a.out = a.out or (OUT_REPL if a.repl else OUT)
+        if a.repl and os.path.abspath(a.out) == os.path.abspath(OUT):
+            ap.error("--repl must not write Study 1's exp/rq1_accuracy.json")
         return cmd_measure(a)
     ap.print_help()
     return 0

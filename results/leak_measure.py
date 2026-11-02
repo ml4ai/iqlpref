@@ -123,7 +123,7 @@ def audit(a):
     sys.path.insert(0, os.path.join(ROOT, "algorithms", "offline"))
     import iql_eval as Q
     rng = np.random.default_rng(0)
-    verdict = True
+    verdict = task_grid_ok = True
     for v in a.variants.split():
         name = f"antmaze-{v.replace('_', '-')}-v2"
         ds = d4rl.qlearning_dataset(gym.make(name))
@@ -137,6 +137,17 @@ def audit(a):
             Q.gauge_reward(g, "max0")
             rewards[f"gauss {k}"] = g["rewards"]
         print(f"\n=== {name}: {len(term)} transitions, {term.sum()} terminals")
+        # The replication's task grid is indices 0-3 (replication.TASK_GRID), as Study 1's:
+        # for a 0/1 reward, 4/6 equal 2 and 5/7 equal 3 exactly when the minimum segment
+        # return is 0.  Shown per split; under "length" it must be 0 (§14.83).
+        for split in ("terminals", "length"):
+            lo, hi, _ = Q.return_reward_range({"rewards": rewards["task"], "terminals": term}, H,
+                                              cut_at_terminals=(split == "terminals"))
+            print(f"  task reward, split {split!r}: min segment return {lo:g}, max {hi:g}"
+                  + ("  -> task grid 0-3 covers every distinct index" if lo == 0 else
+                     "  -> min != 0: indices 4-7 are NOT duplicates of 2-3" if split == a.split else ""))
+            if split == a.split and lo != 0:
+                task_grid_ok = False
         for split in ("terminals", "length"):
             print(f"  split {split!r}" + ("  <- the audit" if split == a.split else ""))
             for lab, r in rewards.items():
@@ -148,7 +159,9 @@ def audit(a):
                       "  ".join(f"{i}:{d:.2g}/{f:.1g}" for i, (d, f) in res.items()))
     print(f"\nLEAK AUDIT (split {a.split!r}): {'PASS' if verdict else 'FAIL'} "
           "(per index: max |real - zero terminals| / relative affine residual sd)")
-    return 0 if verdict else 1
+    print(f"TASK GRID 0-3 (split {a.split!r}): " + ("covers every distinct index (min segment return 0 "
+          "on every maze)" if task_grid_ok else "does NOT: some maze's min segment return is not 0"))
+    return 0 if verdict and task_grid_ok else 1
 
 
 def run(a):

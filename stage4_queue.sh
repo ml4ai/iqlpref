@@ -14,7 +14,7 @@
 #   GPU_LIST        space-separated GPU ids (quote it)
 #   AGENTS_PER_GPU  agents per GPU; concurrency x 25 eval cores must fit
 #                   alongside whatever else is on the box
-#   ITEM            <family>:<sweep>[@stage4|@eval|@<cond>], family in bnn|ensemble|mr|pt|tr
+#   ITEM            <family>:<sweep>[@stage4|@eval|@control|@repl|@<cond>], family in bnn|ensemble|mr|pt|tr|ctrl|repl
 #                   An experiment condition's sweeps live one directory down:
 #                   bnn:r32/sweep_antmaze_large_play_cvar@r32 is
 #                   bnn_sweeps/r32/sweep_antmaze_large_play_cvar.yaml, and @r32
@@ -54,7 +54,8 @@ for item in "$@"; do
     eval)   pat="Lineage: EVALUATION" ;;
     r[0-9]*|n[0-9]*|ties) pat="Lineage: EXPERIMENT ${want}," ;;
     control) pat="Lineage: CONTROL" ;;
-    *)      echo "ERROR: unknown lineage tag @$want ($item); use @stage4, @eval, @control or @<cond>" >&2; exit 1 ;;
+    repl)   pat="Lineage: REPLICATION" ;;        # gp_reward-priors HANDOFF 14.83 (replication.py)
+    *)      echo "ERROR: unknown lineage tag @$want ($item); use @stage4, @eval, @control, @repl or @<cond>" >&2; exit 1 ;;
   esac
   if [[ -n "$want" ]] && ! grep -q "$pat" "${fam}_sweeps/${sw}.yaml"; then
     echo "ERROR: ${fam}_sweeps/${sw}.yaml is not in the @$want lineage ($item)." >&2
