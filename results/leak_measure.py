@@ -27,6 +27,20 @@ iql_eval labels and shifts it, this reports:
 
     python results/leak_measure.py > exp/leak_measure.txt 2>&1
     python results/leak_measure.py --selftest
+
+THE LEAK AUDIT (--audit; handoff §14.83, registered for the corrected candidate protocol)
+  Criterion: the normalized reward must NOT DEPEND ON THE TERMINALS.  For every variant and
+  every index 0-7, modify_reward run on the dataset's real terminals and on all-zero
+  terminals must agree EXACTLY (max |difference| = 0), under the protocol's split.  The
+  goal can reach a transition through the normalization only via the terminals, and the
+  check is made on rewards that are not the learned ones -- the task reward, the motion
+  reward and three Gaussian draws, each shifted as iql_eval shifts a learned reward -- so
+  passing it holds for any reward model.  Index 0 is iql_eval's "no modify_reward".
+  Reported beside: the residual sd of the best global affine fit of the normalized reward
+  on its input (relative to the normalized reward's sd), which is 0 when the index is one
+  global map.  Both splits are printed; only --split's verdict is the audit's.
+
+    python results/leak_measure.py --audit [--split length] > exp/leak_audit.txt 2>&1
 """
 
 import argparse
@@ -75,6 +89,66 @@ def summarize(own, bonus, trj, term):
             "share_len1": float(one.mean()),
             "len1_that_are_terminals": float(term[one].mean()) if one.any() else float("nan"),
             "own_sd": float(own.std()), "bonus_sd": float(bonus.std())}
+
+
+INDICES = range(8)
+
+
+def normalized(Q, rewards, terminals, idx, split):
+    """The reward iql_eval trains on at this index (before drop_terminals); index 0 is
+    iql_eval's `if config.normalize_reward:` skip."""
+    ds = {"rewards": np.array(rewards, dtype=np.float32, copy=True), "terminals": np.asarray(terminals)}
+    if idx:
+        Q.modify_reward(ds, "antmaze-audit", idx, split=split)
+    return ds["rewards"]
+
+
+def audit_rewards(Q, rewards, terminals, split):
+    """{index: (max |real terminals - zero terminals|, relative affine residual sd)}."""
+    zeros = np.zeros_like(np.asarray(terminals))
+    x = np.asarray(rewards, dtype=np.float64)
+    out = {}
+    for i in INDICES:
+        y = normalized(Q, rewards, terminals, i, split).astype(np.float64)
+        d = float(np.abs(y - normalized(Q, rewards, zeros, i, split)).max())
+        A = np.stack([x, np.ones_like(x)], axis=1)
+        res = y - A @ np.linalg.lstsq(A, y, rcond=None)[0]
+        out[i] = (d, float(res.std() / y.std()) if y.std() > 0 else 0.0)
+    return out
+
+
+def audit(a):
+    import d4rl  # noqa: F401
+    import gym
+    sys.path.insert(0, os.path.join(ROOT, "algorithms", "offline"))
+    import iql_eval as Q
+    rng = np.random.default_rng(0)
+    verdict = True
+    for v in a.variants.split():
+        name = f"antmaze-{v.replace('_', '-')}-v2"
+        ds = d4rl.qlearning_dataset(gym.make(name))
+        term = np.asarray(ds["terminals"]).astype(bool)
+        rewards = {"task": np.asarray(ds["rewards"], dtype=np.float32)}
+        mot = {"rewards": Q.heuristic_rewards(ds, "path_length")}
+        Q.gauge_reward(mot, "max0")
+        rewards["motion"] = mot["rewards"]
+        for k in range(3):
+            g = {"rewards": rng.standard_normal(len(term)).astype(np.float32)}
+            Q.gauge_reward(g, "max0")
+            rewards[f"gauss {k}"] = g["rewards"]
+        print(f"\n=== {name}: {len(term)} transitions, {term.sum()} terminals")
+        for split in ("terminals", "length"):
+            print(f"  split {split!r}" + ("  <- the audit" if split == a.split else ""))
+            for lab, r in rewards.items():
+                res = audit_rewards(Q, r, term, split)
+                ok = all(d == 0.0 for d, _ in res.values())
+                if split == a.split:
+                    verdict &= ok
+                print(f"    {lab:8s} {'PASS' if ok else 'FAIL'}  " +
+                      "  ".join(f"{i}:{d:.2g}/{f:.1g}" for i, (d, f) in res.items()))
+    print(f"\nLEAK AUDIT (split {a.split!r}): {'PASS' if verdict else 'FAIL'} "
+          "(per index: max |real - zero terminals| / relative affine residual sd)")
+    return 0 if verdict else 1
 
 
 def run(a):
@@ -150,6 +224,27 @@ def selftest():
     r2 = -0.1 * np.arange(1, 21) / 20                   # two 10-step segments with different returns
     _, bf, tf, _, _ = bonus_terms(r2, term, H=10, use_terminals=False)
     assert np.isfinite(bf).all() and np.allclose(bf, bf[0]) and (tf == 10).all()
+    # the audit, on iql_eval's own modify_reward (d4rl / gym stubbed if absent): 3,000 steps,
+    # clustered terminals.  "length" passes at every index; "terminals" fails at 2-7.
+    import types
+    for m in ("d4rl", "gym"):
+        try:
+            __import__(m)
+        except ImportError:
+            sys.modules[m] = types.ModuleType(m)
+    sys.path.insert(0, os.path.join(ROOT, "algorithms", "offline"))
+    import iql_eval as Q
+    rng = np.random.default_rng(1)
+    r = (rng.standard_normal(3000) - 3.0).astype(np.float32)
+    term = np.zeros(3000, dtype=bool)
+    term[[400, 401, 402, 1700, 1701, 2550]] = True
+    res = audit_rewards(Q, r, term, "length")
+    assert all(d == 0.0 for d, _ in res.values()), res
+    assert all(f < 1e-3 for _, f in res.values()), res                 # one global map (float32: 4/5 ~1.5e-4)
+    res = audit_rewards(Q, r, term, "terminals")
+    assert res[0][0] == 0.0 and res[1][0] == 0.0, res                    # 0, 1 never read terminals
+    assert all(res[i][0] > 0 for i in range(2, 8)), res                  # 2-7 do under "terminals"
+    assert res[6][1] > 1e-3 and res[7][1] > 1e-3, res                    # and 6, 7 are not one map
     print("selftest OK")
     return 0
 
@@ -160,8 +255,11 @@ def main():
     ap.add_argument("--seeds", default="1 2 3")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--audit", action="store_true", help="the registered leak audit (§14.83)")
+    ap.add_argument("--split", choices=("terminals", "length"), default="length",
+                    help="--audit: the split whose verdict counts")
     a = ap.parse_args()
-    return selftest() if a.selftest else run(a)
+    return selftest() if a.selftest else audit(a) if a.audit else run(a)
 
 
 if __name__ == "__main__":
