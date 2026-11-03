@@ -217,8 +217,10 @@ H. TRIVIAL REWARDS  (zero / mean-constant, index 0; each reward - trivial, paire
   large-diverse   ENS_MEAN    - mean, no terminals (own winner) 0.123 ± 0.027  vs  0.000 ± 0.000   diff +0.123   95% exact bootstrap [+0.107, +0.138]   paired-t [+0.103, +0.142]   ahead on 10/10
 
 I. THE INDEX-6/7 LEAK  (as run - leak-free, both without terminals, same index; §14.82)
-  large-diverse   heuristic leak-free 04xb56cs  idx 7  INCOMPLETE (5/10 seeds scored)
-  large-diverse   heuristic as run - leak-free           NOT READ -- INCOMPLETE (5/10 seeds scored)
+  large-diverse   heuristic leak-free 04xb56cs  idx 7  0.001 ± 0.001
+  large-diverse   heuristic as run - leak-free           0.134 ± 0.040  vs  0.001 ± 0.001   diff +0.133   95% exact bootstrap [+0.109, +0.155]   paired-t [+0.105, +0.161]   ahead on 10/10
+  large-diverse   MR        leak-free 0ymwjhdl  idx 6  INCOMPLETE (0/10 seeds scored)
+  large-diverse   MR        as run - leak-free           NOT READ -- INCOMPLETE (0/10 seeds scored)
   medium-play     rerun_MR           6s1jp7am  idx 1  0.652 ± 0.067
   medium-play     rerun_task_reward  aqszat8y  idx 0  0.672 ± 0.037
   medium-play     atwin_PT           8emcmxe7  idx 1  0.409 ± 0.267
