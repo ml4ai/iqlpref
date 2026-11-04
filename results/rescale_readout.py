@@ -40,7 +40,7 @@ import eval_readout as R                                   # noqa: E402
 import rq1_readout as Q                                    # noqa: E402
 
 SEEDS = R.SEEDS
-REGISTERED_READ = {"sparsity": {"MR"}, "noise": set()}     # §14.70: MR on sparsity
+REGISTERED_READ = {"sparsity": {"MR", "PT"}, "noise": set()}     # §14.70: MR on sparsity; §14.87: PT
 LEVEL_ORDER = ("full",)                                     # then the axis's levels, coarse to fine
 
 
@@ -154,17 +154,17 @@ def selftest():
         dx = (xs[i] - xs.mean()) / (xs.max() - xs.min())
         frozen[(v, "MR", lv)] = cell(0.4 + 0.4 * dx + rng.normal(0, 0.01, 10))      # declines
         comp[(v, "MR", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))                  # flat
-        frozen[(v, "PT", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))
-        comp[(v, "PT", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))
-    res = run(axis, frozen, comp, [(v, "MR"), (v, "PT")])
+        frozen[(v, "NMR", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))
+        comp[(v, "NMR", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))
+    res = run(axis, frozen, comp, [(v, "MR"), (v, "NMR")])
     r, why = res[(v, "MR")]
     assert why is None and r["slopes"]["frozen"]["lower"] > 0 and r["slopes"]["companion"]["upper"] < 0.05
     assert r["slopes"]["companion - frozen"]["upper"] < 0                         # the companion is flatter
-    assert res[(v, "PT")][0] is None and "registered sparsity reading" in res[(v, "PT")][1][0]   # the gate
+    assert res[(v, "NMR")][0] is None and "registered sparsity reading" in res[(v, "NMR")][1][0]   # the gate
     comp[(v, "MR", "r32")]["incomplete"] = ["seed 2 running"]
     assert run(axis, frozen, comp, [(v, "MR")])[(v, "MR")][0] is None              # completeness
     lines = []
-    report(res, axis, {(v, "MR"): 1, (v, "PT"): 1}, {(v, "MR"): 2, (v, "PT"): 3}, out=lines.append)
+    report(res, axis, {(v, "MR"): 1, (v, "NMR"): 1}, {(v, "MR"): 2, (v, "NMR"): 3}, out=lines.append)
     assert any("companion - frozen" in x for x in lines) and any("NOT READ" in x for x in lines)
     print("selftest OK")
     return 0

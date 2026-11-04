@@ -32,16 +32,34 @@ MR
   VERDICT: NOT SENSITIVE ((a) the candidate protocol does not respond)
 
 PT
-  NOT READ -- 4 reason(s): candidate medium-play r128: INCOMPLETE (5/10 seeds scored); candidate medium-diverse r128: INCOMPLETE (5/10 seeds scored); candidate large-play r128: INCOMPLETE (0/10 seeds scored); candidate large-diverse r128: INCOMPLETE (5/10 seeds scored)
+  manipulation check, slope of A (all 4 variants): pooled +0.0492 [+0.0436, +0.0547]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      medium-play     +0.0283 [+0.0211, +0.0358]
+      medium-diverse  +0.0369 [+0.0268, +0.0464]
+      large-play      +0.0826 [+0.0689, +0.0960]
+      large-diverse   +0.0491 [+0.0362, +0.0614]
+  usable variants: medium-play, medium-diverse, large-play, large-diverse
+  (a) candidate slope of S           pooled +0.0248 [+0.0139, +0.0357]   p = 0.002122 (W+ 619, n 40, 0 zero)   REJECTS
+      medium-play     +0.0900 [+0.0486, +0.1315]
+      medium-diverse  +0.0068 [-0.0031, +0.0152]
+      large-play      +0.0017 [-0.0067, +0.0099]
+      large-diverse   +0.0007 [-0.0036, +0.0052]
+  (b) candidate - standard slope     pooled -0.0002 [-0.0136, +0.0132]   p = 0.6721 (W+ 377, n 40, 0 zero)   does NOT reject
+      medium-play     +0.0695 [+0.0310, +0.1088]
+      medium-diverse  -0.0005 [-0.0243, +0.0238]
+      large-play      -0.0601 [-0.0819, -0.0412]
+      large-diverse   -0.0095 [-0.0292, +0.0080]
+  (c) family - zero                  pooled +0.2526 [+0.2103, +0.2934]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      family - mean-constant         pooled +0.2546 [+0.2137, +0.2940]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+  VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 NMR
-  NOT READ -- 30 reason(s): candidate medium-play r16: no evaluation sweep; standard medium-play r32: INCOMPLETE (0/10 seeds scored); candidate medium-play r32: no evaluation sweep; standard medium-play r64: no evaluation sweep ...
+  NOT READ -- 26 reason(s): candidate medium-play r16: INCOMPLETE (5/10 seeds scored); candidate medium-play r32: no evaluation sweep; standard medium-play r64: INCOMPLETE (0/10 seeds scored); candidate medium-play r64: no evaluation sweep ...
 
 ENS_MEAN
-  NOT READ -- 3 reason(s): candidate large-play r32: INCOMPLETE (5/10 seeds scored); candidate large-diverse r32: no evaluation sweep; standard large-diverse r64: INCOMPLETE (5/10 seeds scored)
+  NOT READ -- 1 reason(s): candidate large-diverse r32: INCOMPLETE (3/10 seeds scored)
 
 RQ1 ON THIS LADDER
-  REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject.  1 of 4 families read (MR NOT SENSITIVE)
+  REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject; PT: (b) did not reject.  2 of 4 families read (MR NOT SENSITIVE, PT NOT SENSITIVE)
 
 BESIDE, NO TEST
   MR        zero - MR, with terminals, full data: pooled -0.4810 [-0.4999, -0.4620] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
