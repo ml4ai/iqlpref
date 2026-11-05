@@ -3,6 +3,7 @@ IQL CONTROLS (handoff §13.13-§13.14): terminals, and motion shaping.  DESCRIPT
 last-10 statistic; paired by seed; exact bootstrap over seeds, paired-t beside it
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not shown; section B is omitted
+  note: k95u2t83: ctrl_sweeps/noterm_antmaze_medium_play_mr at seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (expected 0) -- ignored
 
 A. WHAT THE TERMINALS CARRY  (anchor, with terminals - the same reward without them)
   medium-play     task_reward with - without terminals    0.519 ± 0.086  vs  0.314 ± 0.054   diff +0.205   95% exact bootstrap [+0.144, +0.261]   paired-t [+0.133, +0.276]   ahead on 10/10

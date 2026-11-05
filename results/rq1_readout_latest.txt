@@ -3,6 +3,7 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  SPARSITY (16, 32, 64, 128 
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: k95u2t83: ctrl_sweeps/noterm_antmaze_medium_play_mr at seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (expected 0) -- ignored
 
 USABILITY CHECK  (candidate protocol, full data: task reward at its own index - zero, per variant)
   medium-play     +0.6717 [+0.6506, +0.6942]   p = 0.0009766 (W+ 55, n 10, 0 zero)   USABLE
@@ -53,13 +54,31 @@ PT
   VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 NMR
-  NOT READ -- 26 reason(s): candidate medium-play r16: INCOMPLETE (5/10 seeds scored); candidate medium-play r32: no evaluation sweep; standard medium-play r64: INCOMPLETE (0/10 seeds scored); candidate medium-play r64: no evaluation sweep ...
+  NOT READ -- 22 reason(s): candidate medium-play r32: INCOMPLETE (0/10 seeds scored); standard medium-play r64: INCOMPLETE (5/10 seeds scored); candidate medium-play r64: no evaluation sweep; standard medium-play r128: no evaluation sweep ...
 
 ENS_MEAN
-  NOT READ -- 1 reason(s): candidate large-diverse r32: INCOMPLETE (3/10 seeds scored)
+  manipulation check, slope of A (all 4 variants): pooled +0.0295 [+0.0247, +0.0343]   p = 1.819e-12 (W+ 819, n 40, 0 zero)   REJECTS
+      medium-play     +0.0175 [+0.0109, +0.0240]
+      medium-diverse  +0.0304 [+0.0219, +0.0392]
+      large-play      +0.0425 [+0.0295, +0.0557]
+      large-diverse   +0.0273 [+0.0193, +0.0365]
+  usable variants: medium-play, medium-diverse, large-play, large-diverse
+  (a) candidate slope of S           pooled +0.0192 [+0.0107, +0.0273]   p = 0.0292 (W+ 551, n 40, 0 zero)   does NOT reject
+      medium-play     +0.0768 [+0.0444, +0.1077]
+      medium-diverse  -0.0027 [-0.0083, +0.0028]
+      large-play      +0.0018 [-0.0062, +0.0097]
+      large-diverse   +0.0008 [-0.0015, +0.0028]
+  (b) candidate - standard slope     pooled +0.0216 [+0.0115, +0.0317]   p = 0.01604 (W+ 569, n 40, 0 zero)   REJECTS
+      medium-play     +0.0768 [+0.0435, +0.1093]
+      medium-diverse  -0.0013 [-0.0105, +0.0085]
+      large-play      +0.0057 [-0.0091, +0.0236]
+      large-diverse   +0.0053 [-0.0082, +0.0181]
+  (c) family - zero                  pooled +0.2985 [+0.2779, +0.3177]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      family - mean-constant         pooled +0.3005 [+0.2804, +0.3190]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+  VERDICT: NOT SENSITIVE ((a) the candidate protocol does not respond)
 
 RQ1 ON THIS LADDER
-  REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject; PT: (b) did not reject.  2 of 4 families read (MR NOT SENSITIVE, PT NOT SENSITIVE)
+  REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject; PT: (b) did not reject; ENS_MEAN: (a) did not reject.  3 of 4 families read (MR NOT SENSITIVE, PT NOT SENSITIVE, ENS_MEAN NOT SENSITIVE)
 
 BESIDE, NO TEST
   MR        zero - MR, with terminals, full data: pooled -0.4810 [-0.4999, -0.4620] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
