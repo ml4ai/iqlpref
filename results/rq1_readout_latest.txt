@@ -3,6 +3,7 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  SPARSITY (16, 32, 64, 128 
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: vfiiu7w8: mr_sweeps/r128/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: k95u2t83: ctrl_sweeps/noterm_antmaze_medium_play_mr at seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (expected 0) -- ignored
 
 USABILITY CHECK  (candidate protocol, full data: task reward at its own index - zero, per variant)
@@ -54,7 +55,7 @@ PT
   VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 NMR
-  NOT READ -- 22 reason(s): candidate medium-play r32: INCOMPLETE (0/10 seeds scored); standard medium-play r64: INCOMPLETE (5/10 seeds scored); candidate medium-play r64: no evaluation sweep; standard medium-play r128: no evaluation sweep ...
+  NOT READ -- 10 reason(s): candidate medium-play r64: INCOMPLETE (3/10 seeds scored); candidate medium-play r128: no evaluation sweep; candidate medium-diverse r64: INCOMPLETE (5/10 seeds scored); candidate medium-diverse r128: no evaluation sweep ...
 
 ENS_MEAN
   manipulation check, slope of A (all 4 variants): pooled +0.0295 [+0.0247, +0.0343]   p = 1.819e-12 (W+ 819, n 40, 0 zero)   REJECTS
