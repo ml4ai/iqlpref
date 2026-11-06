@@ -3,6 +3,7 @@ IQL CONTROLS (handoff §13.13-§13.14): terminals, and motion shaping.  DESCRIPT
 last-10 statistic; paired by seed; exact bootstrap over seeds, paired-t beside it
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not shown; section B is omitted
+  note: iaz2xd46: ctrl_sweeps/atwin_noterm_antmaze_medium_play_pt at index 3 (winner 1) -- ignored
   note: k95u2t83: ctrl_sweeps/noterm_antmaze_medium_play_mr at seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (expected 0) -- ignored
 
 A. WHAT THE TERMINALS CARRY  (anchor, with terminals - the same reward without them)

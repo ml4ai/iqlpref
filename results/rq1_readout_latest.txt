@@ -3,7 +3,9 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  SPARSITY (16, 32, 64, 128 
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: mng4gtgf: mr_sweeps/r64/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: vfiiu7w8: mr_sweeps/r128/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
+  note: iaz2xd46: ctrl_sweeps/atwin_noterm_antmaze_medium_play_pt at index 3 (winner 1) -- ignored
   note: k95u2t83: ctrl_sweeps/noterm_antmaze_medium_play_mr at seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (expected 0) -- ignored
 
 USABILITY CHECK  (candidate protocol, full data: task reward at its own index - zero, per variant)
@@ -55,7 +57,7 @@ PT
   VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 NMR
-  NOT READ -- 9 reason(s): candidate medium-play r64: INCOMPLETE (8/10 seeds scored); candidate medium-play r128: no evaluation sweep; candidate medium-diverse r128: INCOMPLETE (0/10 seeds scored); candidate large-play r64: INCOMPLETE (5/10 seeds scored) ...
+  NOT READ -- 6 reason(s): candidate medium-play r128: INCOMPLETE (0/10 seeds scored); candidate medium-diverse r128: INCOMPLETE (0/10 seeds scored); candidate large-play r64: INCOMPLETE (5/10 seeds scored); standard large-play r128: INCOMPLETE (5/10 seeds scored) ...
 
 ENS_MEAN
   manipulation check, slope of A (all 4 variants): pooled +0.0295 [+0.0247, +0.0343]   p = 1.819e-12 (W+ 819, n 40, 0 zero)   REJECTS
