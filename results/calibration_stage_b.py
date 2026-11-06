@@ -275,7 +275,8 @@ def cmd_analyse(a, out=print):
                          spearmanr(psd, sp)[0], float(np.median(sp / np.maximum(psd, 1e-12))),
                          spearmanr(psd, nov["z_body"])[0], spearmanr(psd, nov["raw"])[0],
                          G.auroc(psd, wrong) if ok else np.nan,
-                         G.auroc(-fam_, wrong) if ok else np.nan, spearmanr(-fam_, sp)[0], spearmanr(-fam_, excess)[0]])
+                         G.auroc(-fam_, wrong) if ok else np.nan, spearmanr(-fam_, sp)[0], spearmanr(-fam_, excess)[0],
+                         G.auroc(sp / np.maximum(psd, 1e-12), wrong) if ok else np.nan])
             for c, m in enumerate(r["chain_mean"]):                # one temperature per chain index
                 tch.setdefault(c, {})[s] = {"d_mean": np.asarray(m), "y1": r["y1"], "p_pred": CM.sig(np.asarray(m))}
         R = np.nanmean(np.asarray(rows, float), 0)
@@ -288,7 +289,8 @@ def cmd_analyse(a, out=print):
             f"per chain explains {R[1]:.2f}; median mean_c|d_c| / |d_bar| {R[2]:.2f}; per-chain T (first "
             f"{len(tc)} chain indices) median {np.median(tc):.3f} [{np.min(tc):.3f}, {np.max(tc):.3f}]")
         out(f"  (iii) prior sd vs posterior sd: Spearman {R[3]:+.3f}, median ratio posterior/prior {R[4]:.3f}; "
-            f"prior sd vs novelty: z_body {R[5]:+.3f}, raw {R[6]:+.3f}; error-AUROC of the prior sd {R[7]:.3f}")
+            f"prior sd vs novelty: z_body {R[5]:+.3f}, raw {R[6]:+.3f}; error-AUROC of the prior sd {R[7]:.3f}, "
+            f"of posterior sd / prior sd {R[11]:.3f}")
         out(f"  (iv) positional novelty (fewer training steps in the pair's cells): error-AUROC {R[8]:.3f}; "
             f"Spearman with the posterior sd {R[9]:+.3f}, with the excess spread {R[10]:+.3f}")
     return 0
