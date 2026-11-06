@@ -55,7 +55,7 @@ PT
   VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 NMR
-  NOT READ -- 10 reason(s): candidate medium-play r64: INCOMPLETE (3/10 seeds scored); candidate medium-play r128: no evaluation sweep; candidate medium-diverse r64: INCOMPLETE (5/10 seeds scored); candidate medium-diverse r128: no evaluation sweep ...
+  NOT READ -- 9 reason(s): candidate medium-play r64: INCOMPLETE (8/10 seeds scored); candidate medium-play r128: no evaluation sweep; candidate medium-diverse r128: INCOMPLETE (0/10 seeds scored); candidate large-play r64: INCOMPLETE (5/10 seeds scored) ...
 
 ENS_MEAN
   manipulation check, slope of A (all 4 variants): pooled +0.0295 [+0.0247, +0.0343]   p = 1.819e-12 (W+ 819, n 40, 0 zero)   REJECTS
