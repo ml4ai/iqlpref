@@ -706,6 +706,18 @@ def ensure_cell(nb, cell_id, cell_type, text):
     nb["cells"].append(cell)
 
 
+def run_done(r):
+    """A run counts as complete: finished, and trained to TOTAL_STEPS by its summary _step
+    OR its last history step.  wandb rewrote two finished runs' summary _step below their
+    last history step (aqszat8y seeds 7 and 8, seen 2026-11-05, handoff §14.90): their
+    history -- what every readout scores -- reaches 1,000,000, so summary _step alone
+    under-counts them."""
+    if r.state != "finished":
+        return False
+    last = max(r.summary.get("_step") or 0, getattr(r, "lastHistoryStep", None) or 0)
+    return last >= TOTAL_STEPS
+
+
 def cmd_register(sp, winners_path, do_write, notebook=NOTEBOOK):
     import wandb
     api = wandb.Api(timeout=120)
@@ -717,8 +729,7 @@ def cmd_register(sp, winners_path, do_write, notebook=NOTEBOOK):
 
     def completeness(sw):
         runs = list(sw.runs)
-        done = sorted(r.config.get("seed") for r in runs if r.state == "finished"
-                      and (r.summary.get("_step") or 0) >= TOTAL_STEPS)
+        done = sorted(r.config.get("seed") for r in runs if run_done(r))
         return done == EVAL_SEEDS and len(runs) == len(EVAL_SEEDS), len(done)
 
     for sw in iql_sweeps(api):
@@ -1636,6 +1647,15 @@ def cmd_control(sp, winners, do_write):
 
 
 def selftest():
+    # run_done (§14.90): summary _step OR last history step; never a run that is not finished
+    class _R:
+        def __init__(self, state, step, last):
+            self.state, self.summary, self.lastHistoryStep = state, {"_step": step}, last
+    assert run_done(_R("finished", TOTAL_STEPS, TOTAL_STEPS))
+    assert run_done(_R("finished", 999_750, TOTAL_STEPS))          # the aqszat8y case
+    assert not run_done(_R("finished", 999_750, 999_750))
+    assert not run_done(_R("running", TOTAL_STEPS, TOTAL_STEPS))
+    assert not run_done(_R("crashed", TOTAL_STEPS, TOTAL_STEPS))
     sp = spec()
     assert len(sp) == 32, len(sp)
     assert sum(1 for n in sp if n.startswith("nmr_")) == 4

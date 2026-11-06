@@ -8,7 +8,12 @@ import wandb
 api = wandb.Api(timeout=120)
 P = "champlin-university-of-arizona/IQL-pref"
 now = dt.datetime.now(dt.timezone.utc)
-runs = api.runs(P, filters={"state": "running"})
+# The project-level state filter can lag the run itself: on 2026-11-05 it still returned two
+# runs that had FINISHED on 23 Oct (aqszat8y seeds 7 and 8; handoff §14.90).  Each run's own
+# state is authoritative, so the filter's mismatches are dropped and counted.
+listed = api.runs(P, filters={"state": "running"})
+runs = [r for r in listed if r.state == "running"]
+index_stale = [r for r in listed if r.state != "running"]
 speeds, by_sweep = [], defaultdict(list)
 for r in runs:
     step = r.summary.get("_step") or 0
@@ -24,6 +29,9 @@ for r in runs:
         speeds.append(sp)
     by_sweep[r.sweep.id if r.sweep else "-"].append((r.config.get("seed"), step, sp, stale))
 print(f"{len(runs)} running; median {statistics.median(speeds) / 1e3:.0f}k steps/h" if speeds else f"{len(runs)} running")
+if index_stale:
+    print(f"  ({len(index_stale)} run(s) listed as running by wandb's filter but {sorted({r.state for r in index_stale})} "
+          f"themselves -- dropped: " + ", ".join(f"{r.sweep.id if r.sweep else '-'}/{r.id}" for r in index_stale) + ")")
 for sid, lst in sorted(by_sweep.items()):
     sw = api.sweep(f"{P}/{sid}") if sid != "-" else None
     name = sw.config.get("name", "") if sw else ""
