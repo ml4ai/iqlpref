@@ -3,8 +3,9 @@
 §14.104, as amended by §14.108).  Which rule the replication (both arms) and Studies 2-3 use.
 
 Fixed before any run.  Arms: S (Study 1's selection, re-run leak-free: its grid winner on reward
-model 0 / IQL seed 50), N (index 0), F (index 2), O3 (one index per protocol x dataset, the best
-mean over the four families on S's grids; run only if N and F both fail).  Units: 40 (dataset,
+model 0 / IQL seed 50), N (index 0), F (index 2), O3 (ONE index per dataset, shared by both
+protocols: the best mean over the four families and both protocols on S's grids, §14.110; run only
+if N and F both fail).  Units: 40 (dataset,
 evaluation seed) per family, paired across arms -- reward model s with IQL seed 50 + s, s = 1-10,
 shown as units 1-10.  Families MR, PT, NMR, ENS_MEAN (no BNN, §14.1).  Last-10 scores.
 
@@ -173,8 +174,8 @@ def collect(api, P, NT):
 
 def run(cells, zeros, gwin, NT, variants, out=print):
     fams = [NT.METHOD[f] for f in NT.ANCHORS]
-    o3_run = any(NT.o3_key(v, p) in gwin for v in variants for p in NT.PROTOCOLS) and all(
-        (f, v, p, gwin.get(NT.o3_key(v, p))) in cells for f in NT.ANCHORS for v in variants for p in NT.PROTOCOLS)
+    o3_run = all(NT.o3_key(v) in gwin for v in variants) and all(       # one index per dataset (§14.110)
+        (f, v, p, gwin[NT.o3_key(v)]) in cells for f in NT.ANCHORS for v in variants for p in NT.PROTOCOLS)
     need = []
     for p in NT.PROTOCOLS:
         for v in variants:
@@ -201,7 +202,7 @@ def run(cells, zeros, gwin, NT, variants, out=print):
             continue
         results[arm] = {}
         for p in NT.PROTOCOLS:
-            A = {(NT.METHOD[f], v): cells[(f, v, p, NT.ARM_INDEX[arm] if arm in NT.ARM_INDEX else gwin[NT.o3_key(v, p)])]
+            A = {(NT.METHOD[f], v): cells[(f, v, p, NT.ARM_INDEX[arm] if arm in NT.ARM_INDEX else gwin[NT.o3_key(v)])]
                  for f in NT.ANCHORS for v in variants}
             S = {(NT.METHOD[f], v): cells[(f, v, p, gwin[NT.grid_name(v, f, p)])] for f in NT.ANCHORS for v in variants}
             Z = {v: zeros[(v, p)] for v in variants}
@@ -239,7 +240,7 @@ def selftest():
     NT = types.SimpleNamespace(PROTOCOLS=("std", "cand"), ANCHORS={"mr": 0, "pt": 0, "nmr": 0, "ens_mean": 0},
                                METHOD={"mr": "MR", "pt": "PT", "nmr": "NMR", "ens_mean": "ENS_MEAN"},
                                ARM_INDEX={"N": 0, "F": 2}, grid_name=lambda v, f, p: f"g|{v}|{f}|{p}",
-                               o3_key=lambda v, p: f"o3|{v}|{p}")
+                               o3_key=lambda v: f"o3|{v}")
     V = ("medium-play", "large-play")
 
     def cell(m):
@@ -277,6 +278,19 @@ def selftest():
     lines = []
     r = run(cells, zeros, gwin, NT, V, out=lines.append)
     assert r is None and any("DECISION: not yet" in x and "run O3" in x for x in lines), lines[-20:]
+    # §14.110: O3 read at ONE index per dataset under both protocols; adopted when N and F fail and it passes both
+    base.update({"mr": 0.6, "pt": 0.5, "nmr": 0.55, "ens_mean": 0.62})
+    cells, zeros, gwin = make({"pt": -0.3}, 0.0)
+    for v in V:
+        gwin[NT.o3_key(v)] = 4
+        for p in NT.PROTOCOLS:
+            for f in NT.ANCHORS:
+                cells[(f, v, p, 4)] = cell(base[f])                        # O3 as good as S
+    lines = []
+    assert run(cells, zeros, gwin, NT, V, out=lines.append) == "O3", lines[-12:]
+    del cells[("mr", V[0], "std", 4)]                                     # one protocol's O3 cell missing: O3 not run
+    lines = []
+    assert run(cells, zeros, gwin, NT, V, out=lines.append) is None and any("run O3" in x for x in lines)
     # the gate: one incomplete cell and nothing is read
     cells, zeros, gwin = make({}, None)
     cells[("pt", "large-play", "std", 0)]["incomplete"] = ["seed 3 running"]

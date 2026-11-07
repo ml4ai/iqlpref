@@ -12,8 +12,8 @@ on both, and one rule must pass under each).
   GRIDS   norm_sweeps/grid_{std,cand}_antmaze_<v>_<fam>     seed 50 (model 0), indices 0-7: S's
           selection unit, scored by Study 1's stage-4 rule (`normtest.py winners`)
   CELLS   norm_sweeps/eval_{std,cand}_antmaze_<v>_<fam>_idx<k>  seeds 51-60 (models 1-10), one per
-          index an arm needs: 0 (N), 2 (F), S's grid winner, and O3's per-(protocol, dataset)
-          index if O3 is run (`write --o3`).  An arm whose index another arm already has shares
+          index an arm needs: 0 (N), 2 (F), S's grid winner, and O3's index if O3 is run
+          (`write --o3`) -- ONE per dataset, shared by both protocols (§14.110).  An arm whose index another arm already has shares
           that cell -- the same reward model, IQL seed and index, so the same runs.
   FLOOR   norm_sweeps/zero_{std,cand}_antmaze_<v>        the zero reward, index 0, seeds 51-60
           (§14.108's floor on criterion (ii))
@@ -25,7 +25,7 @@ files equal the replication's zero cells but for the seeds (51-60 vs 101-110); e
 checks seeds.
 
     python normtest.py write [--write] [--o3]
-    python normtest.py winners [--write]        # S's grid winners, then O3's indices
+    python normtest.py winners [--write]        # S's grid winners, then O3's one index per dataset
     python normtest.py --selftest
 Launch with stage4_queue.sh items  norm:<file>@normtest  (one sweep each; norm_sweeps/launch.sh).
 """
@@ -81,8 +81,9 @@ def zero_name(v, prot):
     return f"{DIR}/zero_{prot}_antmaze_{v}"
 
 
-def o3_key(v, prot):
-    return f"o3_{prot}_{v}"
+def o3_key(v):
+    """O3's index is ONE per dataset, shared by both protocols (§14.110)."""
+    return f"o3_{v}"
 
 
 def arm_indices(fam, v, prot, gwin, o3=False):
@@ -90,7 +91,7 @@ def arm_indices(fam, v, prot, gwin, o3=False):
     out = dict(ARM_INDEX)
     out["S"] = gwin.get(grid_name(v, fam, prot))
     if o3:
-        out["O3"] = gwin.get(o3_key(v, prot))
+        out["O3"] = gwin.get(o3_key(v))                 # the same index under both protocols (§14.110)
     return out
 
 
@@ -187,11 +188,12 @@ def cmd_write(do_write, o3=False, root=ROOT):
     return 1 if bad else 0
 
 
-def o3_index(scores_by_family):
-    """{family: {index: score}} for one (protocol, dataset) -> the index with the highest mean score
-    over the families, exact ties to the lowest index (§14.104's O3 rule)."""
-    idx = sorted(set.intersection(*(set(s) for s in scores_by_family.values())))
-    means = {k: sum(s[k] for s in scores_by_family.values()) / len(scores_by_family) for k in idx}
+def o3_index(scores):
+    """{(family, protocol): {index: seed-50 score}} for one dataset -> the index with the highest mean
+    score over the families AND both protocols (eight scores per index), exact ties to the lowest
+    index (§14.104's O3 rule as amended by §14.110)."""
+    idx = sorted(set.intersection(*(set(s) for s in scores.values())))
+    means = {k: sum(s[k] for s in scores.values()) / len(scores) for k in idx}
     best = max(means.values())
     return min(k for k in idx if means[k] == best)
 
@@ -240,15 +242,14 @@ def cmd_winners(do_write):
         new[name] = int(win)
         by[name] = {s["normalize_reward"]: s["score"] for s in table}
         print(f"  {name:48s} {sws[0].id}  " + " ".join(f"{by[name][i]:.3f}" for i in P.STAGE4_INDICES) + f"   winner {win}")
-    for v in P.VARIANTS:                                # O3: needs all four families' grids
-        for prot in PROTOCOLS:
-            names = [grid_name(v, fam, prot) for fam in ANCHORS]
-            if all(n in by for n in names):
-                k = o3_index({n: by[n] for n in names})
-                if o3_key(v, prot) in gwin and gwin[o3_key(v, prot)] != k:
-                    sys.exit(f"!! {o3_key(v, prot)} changed {gwin[o3_key(v, prot)]} -> {k}: nothing written")
-                new[o3_key(v, prot)] = k
-                print(f"  {o3_key(v, prot):48s} O3 index {k}")
+    for v in P.VARIANTS:              # O3 (§14.110): one index per dataset, from all eight family x protocol grids
+        names = [grid_name(v, fam, prot) for fam in ANCHORS for prot in PROTOCOLS]
+        if all(n in by for n in names):
+            k = o3_index({n: by[n] for n in names})
+            if o3_key(v) in gwin and gwin[o3_key(v)] != k:
+                sys.exit(f"!! {o3_key(v)} changed {gwin[o3_key(v)]} -> {k}: nothing written")
+            new[o3_key(v)] = k
+            print(f"  {o3_key(v):48s} O3 index {k} (both protocols)")
     if do_write:
         json.dump(dict(sorted(new.items())), open(path, "w"), indent=1)
         print(f"\n  {len(new)} entries in {WINNERS}")
@@ -292,6 +293,20 @@ def selftest():
     # O3: the highest mean over families, ties to the lowest index
     assert o3_index({"a": {0: .1, 1: .3, 2: .3}, "b": {0: .2, 1: .1, 2: .1}}) == 1
     assert o3_index({"a": {0: .2, 1: .1}, "b": {0: .0, 1: .1}}) == 0             # exact tie -> lowest
+    # §14.110: per-protocol bests differ (std -> 6, cand -> 2); ONE index, the best pooled mean (2 here)
+    sc = {}
+    for f in ANCHORS:
+        sc[(f, "std")] = {0: .10, 2: .30, 6: .35}
+        sc[(f, "cand")] = {0: .05, 2: .40, 6: .05}
+    assert o3_index({k: v for k, v in sc.items() if k[1] == "std"}) == 6
+    assert o3_index({k: v for k, v in sc.items() if k[1] == "cand"}) == 2
+    assert o3_index(sc) == 2                                                     # pooled: 0.35 vs 0.20
+    g = {grid_name("large_play", f, p): 5 for f in ANCHORS for p in PROTOCOLS}
+    g[o3_key("large_play")] = 2
+    pl = {x[0]: x for x in plan(sp, g, o3=True) if x[3] is None}
+    for f in ANCHORS:
+        for p in PROTOCOLS:                                  # both protocols' O3 cells at the one index
+            assert "O3" in pl[cell_name("large_play", f, p, 2)][1][3], (f, p)
     with tempfile.TemporaryDirectory() as d:
         assert cmd_write(True, root=d) == 0
         assert len([f for f in os.listdir(os.path.join(d, DIR))]) == 32 + 64 + 8
