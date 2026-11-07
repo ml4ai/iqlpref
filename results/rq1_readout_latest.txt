@@ -59,7 +59,25 @@ PT
   VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 NMR
-  NOT READ -- 1 reason(s): candidate large-play r128: INCOMPLETE (5/10 seeds scored)
+  manipulation check, slope of A (all 4 variants): pooled +0.0362 [+0.0304, +0.0418]   p = 2.728e-12 (W+ 818, n 40, 0 zero)   REJECTS
+      medium-play     +0.0237 [+0.0152, +0.0323]
+      medium-diverse  +0.0320 [+0.0240, +0.0406]
+      large-play      +0.0501 [+0.0381, +0.0615]
+      large-diverse   +0.0388 [+0.0233, +0.0540]
+  usable variants: medium-play, medium-diverse, large-play, large-diverse
+  (a) candidate slope of S           pooled +0.0383 [+0.0255, +0.0495]   p = 1.531e-05 (W+ 703, n 40, 0 zero)   REJECTS
+      medium-play     +0.0941 [+0.0538, +0.1297]
+      medium-diverse  +0.0539 [+0.0218, +0.0760]
+      large-play      +0.0023 [-0.0043, +0.0093]
+      large-diverse   +0.0028 [-0.0010, +0.0062]
+  (b) candidate - standard slope     pooled +0.0082 [-0.0063, +0.0222]   p = 0.1877 (W+ 477, n 40, 0 zero)   does NOT reject
+      medium-play     +0.0441 [+0.0105, +0.0752]
+      medium-diverse  -0.0002 [-0.0377, +0.0350]
+      large-play      +0.0120 [-0.0115, +0.0328]
+      large-diverse   -0.0232 [-0.0415, -0.0040]
+  (c) family - zero                  pooled +0.3266 [+0.2948, +0.3556]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      family - mean-constant         pooled +0.3286 [+0.2983, +0.3556]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+  VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 ENS_MEAN
   manipulation check, slope of A (all 4 variants): pooled +0.0295 [+0.0247, +0.0343]   p = 1.819e-12 (W+ 819, n 40, 0 zero)   REJECTS
@@ -83,7 +101,7 @@ ENS_MEAN
   VERDICT: NOT SENSITIVE ((a) the candidate protocol does not respond)
 
 RQ1 ON THIS LADDER
-  REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject; PT: (b) did not reject; ENS_MEAN: (a) did not reject.  3 of 4 families read (MR NOT SENSITIVE, PT NOT SENSITIVE, ENS_MEAN NOT SENSITIVE)
+  REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject; PT: (b) did not reject; NMR: (b) did not reject; ENS_MEAN: (a) did not reject.  4 of 4 families read (MR NOT SENSITIVE, PT NOT SENSITIVE, NMR NOT SENSITIVE, ENS_MEAN NOT SENSITIVE)
 
 BESIDE, NO TEST
   MR        zero - MR, with terminals, full data: pooled -0.4810 [-0.4999, -0.4620] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND

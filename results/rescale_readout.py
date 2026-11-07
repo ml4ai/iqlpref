@@ -40,7 +40,7 @@ import eval_readout as R                                   # noqa: E402
 import rq1_readout as Q                                    # noqa: E402
 
 SEEDS = R.SEEDS
-REGISTERED_READ = {"sparsity": {"MR", "PT", "ENS_MEAN"}, "noise": set()}     # §14.70: MR; §14.87: PT; §14.88: ENS_MEAN
+REGISTERED_READ = {"sparsity": {"MR", "PT", "ENS_MEAN", "NMR"}, "noise": set()}     # §14.70 MR; §14.87 PT; §14.88 ENS_MEAN; §14.101 NMR
 LEVEL_ORDER = ("full",)                                     # then the axis's levels, coarse to fine
 
 
@@ -156,11 +156,12 @@ def selftest():
         comp[(v, "MR", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))                  # flat
         frozen[(v, "NMR", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))
         comp[(v, "NMR", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))
-    res = run(axis, frozen, comp, [(v, "MR"), (v, "NMR")])
+    res = run(axis, frozen, comp, [(v, "MR")])
+    res.update(run("noise", frozen, comp, [(v, "NMR")]))      # the gate: nothing is read on the noise ladder yet
     r, why = res[(v, "MR")]
     assert why is None and r["slopes"]["frozen"]["lower"] > 0 and r["slopes"]["companion"]["upper"] < 0.05
     assert r["slopes"]["companion - frozen"]["upper"] < 0                         # the companion is flatter
-    assert res[(v, "NMR")][0] is None and "registered sparsity reading" in res[(v, "NMR")][1][0]   # the gate
+    assert res[(v, "NMR")][0] is None and "registered noise reading" in res[(v, "NMR")][1][0]   # the gate
     comp[(v, "MR", "r32")]["incomplete"] = ["seed 2 running"]
     assert run(axis, frozen, comp, [(v, "MR")])[(v, "MR")][0] is None              # completeness
     lines = []
