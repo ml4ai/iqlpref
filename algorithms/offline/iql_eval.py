@@ -170,6 +170,11 @@ class TrainConfig:
     # ``{reward_model_root}_{seed}`` so the IQL seed and the reward model always
     # match.  Takes precedence over reward_model_path when both are given.
     reward_model_root: Optional[str] = None
+    # The normalization test (handoff §14.104, §14.108) reuses Study 1's reward models 0-10
+    # on NEW IQL seeds 50-60: the model loaded is ``{reward_model_root}_{seed - offset}``.  An
+    # offset (not a second seed) so that one fixed value per sweep pairs model s with IQL seed
+    # s + offset under a grid over seeds.  0, the default, is Study 1's loading exactly.
+    reward_model_seed_offset: int = 0
     # required for when loading a reward model. If ==1 then MR, if >1 then PT
     query_length: int = 1
     # Sequence-model labeller version (handoff §14.10).  Must be 2 whenever
@@ -223,7 +228,12 @@ class TrainConfig:
         # Tie the reward-model directory to the training seed: the eval training
         # scripts write each run to a deterministic "{root}_{seed}" directory.
         if self.reward_model_root:
-            self.reward_model_path = f"{self.reward_model_root}_{self.seed}"
+            model_seed = self.seed - self.reward_model_seed_offset
+            if model_seed < 0:
+                raise ValueError(f"seed {self.seed} - reward_model_seed_offset {self.reward_model_seed_offset} < 0")
+            self.reward_model_path = f"{self.reward_model_root}_{model_seed}"
+        elif self.reward_model_seed_offset:
+            raise ValueError("reward_model_seed_offset needs reward_model_root")
         if self.heuristic_reward is not None:
             if self.heuristic_reward != "path_length":
                 raise ValueError(f"heuristic_reward must be 'path_length', got {self.heuristic_reward!r}")

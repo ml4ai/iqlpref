@@ -1060,7 +1060,9 @@ def is_pre_fix_seq(params_flat):
 def is_control(params_flat):
     return ("drop_terminals" in params_flat or "heuristic_reward" in params_flat
             or "log_final_positions" in params_flat or "trivial_reward" in params_flat
-            or "gauge_reward" in params_flat)                 # the leveling ablation (§14.40)
+            or "gauge_reward" in params_flat                  # the leveling ablation (§14.40)
+            or "return_range_split" in params_flat            # the leak control, replication, normalization test
+            or "reward_model_seed_offset" in params_flat)     # (§14.82, §14.83, §14.104): not anchor cells
 
 
 def control_spec(sp):
