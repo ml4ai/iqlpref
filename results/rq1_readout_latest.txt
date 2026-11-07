@@ -3,6 +3,8 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  SPARSITY (16, 32, 64, 128 
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: h1sq743t: mr_sweeps/r16/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
+  note: 1o5s6l0x: pt_sweeps/r64/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
   note: etlgsd8x: mr_sweeps/r32/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: 8bsjcypn: pt_sweeps/r128/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
   note: mng4gtgf: mr_sweeps/r64/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
@@ -101,7 +103,8 @@ ENS_MEAN
   VERDICT: NOT SENSITIVE ((a) the candidate protocol does not respond)
 
 RQ1 ON THIS LADDER
-  REFUTED on this ladder (per-family reading, §14.70): MR: (a) did not reject; PT: (b) did not reject; NMR: (b) did not reject; ENS_MEAN: (a) did not reject.  4 of 4 families read (MR NOT SENSITIVE, PT NOT SENSITIVE, NMR NOT SENSITIVE, ENS_MEAN NOT SENSITIVE)
+  REFUTED on this ladder: every family that passed the manipulation check fails (a) or (b) (MR: (a) did not reject; PT: (b) did not reject; NMR: (b) did not reject; ENS_MEAN: (a) did not reject).  4 of 4 families read (MR NOT SENSITIVE, PT NOT SENSITIVE, NMR NOT SENSITIVE, ENS_MEAN NOT SENSITIVE)
+  stricter per-family reading (§14.70, superseded by §14.106; reported beside it): REFUTED (MR: (a) did not reject; PT: (b) did not reject; NMR: (b) did not reject; ENS_MEAN: (a) did not reject)
 
 BESIDE, NO TEST
   MR        zero - MR, with terminals, full data: pooled -0.4810 [-0.4999, -0.4620] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND

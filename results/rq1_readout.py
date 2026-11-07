@@ -218,28 +218,53 @@ def ni_verdict(e):
 
 
 def ladder_verdict(verdicts, res):
-    """RQ1's second part on the ladder.  §14.5's refutation clause ("refuted on a ladder if (a)
-    or (b) fails on the usable variants") is read PER FAMILY (author, 2026-10-31, §14.70): one
-    read family whose (a) or (b) does not reject refutes the ladder.  A FLAGGED family (failed
-    manipulation check) is not a sensitivity test and does not refute.  Holds in full only when
-    every family is read and SENSITIVE."""
+    """RQ1's main hypothesis on the ladder, read for EVERY family (author, 2026-11-05, §14.106;
+    it supersedes §14.70's per-family reading, printed beside it as the stricter alternative).
+
+    Each family keeps its own verdict.  Of the families that passed the manipulation check
+    (FLAGGED ones count toward neither side):
+      HOLDS IN FULL  every family read, and every such family SENSITIVE (§14.5)
+      REFUTED        every family read, and every such family fails (a) or (b); or no variant
+                     is usable (a ladder-wide condition, so it refutes whatever is unread)
+      OPEN           a family unread, and every such family read so far fails (a) or (b)
+      not yet        a family unread, and every such family read so far SENSITIVE
+      PARTIAL        otherwise (some SENSITIVE or failing only (c), some failing (a) or (b))"""
     tag = ", ".join(f"{f} {v.split(' (')[0].split(':')[0]}" for f, v in verdicts.items()) or "none"
-    refuting = [f for f, r in res.items() if r.get("status") == "READ" and not r["verdict"].startswith("FLAGGED")
-                and ("a" not in r or not r["a"]["rejects"] or not r["b"]["rejects"])]
+    fams = [f for f in FAMILIES if hold.shown(f)]
+    read = {f: res[f] for f in fams if (res.get(f) or {}).get("status") == "READ"}
+    tested = {f: r for f, r in read.items() if not r["verdict"].startswith("FLAGGED")}
+    def fails_ab(r):
+        return "a" not in r or not r["a"]["rejects"] or not r["b"]["rejects"]
     def fails(r):
         if "a" not in r:                                   # no usable variant
             return r["verdict"]
         return " and ".join(x for x, ok in (("(a)", r["a"]["rejects"]), ("(b)", r["b"]["rejects"])) if not ok) + \
             " did not reject"
-    if refuting:
-        why = "; ".join(f"{f}: {fails(res[f])}" for f in refuting)
-        return (f"  REFUTED on this ladder (per-family reading, §14.70): {why}.  "
-                f"{len(verdicts)} of {len(FAMILIES)} families read ({tag})")
-    if len(verdicts) < len(FAMILIES):
-        return f"  not yet: {len(verdicts)} of {len(FAMILIES)} families read ({tag})"
-    if all(v == "SENSITIVE" for v in verdicts.values()):
-        return "  HOLDS IN FULL: SENSITIVE for every family"
-    return f"  PARTIAL: {tag}"
+    refuting = [f for f, r in tested.items() if fails_ab(r)]
+    n_read = f"{len(read)} of {len(fams)} families read ({tag})"
+    if any("a" not in r for r in tested.values()):
+        main = f"REFUTED on this ladder: no variant passes the usability check.  {n_read}"
+    elif not read:
+        main = f"not yet: {n_read}"
+    elif not tested:
+        main = f"not yet: no family read so far passed the manipulation check (FLAGGED).  {n_read}"
+    elif len(read) < len(fams):
+        if len(refuting) == len(tested):
+            main = f"OPEN: every family read so far fails (a) or (b) ({'; '.join(f'{f}: {fails(tested[f])}' for f in refuting)}).  {n_read}"
+        elif not refuting and all(r["verdict"] == "SENSITIVE" for r in tested.values()):
+            main = f"not yet: {n_read}"
+        else:
+            main = f"PARTIAL SUPPORT so far: {n_read}"
+    elif len(refuting) == len(tested):
+        main = (f"REFUTED on this ladder: every family that passed the manipulation check fails (a) or (b) "
+                f"({'; '.join(f'{f}: {fails(tested[f])}' for f in refuting)}).  {n_read}")
+    elif all(r["verdict"] == "SENSITIVE" for r in tested.values()):
+        main = f"HOLDS IN FULL: SENSITIVE for every family that passed the manipulation check.  {n_read}"
+    else:
+        main = f"PARTIAL SUPPORT: {n_read}"
+    strict = (f"REFUTED ({'; '.join(f'{f}: {fails(tested[f])}' for f in refuting)})" if refuting else
+              "not refuted by any family read")
+    return (f"  {main}\n  stricter per-family reading (§14.70, superseded by §14.106; reported beside it): {strict}")
 
 
 def non_inferior(triv, fam, variants=VARIANTS):
@@ -475,9 +500,23 @@ def selftest():
     res = run("sparsity", std, cand, full, ctrl, acc)[0]
     r = res["MR"]
     assert r["verdict"].startswith("NOT SENSITIVE") and "(b)" in r["verdict"] and "(a)" not in r["verdict"]
-    # the per-family reading (§14.70): one read family failing (a) or (b) refutes the ladder
+    # §14.106: (b) failing in ONE family, the others unread, is OPEN (the stricter §14.70
+    # reading, printed beside, would refute)
     lv = ladder_verdict({"MR": r["verdict"]}, res)
-    assert "REFUTED" in lv and "MR: (b) did not reject" in lv and "1 of 4" in lv, lv
+    main, strict = lv.split("\n")
+    assert main.startswith("  OPEN") and "MR: (b) did not reject" in main and "1 of 4" in main, lv
+    assert "REFUTED (MR: (b) did not reject)" in strict, lv
+    # every read family failing (a) or (b) refutes; one SENSITIVE among them makes it PARTIAL
+    every = {f: r for f in FAMILIES}
+    lv = ladder_verdict({f: r["verdict"] for f in FAMILIES}, every)
+    assert lv.split("\n")[0].startswith("  REFUTED on this ladder: every family") and "4 of 4" in lv, lv
+    sens = run("sparsity", *build("sparsity"))[0]["MR"]
+    mixed = dict(every, PT=sens)
+    lv = ladder_verdict({f: mixed[f]["verdict"] for f in FAMILIES}, mixed)
+    assert lv.split("\n")[0].startswith("  PARTIAL SUPPORT:"), lv
+    assert "REFUTED (MR" in lv.split("\n")[1], lv                       # the stricter reading would refute
+    lv = ladder_verdict({f: sens["verdict"] for f in FAMILIES}, {f: sens for f in FAMILIES})
+    assert lv.split("\n")[0].startswith("  HOLDS IN FULL"), lv
     # (c): the family no better than zero
     std, cand, full, ctrl, acc = build("sparsity", fam_minus_zero=0.0)
     r = run("sparsity", std, cand, full, ctrl, acc)[0]["MR"]
@@ -488,6 +527,12 @@ def selftest():
     r = res["MR"]
     assert r["verdict"].startswith("FLAGGED") and not r["manip"]["rejects"]
     assert ladder_verdict({"MR": r["verdict"]}, res).startswith("  not yet")      # FLAGGED does not refute
+    flagged = r
+    std_, cand_, full_, ctrl_, acc_ = build("sparsity", std_slope=0.2)
+    failing = run("sparsity", std_, cand_, full_, ctrl_, acc_)[0]["MR"]
+    three = {"MR": failing, "PT": failing, "NMR": failing, "ENS_MEAN": flagged}    # FLAGGED counts toward neither
+    lv = ladder_verdict({f: three[f]["verdict"] for f in FAMILIES}, three)
+    assert lv.split("\n")[0].startswith("  REFUTED on this ladder: every family"), lv
     # an unusable variant is left out of (a)-(c) but kept in the manipulation check
     std, cand, full, ctrl, acc = build("sparsity", bad_variant="large-diverse")
     res, use, _, _ = run("sparsity", std, cand, full, ctrl, acc)
