@@ -318,7 +318,16 @@ def logged_accuracies():
     import production_readout as PR
     out, dup = {}, set()
     for fam in ("mr", "pt", "nmr"):
-        prod, _ = PR.fetch(fam, SINCE)
+        for k in range(3):                     # W&B reads time out or reset now and then (2026-11-09)
+            try:
+                prod, _ = PR.fetch(fam, SINCE)
+                break
+            except Exception as e:             # noqa: BLE001
+                if k == 2:
+                    raise
+                print(f"  logged accuracies, {fam}: {type(e).__name__}, retrying in 30 s", file=sys.stderr)
+                import time
+                time.sleep(30)
         for r in prod:
             if r["state"] != "finished":
                 continue
