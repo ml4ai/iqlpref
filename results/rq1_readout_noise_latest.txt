@@ -4,6 +4,7 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  LABEL NOISE, primary arm (
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: ak051s1d: ctrl_sweeps/atwin_noterm_antmaze_medium_diverse_nmr at index 2 (winner 0) -- ignored
   note: t5uoj7l9: ctrl_sweeps/atwin_noterm_antmaze_medium_play_nmr at index 3 (winner 1) -- ignored
   note: q7q922cu: ctrl_sweeps/atwin_noterm_antmaze_medium_play_ens_mean at index 2 (winner 1) -- ignored
   note: iaz2xd46: ctrl_sweeps/atwin_noterm_antmaze_medium_play_pt at index 3 (winner 1) -- ignored
@@ -43,7 +44,7 @@ NMR
   NOT READ -- 40 reason(s): standard medium-play n01: no evaluation sweep; candidate medium-play n01: no evaluation sweep; standard medium-play n02: no evaluation sweep; candidate medium-play n02: no evaluation sweep ...
 
 ENS_MEAN
-  NOT READ -- 27 reason(s): candidate medium-play n02: INCOMPLETE (5/10 seeds scored); candidate medium-play n03: no evaluation sweep; standard medium-play n04: INCOMPLETE (5/10 seeds scored); candidate medium-play n04: no evaluation sweep ...
+  NOT READ -- 21 reason(s): candidate medium-play n03: INCOMPLETE (5/10 seeds scored); candidate medium-play n04: no evaluation sweep; standard medium-play n045: INCOMPLETE (5/10 seeds scored); candidate medium-play n045: no evaluation sweep ...
 
 RQ1 ON THIS LADDER
   OPEN: every family read so far fails (a) or (b) (MR: (b) did not reject).  1 of 4 families read (MR NOT SENSITIVE)

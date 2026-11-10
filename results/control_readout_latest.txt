@@ -1,8 +1,10 @@
+wandb: [wandb.Api()] Loaded credentials for https://api.wandb.ai from /Users/champlin/.netrc.
 ====================================================================================================
 IQL CONTROLS (handoff §13.13-§13.14): terminals, and motion shaping.  DESCRIPTIVE.
 last-10 statistic; paired by seed; exact bootstrap over seeds, paired-t beside it
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not shown; section B is omitted
+  note: ak051s1d: ctrl_sweeps/atwin_noterm_antmaze_medium_diverse_nmr at index 2 (winner 0) -- ignored
   note: t5uoj7l9: ctrl_sweeps/atwin_noterm_antmaze_medium_play_nmr at index 3 (winner 1) -- ignored
   note: q7q922cu: ctrl_sweeps/atwin_noterm_antmaze_medium_play_ens_mean at index 2 (winner 1) -- ignored
   note: iaz2xd46: ctrl_sweeps/atwin_noterm_antmaze_medium_play_pt at index 3 (winner 1) -- ignored
