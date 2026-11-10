@@ -1,3 +1,4 @@
+wandb: [wandb.Api()] Loaded credentials for https://api.wandb.ai from /Users/champlin/.netrc.
 ====================================================================================================
 RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  LABEL NOISE, primary arm (flip 0.1-0.45 + the clean anchor)
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
@@ -42,7 +43,7 @@ NMR
   NOT READ -- 40 reason(s): standard medium-play n01: no evaluation sweep; candidate medium-play n01: no evaluation sweep; standard medium-play n02: no evaluation sweep; candidate medium-play n02: no evaluation sweep ...
 
 ENS_MEAN
-  NOT READ -- 30 reason(s): candidate medium-play n02: INCOMPLETE (0/10 seeds scored); candidate medium-play n03: no evaluation sweep; standard medium-play n04: INCOMPLETE (0/10 seeds scored); candidate medium-play n04: no evaluation sweep ...
+  NOT READ -- 27 reason(s): candidate medium-play n02: INCOMPLETE (5/10 seeds scored); candidate medium-play n03: no evaluation sweep; standard medium-play n04: INCOMPLETE (5/10 seeds scored); candidate medium-play n04: no evaluation sweep ...
 
 RQ1 ON THIS LADDER
   OPEN: every family read so far fails (a) or (b) (MR: (b) did not reject).  1 of 4 families read (MR NOT SENSITIVE)
