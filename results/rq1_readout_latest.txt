@@ -4,6 +4,8 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  SPARSITY (16, 32, 64, 128 
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: v5auzrsp: nmr_sweeps/r128/sweep_antmaze_medium_diverse seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 0) -- not this experiment's lineage, ignored
+  note: 8qi9nick: nmr_sweeps/r16/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
   note: hcgrggyg: nmr_sweeps/r32/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
   note: 02s4bqhc: ensemble_sweeps/r16/sweep_antmaze_medium_play_mean seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: 9kbpkghh: nmr_sweeps/r64/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
