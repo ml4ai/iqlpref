@@ -44,9 +44,10 @@ REGISTERED_READ = {"sparsity": {"MR", "PT", "ENS_MEAN", "NMR"}, "noise": {"MR"}}
 LEVEL_ORDER = ("full",)                                     # then the axis's levels, coarse to fine
 
 
-def companion_cells(api, P, sp, gwin, axis):
+def companion_cells(api, P, sp, gwin, axis, only=None):
     """{(variant, method, level): cell} for the companion sweeps of the axis (exact match,
-    index = the companion index), level "full" for the full-data companions."""
+    index = the companion index), level "full" for the full-data companions.  only: a set
+    of (variant, method) pairs; other cells are skipped before their runs are fetched."""
     import iql_score
     E = P._conditions()
     spec = {n: v for n, v in P.rescale_arm_spec(sp, gwin, E).items()
@@ -64,6 +65,8 @@ def companion_cells(api, P, sp, gwin, axis):
         anchor, fixed, k, cond = spec[name]
         key = (Q.VARIANTS[[v.replace("-", "_") for v in Q.VARIANTS].index(P.variant_of_name(anchor))],
                P.method_of(anchor), cond or Q.FULL)
+        if only is not None and key[:2] not in only:
+            continue
         cell = {"sweep": sw.id, "index": k, "scores": {}, "incomplete": [], "audit": [], "name": name}
         for r in sw.runs:
             s = (r.config or {}).get("seed")

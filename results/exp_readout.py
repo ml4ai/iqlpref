@@ -243,14 +243,17 @@ def _short(dataset):
     return dataset.replace("antmaze-", "").replace("-v2", "")
 
 
-def collect_exp(api, P, winners, axis="sparsity", protocol="standard"):
+def collect_exp(api, P, winners, axis="sparsity", protocol="standard", only=None):
     """{(variant, method, level): cell} for every experiment sweep at the
     anchor's stage-4 index.  Cells are built exactly as §12's are.
 
     protocol "candidate" (§14.5): the same experiment sweeps WITHOUT terminals --
     each experiment file plus drop_terminals -- and `winners` must then be the
     no-terminals grid winners (results/control_grid_winners.json), the candidate
-    protocol's frozen indices.  Same reward models; only the protocol differs."""
+    protocol's frozen indices.  Same reward models; only the protocol differs.
+
+    only: a set of (variant, method) pairs; other cells are skipped before their runs
+    are fetched (None: every cell)."""
     import iql_score
     assert protocol in ("standard", "candidate"), protocol
     sp = P.spec()
@@ -279,6 +282,8 @@ def collect_exp(api, P, winners, axis="sparsity", protocol="standard"):
         if not R.hold.shown(P.method_of(anchor)):
             continue                                   # covered by the hold (§14.1): not fetched
         key = (_short(P.dataset_of(anchor)), P.method_of(anchor), cond)
+        if only is not None and key[:2] not in only:
+            continue
         cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
                 "incomplete": [], "audit": [], "name": name}
         if sw.config.get("program") != P.program_of(anchor):
