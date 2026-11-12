@@ -40,7 +40,7 @@ import eval_readout as R                                   # noqa: E402
 import rq1_readout as Q                                    # noqa: E402
 
 SEEDS = R.SEEDS
-REGISTERED_READ = {"sparsity": {"MR", "PT", "ENS_MEAN", "NMR"}, "noise": {"MR"}}     # sparsity: §14.70 MR, §14.87 PT, §14.88 ENS_MEAN, §14.101 NMR; noise: §14.116 MR
+REGISTERED_READ = {"sparsity": {"MR", "PT", "ENS_MEAN", "NMR"}, "noise": {"MR", "ENS_MEAN"}}     # sparsity: §14.70 MR, §14.87 PT, §14.88 ENS_MEAN, §14.101 NMR; noise: §14.116 MR, §14.127 ENS_MEAN
 LEVEL_ORDER = ("full",)                                     # then the axis's levels, coarse to fine
 
 

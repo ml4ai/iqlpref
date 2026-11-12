@@ -4,6 +4,8 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  LABEL NOISE, primary arm (
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: mco3qiyg: mr_sweeps/n03/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
+  note: iyvak959: mr_sweeps/n02/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: 8us8kpbp: mr_sweeps/n01/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: ak051s1d: ctrl_sweeps/atwin_noterm_antmaze_medium_diverse_nmr at index 2 (winner 0) -- ignored
   note: t5uoj7l9: ctrl_sweeps/atwin_noterm_antmaze_medium_play_nmr at index 3 (winner 1) -- ignored
@@ -39,17 +41,35 @@ MR
   VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 PT
-  NOT READ -- 38 reason(s): candidate medium-play n01: no evaluation sweep; standard medium-play n02: INCOMPLETE (5/10 seeds scored); candidate medium-play n02: no evaluation sweep; standard medium-play n03: no evaluation sweep ...
+  NOT READ -- 30 reason(s): candidate medium-play n02: INCOMPLETE (0/10 seeds scored); candidate medium-play n03: no evaluation sweep; standard medium-play n04: INCOMPLETE (5/10 seeds scored); candidate medium-play n04: no evaluation sweep ...
 
 NMR
   NOT READ -- 40 reason(s): standard medium-play n01: no evaluation sweep; candidate medium-play n01: no evaluation sweep; standard medium-play n02: no evaluation sweep; candidate medium-play n02: no evaluation sweep ...
 
 ENS_MEAN
-  NOT READ -- 8 reason(s): candidate medium-play n045: INCOMPLETE (0/10 seeds scored); candidate medium-diverse n045: INCOMPLETE (0/10 seeds scored); candidate large-play n04: INCOMPLETE (0/10 seeds scored); standard large-play n045: INCOMPLETE (5/10 seeds scored) ...
+  manipulation check, slope of A (all 4 variants): pooled +0.7552 [+0.7114, +0.7998]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      medium-play     +0.8527 [+0.7476, +0.9560]
+      medium-diverse  +0.7160 [+0.6477, +0.7858]
+      large-play      +0.7191 [+0.6108, +0.8374]
+      large-diverse   +0.7329 [+0.6799, +0.7823]
+  usable variants: medium-play, medium-diverse, large-play, large-diverse
+  (a) candidate slope of S           pooled +0.2314 [+0.1758, +0.2777]   p = 0.0961 (W+ 508, n 40, 0 zero)   does NOT reject
+      medium-play     +0.9868 [+0.7759, +1.1541]
+      medium-diverse  -0.0463 [-0.0898, -0.0062]
+      large-play      -0.0163 [-0.0662, +0.0405]
+      large-diverse   +0.0012 [-0.0269, +0.0323]
+  (b) candidate - standard slope     pooled +0.1651 [+0.0946, +0.2310]   p = 0.1159 (W+ 500, n 40, 0 zero)   does NOT reject
+      medium-play     +0.8716 [+0.6588, +1.0466]
+      medium-diverse  -0.0221 [-0.0677, +0.0293]
+      large-play      -0.1575 [-0.2870, -0.0185]
+      large-diverse   -0.0315 [-0.1616, +0.0872]
+  (c) family - zero                  pooled +0.2985 [+0.2779, +0.3177]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      family - mean-constant         pooled +0.3005 [+0.2804, +0.3190]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+  VERDICT: NOT SENSITIVE ((a) the candidate protocol does not respond; (b) it does not respond more than the standard protocol)
 
 RQ1 ON THIS LADDER
-  OPEN: every family read so far fails (a) or (b) (MR: (b) did not reject).  1 of 4 families read (MR NOT SENSITIVE)
-  stricter per-family reading (§14.70, superseded by §14.106; reported beside it): REFUTED (MR: (b) did not reject)
+  OPEN: every family read so far fails (a) or (b) (MR: (b) did not reject; ENS_MEAN: (a) and (b) did not reject).  2 of 4 families read (MR NOT SENSITIVE, ENS_MEAN NOT SENSITIVE)
+  stricter per-family reading (§14.70, superseded by §14.106; reported beside it): REFUTED (MR: (b) did not reject; ENS_MEAN: (a) and (b) did not reject)
 
 BESIDE, NO TEST
   MR        zero - MR, with terminals, full data: pooled -0.4810 [-0.4999, -0.4620] TOO FAR BEHIND;  medium-play TOO FAR BEHIND, medium-diverse TOO FAR BEHIND, large-play TOO FAR BEHIND, large-diverse TOO FAR BEHIND
