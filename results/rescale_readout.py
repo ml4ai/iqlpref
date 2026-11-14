@@ -20,7 +20,15 @@ the same arm, so they wait too.  REGISTERED_READ lists the (ladder, family) read
 add to it, by hand and in the handoff, as each registered reading is made.  Beyond that,
 every cell shown is complete and audit-clean.
 
-    python results/rescale_readout.py [--axis sparsity|noise]
+THE SENSITIVITY ARM (--axis sensitivity).  The noise ladder's sensitivity arm (n01o ...
+n045o: the same flips, the checkpoint picked on the clean test split; MR, PT and NMR on
+medium_play, §11.3, §14.18) has companions too (§14.78).  The arm is descriptive with no
+registered test (§14.64); its frozen candidate cells are read only once the whole arm is
+complete, which compare() requires anyway.  It is part of the noise experiment, so it
+waits for the family's registered NOISE reading (READ_AXIS).  Same table and slopes, x =
+the flip fraction, the anchor (full data, clean) shared with the primary arm.
+
+    python results/rescale_readout.py [--axis sparsity|noise|sensitivity]
     python results/rescale_readout.py --selftest
 """
 
@@ -37,9 +45,15 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, ROOT)
 
 import eval_readout as R                                   # noqa: E402
+import exp_readout as X                                    # noqa: E402
 import rq1_readout as Q                                    # noqa: E402
 
 SEEDS = R.SEEDS
+ORACLE_LEVELS = tuple(f"{lv}o" for lv in X.NOISE_LEVELS)   # n01o ... n045o, the sensitivity arm
+AXES = dict(Q.AXES, sensitivity={"levels": ORACLE_LEVELS, "x": lambda v, lv: X._x_noise(v, lv.removesuffix("o")),
+                                 "sign": Q.AXES["noise"]["sign"], "title": "LABEL NOISE, sensitivity arm"})
+READ_AXIS = {"sensitivity": "noise"}                        # whose registered reading opens the gate
+ORACLE_PAIRS = {("medium-play", "MR"), ("medium-play", "PT"), ("medium-play", "NMR")}   # §11.3, §14.18
 REGISTERED_READ = {"sparsity": {"MR", "PT", "ENS_MEAN", "NMR"}, "noise": {"MR", "ENS_MEAN"}}     # sparsity: §14.70 MR, §14.87 PT, §14.88 ENS_MEAN, §14.101 NMR; noise: §14.116 MR, §14.127 ENS_MEAN
 LEVEL_ORDER = ("full",)                                     # then the axis's levels, coarse to fine
 
@@ -51,7 +65,7 @@ def companion_cells(api, P, sp, gwin, axis, only=None):
     import iql_score
     E = P._conditions()
     spec = {n: v for n, v in P.rescale_arm_spec(sp, gwin, E).items()
-            if v[3] is None or v[3] in Q.AXES[axis]["levels"]}
+            if v[3] is None or v[3] in AXES[axis]["levels"]}
     fixed_of = {n: f for n, (_, f, _, _) in spec.items()}
     cells, notes = {}, []
     for sw in P.iql_sweeps(api):
@@ -89,7 +103,7 @@ def companion_cells(api, P, sp, gwin, axis, only=None):
 
 def compare(frozen, comp, axis, v, fam):
     """The per-level and slope comparison for one (variant, family), or the reason it is not read."""
-    levels = (Q.FULL,) + tuple(Q.AXES[axis]["levels"])
+    levels = (Q.FULL,) + tuple(AXES[axis]["levels"])
     why = [f"{arm} {lv}: {R.cell_ready(c)}" for lv in levels
            for arm, c in (("frozen", frozen.get((v, fam, lv))), ("companion", comp.get((v, fam, lv))))
            if R.cell_ready(c)]
@@ -101,10 +115,10 @@ def compare(frozen, comp, axis, v, fam):
         b = [frozen[(v, fam, lv)]["scores"][s] for s in SEEDS]
         rows.append((lv, float(np.mean(b)), float(np.std(b, ddof=1)), float(np.mean(a)), float(np.std(a, ddof=1)),
                      R.exact_bootstrap(np.array(a) - np.array(b))))
-    xs = [Q.AXES[axis]["x"](v, lv) for lv in levels]
+    xs = [AXES[axis]["x"](v, lv) for lv in levels]
     sl = {}
     for arm, cells in (("frozen", frozen), ("companion", comp)):
-        sl[arm] = [Q.dslope(xs, [cells[(v, fam, lv)]["scores"][s] for lv in levels], Q.AXES[axis]["sign"])
+        sl[arm] = [Q.dslope(xs, [cells[(v, fam, lv)]["scores"][s] for lv in levels], AXES[axis]["sign"])
                    for s in SEEDS]
     slopes = {arm: R.exact_bootstrap(sl[arm]) for arm in sl}
     slopes["companion - frozen"] = R.exact_bootstrap(np.array(sl["companion"]) - np.array(sl["frozen"]))
@@ -117,7 +131,8 @@ def _iv(e):
 
 def report(results, axis, frozen_idx, comp_idx, out=print):
     out("=" * 100)
-    out(f"RESCALING COMPANION ARMS (HANDOFF §14.78), {axis} ladder, WITHOUT terminals.  DESCRIPTIVE; not §14.5's test.")
+    ladder = {"sensitivity": "noise ladder, SENSITIVITY arm"}.get(axis, f"{axis} ladder")
+    out(f"RESCALING COMPANION ARMS (HANDOFF §14.78), {ladder}, WITHOUT terminals.  DESCRIPTIVE; not §14.5's test.")
     out("frozen = the candidate cell at its frozen index; companion = the same cell at the family's best rescaling index")
     out("=" * 100)
     for (v, fam), (res, why) in results.items():
@@ -134,9 +149,10 @@ def report(results, axis, frozen_idx, comp_idx, out=print):
 def run(axis, frozen, comp, sp_anchor_idx):
     """{(variant, family): (result or None, reasons)} for every companion cell of the axis."""
     out = {}
+    read_axis = READ_AXIS.get(axis, axis)
     for (v, fam) in sp_anchor_idx:
-        if fam not in REGISTERED_READ[axis]:
-            out[(v, fam)] = (None, [f"{fam}'s registered {axis} reading has not been made "
+        if fam not in REGISTERED_READ[read_axis]:
+            out[(v, fam)] = (None, [f"{fam}'s registered {read_axis} reading has not been made "
                                     f"(§14.5: its candidate arm is not read before then)"])
             continue
         out[(v, fam)] = compare(frozen, comp, axis, v, fam)
@@ -144,6 +160,15 @@ def run(axis, frozen, comp, sp_anchor_idx):
 
 
 def selftest():
+    saved = {k: set(f) for k, f in REGISTERED_READ.items()}
+    REGISTERED_READ.update(sparsity={"MR"}, noise={"MR"})     # fixed here, so later readings do not break the test
+    try:
+        return _selftest()
+    finally:
+        REGISTERED_READ.update(saved)
+
+
+def _selftest():
     rng = np.random.default_rng(3)
 
     def cell(xs):
@@ -160,7 +185,7 @@ def selftest():
         frozen[(v, "NMR", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))
         comp[(v, "NMR", lv)] = cell(0.4 + rng.normal(0, 0.01, 10))
     res = run(axis, frozen, comp, [(v, "MR")])
-    res.update(run("noise", frozen, comp, [(v, "NMR")]))      # the gate: nothing is read on the noise ladder yet
+    res.update(run("noise", frozen, comp, [(v, "NMR")]))      # the gate: NMR is not read on noise here
     r, why = res[(v, "MR")]
     assert why is None and r["slopes"]["frozen"]["lower"] > 0 and r["slopes"]["companion"]["upper"] < 0.05
     assert r["slopes"]["companion - frozen"]["upper"] < 0                         # the companion is flatter
@@ -170,13 +195,26 @@ def selftest():
     lines = []
     report(res, axis, {(v, "MR"): 1, (v, "NMR"): 1}, {(v, "MR"): 2, (v, "NMR"): 3}, out=lines.append)
     assert any("companion - frozen" in x for x in lines) and any("NOT READ" in x for x in lines)
+    # the sensitivity arm: x is the flip fraction, and the gate is the family's NOISE reading
+    assert AXES["sensitivity"]["x"](v, "n045o") == 0.45 and AXES["sensitivity"]["x"](v, Q.FULL) == 0.0
+    fs, cs = {}, {}
+    for lv in (Q.FULL,) + ORACLE_LEVELS:
+        p = AXES["sensitivity"]["x"](v, lv)
+        for fam in ("MR", "NMR"):
+            fs[(v, fam, lv)] = cell(0.6 - p + rng.normal(0, 0.01, 10))           # falls as p rises
+            cs[(v, fam, lv)] = cell(0.6 - p + rng.normal(0, 0.01, 10))
+    rs = run("sensitivity", fs, cs, [(v, "MR"), (v, "NMR")])
+    r = rs[(v, "MR")][0]
+    assert r is not None and 0.9 < r["slopes"]["frozen"]["mean"] < 1.1        # positive = falls
+    assert abs(r["slopes"]["companion - frozen"]["mean"]) < 0.05
+    assert rs[(v, "NMR")][0] is None and "registered noise reading" in rs[(v, "NMR")][1][0]
     print("selftest OK")
     return 0
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--axis", choices=tuple(Q.AXES), default="sparsity")
+    ap.add_argument("--axis", choices=tuple(AXES), default="sparsity")
     ap.add_argument("--selftest", action="store_true")
     import hold
     hold.parse()
@@ -195,13 +233,26 @@ def main():
     for anchor, k in P.RESCALE_ARM.items():
         v = Q.VARIANTS[[x.replace("-", "_") for x in Q.VARIANTS].index(P.variant_of_name(anchor))]
         fam = P.method_of(anchor)
+        if a.axis == "sensitivity" and (v, fam) not in ORACLE_PAIRS:
+            continue                   # no sensitivity arm for this cell (§11.3)
         pairs.append((v, fam))
         fidx[(v, fam)], cidx[(v, fam)] = gwin[anchor], k
-    readable = {f for f in REGISTERED_READ[a.axis]}
+    readable = {f for f in REGISTERED_READ[READ_AXIS.get(a.axis, a.axis)]}
     frozen, comp, notes = {}, {}, []
-    if readable:                       # nothing of a family's candidate arm is fetched before its reading
+    if readable and a.axis == "sensitivity":
+        # the arm's frozen candidate cells, and the full-data point (the no-terminals control at
+        # its winner, as rq1_readout.collect), for the readable pairs only
+        import control_readout as C
+        only = {p for p in pairs if p[1] in readable}
+        frozen, _ = X.collect_exp(api, P, gwin, "noise", "candidate", only=only, levels=ORACLE_LEVELS)
+        ctrl, _ = C.collect_controls(api, P, winners, gwin)
+        for v, fam in only:
+            frozen[(v, fam, Q.FULL)] = (C.at_winner(ctrl, gwin, winners, v, fam) if fam == "MR"
+                                        else ctrl.get((v, f"atwin_{fam}")))
+    elif readable:                     # nothing of a family's candidate arm is fetched before its reading
         _, cand, full, _, n1 = Q.collect(api, P, winners, gwin, a.axis)
         frozen = {k: c for k, c in cand.items() if k[1] in readable}
+    if readable:
         comp, n2 = companion_cells(api, P, sp, gwin, a.axis)
         comp = {k: c for k, c in comp.items() if k[1] in readable}
         notes = n2

@@ -243,7 +243,7 @@ def _short(dataset):
     return dataset.replace("antmaze-", "").replace("-v2", "")
 
 
-def collect_exp(api, P, winners, axis="sparsity", protocol="standard", only=None):
+def collect_exp(api, P, winners, axis="sparsity", protocol="standard", only=None, levels=None):
     """{(variant, method, level): cell} for every experiment sweep at the
     anchor's stage-4 index.  Cells are built exactly as §12's are.
 
@@ -253,13 +253,14 @@ def collect_exp(api, P, winners, axis="sparsity", protocol="standard", only=None
     protocol's frozen indices.  Same reward models; only the protocol differs.
 
     only: a set of (variant, method) pairs; other cells are skipped before their runs
-    are fetched (None: every cell)."""
+    are fetched (None: every cell).  levels: the conditions to collect in place of the
+    axis's own (e.g. the noise sensitivity arm's n01o ... n045o; None: the axis's)."""
     import iql_score
     assert protocol in ("standard", "candidate"), protocol
     sp = P.spec()
     E = P._conditions()
     by_params = {}
-    for cond in AXES[axis]["levels"]:
+    for cond in AXES[axis]["levels"] if levels is None else levels:
         for name, (anchor, fixed) in P.exp_spec(sp, cond, E).items():
             if protocol == "candidate":
                 fixed = dict(fixed, drop_terminals=True)
