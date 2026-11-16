@@ -286,7 +286,7 @@ def collect_exp(api, P, winners, axis="sparsity", protocol="standard", only=None
         if only is not None and key[:2] not in only:
             continue
         cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
-                "incomplete": [], "audit": [], "name": name}
+                "incomplete": [], "audit": [], "name": name, "runs": {}}
         if sw.config.get("program") != P.program_of(anchor):
             cell["audit"].append(f"program {sw.config.get('program')!r}")
         seen = set()
@@ -295,6 +295,7 @@ def collect_exp(api, P, winners, axis="sparsity", protocol="standard", only=None
             if s in seen:
                 cell["audit"].append(f"seed {s} appears twice")
             seen.add(s)
+            cell["runs"][s] = R.run_meta(r)
             cell["audit"] += [f"run {r.id}: {x}" for x in
                               R.audit_run(r.config or {}, name, s, fixed, index, False)]
             if r.state != "finished":

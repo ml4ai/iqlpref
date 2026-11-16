@@ -425,6 +425,15 @@ def collect(api, P, winners, gwin, axis):
     cand, n2 = X.collect_exp(api, P, gwin, axis, "candidate")
     anchor, n3 = R.collect(api, P, winners)
     ctrl, n4 = C.collect_controls(api, P, winners, gwin)
+    std, cand, full = assemble(std, cand, anchor, ctrl, winners, gwin)
+    return std, cand, full, ctrl, n1 + n2 + n3 + n4
+
+
+def assemble(std, cand, anchor, ctrl, winners, gwin):
+    """Pure: the ladders' full-data level from the anchor (standard) and from each reward's
+    no-terminals control at its winner (candidate).  Also used offline by the paper pipeline
+    (results/paper, handoff §14.135), which rebuilds the cells from a snapshot."""
+    import control_readout as C
     full = {}
     for v in VARIANTS:
         for m in FAMILIES + ("task_reward",):
@@ -432,7 +441,7 @@ def collect(api, P, winners, gwin, axis):
             full[(v, m)] = (C.at_winner(ctrl, gwin, winners, v, m) if m in ("task_reward", "MR")
                             else ctrl.get((v, f"atwin_{m}")))
             cand[(v, m, FULL)] = full[(v, m)]
-    return std, cand, full, ctrl, n1 + n2 + n3 + n4
+    return std, cand, full
 
 
 def run(axis, std, cand, full, ctrl, acc):

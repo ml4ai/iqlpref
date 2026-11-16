@@ -133,7 +133,7 @@ def collect_controls(api, P, winners, gwin=None):
         if not hold.shown_kind(kind):
             continue                                   # covered by the hold (§14.1): not fetched
         cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
-                "incomplete": [], "audit": [], "name": name}
+                "incomplete": [], "audit": [], "name": name, "runs": {}}
         if sw.config.get("program") != P.DEFAULT_PROGRAM:
             cell["audit"].append(f"program {sw.config.get('program')!r}")
         seen = set()
@@ -142,6 +142,7 @@ def collect_controls(api, P, winners, gwin=None):
             if s in seen:
                 cell["audit"].append(f"seed {s} appears twice")
             seen.add(s)
+            cell["runs"][s] = R.run_meta(r)
             cell["audit"] += [f"run {r.id}: {x}" for x in
                               R.audit_run(r.config or {}, name, s, fixed, index, no_model)]
             if r.state != "finished":

@@ -185,6 +185,15 @@ def audit_run(cfg, name, seed, fixed, winner, oracle):
     return probs
 
 
+def run_meta(r):
+    """The run's identity and the settings a paper table reports beside its score (handoff
+    §14.135): W&B id, state, normalization index, trajectory cut, terminals dropped."""
+    cfg = r.config or {}
+    return {"id": r.id, "state": r.state, "normalize_reward": cfg.get("normalize_reward"),
+            "return_range_split": cfg.get("return_range_split", "terminals"),
+            "drop_terminals": bool(cfg.get("drop_terminals", False))}
+
+
 def collect(api, P, winners, sp=None, method_as=None, program=None):
     """{(dataset, method): cell} for every evaluation sweep at a registered index.
 
@@ -227,7 +236,7 @@ def collect(api, P, winners, sp=None, method_as=None, program=None):
             continue                                   # covered by the hold (§14.1): not fetched
         key = (P.dataset_of(name), method)
         cell = {"sweep": sw.id, "index": index, "scores": {}, "robust": {}, "max": {},
-                "incomplete": [], "audit": [], "name": name}
+                "incomplete": [], "audit": [], "name": name, "runs": {}}
         if sw.config.get("program") != (program or P.program_of(name)):
             cell["audit"].append(f"program {sw.config.get('program')!r}")
         runs = list(sw.runs)
@@ -237,6 +246,7 @@ def collect(api, P, winners, sp=None, method_as=None, program=None):
             if s in seen:
                 cell["audit"].append(f"seed {s} appears twice")
             seen.add(s)
+            cell["runs"][s] = run_meta(r)
             cell["audit"] += [f"run {r.id}: {x}" for x in
                               audit_run(r.config or {}, name, s, sp[name], index, oracle)]
             if r.state != "finished":
