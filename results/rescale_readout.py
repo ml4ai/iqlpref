@@ -54,7 +54,7 @@ AXES = dict(Q.AXES, sensitivity={"levels": ORACLE_LEVELS, "x": lambda v, lv: X._
                                  "sign": Q.AXES["noise"]["sign"], "title": "LABEL NOISE, sensitivity arm"})
 READ_AXIS = {"sensitivity": "noise"}                        # whose registered reading opens the gate
 ORACLE_PAIRS = {("medium-play", "MR"), ("medium-play", "PT"), ("medium-play", "NMR")}   # §11.3, §14.18
-REGISTERED_READ = {"sparsity": {"MR", "PT", "ENS_MEAN", "NMR"}, "noise": {"MR", "ENS_MEAN"}}     # sparsity: §14.70 MR, §14.87 PT, §14.88 ENS_MEAN, §14.101 NMR; noise: §14.116 MR, §14.127 ENS_MEAN
+REGISTERED_READ = {"sparsity": {"MR", "PT", "ENS_MEAN", "NMR"}, "noise": {"MR", "ENS_MEAN", "PT"}}     # sparsity: §14.70 MR, §14.87 PT, §14.88 ENS_MEAN, §14.101 NMR; noise: §14.116 MR, §14.127 ENS_MEAN, §14.134 PT
 LEVEL_ORDER = ("full",)                                     # then the axis's levels, coarse to fine
 
 

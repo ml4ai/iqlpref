@@ -4,6 +4,7 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  LABEL NOISE, primary arm (
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: ix1r2hj2: pt_sweeps/n045/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
   note: xvewvhdh: pt_sweeps/n04/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
   note: j7nvk6uo: pt_sweeps/n03/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
   note: 1k68prcn: pt_sweeps/n02/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
@@ -47,10 +48,28 @@ MR
   VERDICT: NOT SENSITIVE ((b) it does not respond more than the standard protocol)
 
 PT
-  NOT READ -- 2 reason(s): candidate large-play n045: INCOMPLETE (5/10 seeds scored); candidate large-diverse n045: INCOMPLETE (5/10 seeds scored)
+  manipulation check, slope of A (all 4 variants): pooled +0.7487 [+0.6869, +0.8116]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      medium-play     +0.7863 [+0.5981, +0.9804]
+      medium-diverse  +0.7071 [+0.6164, +0.7968]
+      large-play      +0.9460 [+0.8438, +1.0536]
+      large-diverse   +0.5553 [+0.4780, +0.6374]
+  usable variants: medium-play, medium-diverse, large-play, large-diverse
+  (a) candidate slope of S           pooled +0.2410 [+0.1684, +0.3113]   p = 3.179e-06 (W+ 723, n 40, 0 zero)   REJECTS
+      medium-play     +0.8062 [+0.5331, +1.0675]
+      medium-diverse  +0.0854 [+0.0063, +0.1799]
+      large-play      +0.0342 [-0.0004, +0.0698]
+      large-diverse   +0.0380 [+0.0031, +0.0721]
+  (b) candidate - standard slope     pooled +0.2605 [+0.1597, +0.3657]   p = 0.001679 (W+ 624, n 40, 0 zero)   REJECTS
+      medium-play     +0.8495 [+0.6381, +1.0853]
+      medium-diverse  +0.2591 [+0.0993, +0.4172]
+      large-play      -0.1696 [-0.3964, +0.0804]
+      large-diverse   +0.1030 [-0.0810, +0.3026]
+  (c) family - zero                  pooled +0.2526 [+0.2103, +0.2934]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+      family - mean-constant         pooled +0.2546 [+0.2137, +0.2940]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
+  VERDICT: SENSITIVE
 
 NMR
-  NOT READ -- 34 reason(s): candidate medium-play n01: INCOMPLETE (5/10 seeds scored); candidate medium-play n02: no evaluation sweep; candidate medium-play n03: no evaluation sweep; standard medium-play n04: INCOMPLETE (0/10 seeds scored) ...
+  NOT READ -- 29 reason(s): candidate medium-play n02: INCOMPLETE (5/10 seeds scored); candidate medium-play n03: no evaluation sweep; candidate medium-play n04: no evaluation sweep; standard medium-play n045: INCOMPLETE (0/10 seeds scored) ...
 
 ENS_MEAN
   manipulation check, slope of A (all 4 variants): pooled +0.7552 [+0.7114, +0.7998]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
@@ -74,7 +93,7 @@ ENS_MEAN
   VERDICT: NOT SENSITIVE ((a) the candidate protocol does not respond; (b) it does not respond more than the standard protocol)
 
 RQ1 ON THIS LADDER
-  OPEN: every family read so far fails (a) or (b) (MR: (b) did not reject; ENS_MEAN: (a) and (b) did not reject).  2 of 4 families read (MR NOT SENSITIVE, ENS_MEAN NOT SENSITIVE)
+  PARTIAL SUPPORT so far: 3 of 4 families read (MR NOT SENSITIVE, PT SENSITIVE, ENS_MEAN NOT SENSITIVE)
   stricter per-family reading (§14.70, superseded by §14.106; reported beside it): REFUTED (MR: (b) did not reject; ENS_MEAN: (a) and (b) did not reject)
 
 BESIDE, NO TEST
