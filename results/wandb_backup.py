@@ -73,7 +73,6 @@ import gzip
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -99,6 +98,7 @@ CONFIG_COLUMNS = ("seed", "env", "dataset", "normalize_reward", "drop_terminals"
                   "reward_model_path", "reward_model_root", "reward_model_seed_offset", "checkpoints_path",
                   "group", "program")
 _lock = threading.Lock()
+_tls = threading.local()
 
 
 # --------------------------------------------------------------------------
@@ -181,6 +181,42 @@ def fingerprint(run):
             "last_history_step": getattr(run, "lastHistoryStep", None), "summary_step": s.get("_step")}
 
 
+def _session():
+    """One HTTP session per worker thread, reused for every file it downloads.  (wandb's own
+    File.download builds a new wandb.Api, with its own connections, on every call unless one
+    is passed in; over thousands of runs that exhausted the box's 1,024 open files,
+    2026-11-17.)"""
+    s = getattr(_tls, "session", None)
+    if s is None:
+        import requests
+        s = _tls.session = requests.Session()
+    return s
+
+
+def fetch_file(fobj, path, api_key):
+    """Stream one run file to path (atomically), authenticated as wandb's own download is."""
+    with _session().get(fobj.url, auth=("api", api_key), stream=True, timeout=120) as r:
+        r.raise_for_status()
+
+        def w(f):
+            for chunk in r.iter_content(1 << 20):
+                f.write(chunk)
+        _atomic(path, w)
+
+
+def raise_open_file_limit():
+    """Lift the soft limit on open files to the hard one (Linux default soft limit: 1,024)."""
+    try:
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        want = hard if hard != resource.RLIM_INFINITY else 65536
+        if soft < want:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
+        return resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+    except (ImportError, ValueError, OSError):
+        return None
+
+
 def history_rows(run):
     """(every logged row, how it was read)."""
     rows = retry(run.history, samples=SAMPLES, pandas=False)
@@ -196,7 +232,7 @@ def verify_history(run):
     return None if a == b else f"sampled {len(a)} rows, scan {len(b)} rows, {len(set(a) ^ set(b))} differ"
 
 
-def backup_run(run, project_dir, files):
+def backup_run(run, project_dir, files, api_key=None):
     """Copy one run.  Returns (status, info) with status 'copied' or 'skipped'."""
     rdir = os.path.join(project_dir, "runs", run.id)
     meta_path = os.path.join(rdir, "run.json")
@@ -221,17 +257,13 @@ def backup_run(run, project_dir, files):
     copied_files = []
     if files:
         for fobj in retry(lambda: list(run.files())):
-            if os.path.basename(fobj.name) in SMALL_FILES and (fobj.size or 0) <= MAX_FILE_BYTES:
+            name = os.path.basename(fobj.name)
+            if name in SMALL_FILES and (fobj.size or 0) <= MAX_FILE_BYTES:
                 try:
-                    tmpd = tempfile.mkdtemp(dir=rdir, prefix=".dl_")
-                    retry(fobj.download, root=tmpd, replace=True)
-                    os.makedirs(os.path.join(rdir, "files"), exist_ok=True)
-                    os.replace(os.path.join(tmpd, fobj.name), os.path.join(rdir, "files", os.path.basename(fobj.name)))
-                    copied_files.append(os.path.basename(fobj.name))
+                    retry(fetch_file, fobj, os.path.join(rdir, "files", name), api_key)
+                    copied_files.append(name)
                 except Exception:                    # noqa: BLE001  a missing log is not fatal
                     pass
-                finally:
-                    shutil.rmtree(tmpd, ignore_errors=True)
     meta = {"id": run.id, "name": run.name, "display_name": getattr(run, "display_name", None),
             "state": run.state, "created_at": run.created_at, "heartbeat_at": getattr(run, "heartbeat_at", None),
             "url": run.url, "entity": run.entity, "project": run.project,
@@ -429,72 +461,95 @@ def main():
         print("index:", build_index(a.dest, a.repo))
         return 0
     import wandb
+    nofile = raise_open_file_limit()
     api = wandb.Api(timeout=120)
     projects = a.projects or sorted(p.name for p in retry(lambda: list(api.projects(a.entity))))
     if not a.dry_run:
         os.makedirs(a.dest, exist_ok=True)
     started = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
-    errors, counts = [], {}
-    for proj in projects:
-        pdir = os.path.join(a.dest, proj)
-        sweeps = retry(lambda: list(api.project(proj, entity=a.entity).sweeps()))
-        runs = retry(lambda: list(api.runs(f"{a.entity}/{proj}", per_page=500)))
-        if a.limit:
-            runs = runs[:a.limit]
-        if a.dry_run:
-            print(f"{proj:40s} sweeps {len(sweeps):5d}  runs {len(runs):6d}")
-            continue
-        write_json(os.path.join(pdir, "project.json"), {"entity": a.entity, "project": proj, "backed_up_utc": started})
-        of_sweep = {}
-        for r in runs:
-            if r.sweep:
-                of_sweep.setdefault(r.sweep.id, []).append(r.id)
-        for sw in sweeps:
+    errors, counts, stopped = [], {}, None
+    try:
+        for proj in projects:
             try:
-                backup_sweep(sw, pdir, of_sweep.get(sw.id, []))
-            except Exception as e:                   # noqa: BLE001
-                errors.append({"project": proj, "what": "sweep", "id": sw.id, "error": f"{type(e).__name__}: {e}"})
-        c = {"copied": 0, "skipped": 0, "failed": 0}
-        done = 0
+                back_up_project(api, a, proj, started, errors, counts)
+            except Exception as e:                   # noqa: BLE001  record it and go on to the next project
+                errors.append({"project": proj, "what": "project", "id": proj, "error": f"{type(e).__name__}: {e}"})
+                print(f"{proj}: FAILED ({type(e).__name__}: {e}); continuing", flush=True)
+    except BaseException as e:                       # interrupted: still write what was copied
+        stopped = f"{type(e).__name__}: {e}"
+        raise
+    finally:
+        if not a.dry_run:
+            finish(a, started, errors, counts, stopped, nofile, wandb.__version__)
+    return 1 if errors or stopped else 0
 
-        def one(run):
-            try:
-                st, _ = backup_run(run, pdir, not a.no_files)
-                return st, None
-            except Exception as e:                   # noqa: BLE001
-                return "failed", {"project": proj, "what": "run", "id": run.id, "error": f"{type(e).__name__}: {e}"}
-        with cf.ThreadPoolExecutor(max_workers=a.workers) as ex:
-            for st, err in ex.map(one, runs):
-                c[st] += 1
-                done += 1
-                if err:
-                    errors.append(err)
-                if done % 500 == 0:
-                    print(f"  {proj}: {done}/{len(runs)} runs ({c['copied']} copied, {c['skipped']} unchanged, "
-                          f"{c['failed']} failed)", flush=True)
-        counts[proj] = dict(c, sweeps=len(sweeps), runs=len(runs))
-        if a.verify:
-            fin = [r for r in runs if r.state == "finished"][:a.verify]
-            bad = [(r.id, verify_history(r)) for r in fin]
-            bad = [(i, d) for i, d in bad if d]
-            counts[proj]["verified"] = {"runs": len(fin), "mismatches": len(bad)}
-            errors += [{"project": proj, "what": "verify", "id": i, "error": d} for i, d in bad]
-            print(f"  {proj}: history verified on {len(fin)} run(s), {len(bad)} mismatch(es)", flush=True)
-        print(f"{proj:40s} sweeps {len(sweeps):5d}  runs {len(runs):6d}  copied {c['copied']}  unchanged "
-              f"{c['skipped']}  failed {c['failed']}", flush=True)
+
+def back_up_project(api, a, proj, started, errors, counts):
+    """One project: its sweeps, then its runs on a thread pool, then the --verify check."""
+    pdir = os.path.join(a.dest, proj)
+    sweeps = retry(lambda: list(api.project(proj, entity=a.entity).sweeps()))
+    runs = retry(lambda: list(api.runs(f"{a.entity}/{proj}", per_page=500)))
+    if a.limit:
+        runs = runs[:a.limit]
     if a.dry_run:
-        return 0
+        print(f"{proj:40s} sweeps {len(sweeps):5d}  runs {len(runs):6d}")
+        return
+    write_json(os.path.join(pdir, "project.json"), {"entity": a.entity, "project": proj, "backed_up_utc": started})
+    of_sweep = {}
+    for r in runs:
+        if r.sweep:
+            of_sweep.setdefault(r.sweep.id, []).append(r.id)
+    for sw in sweeps:
+        try:
+            backup_sweep(sw, pdir, of_sweep.get(sw.id, []))
+        except Exception as e:                   # noqa: BLE001
+            errors.append({"project": proj, "what": "sweep", "id": sw.id, "error": f"{type(e).__name__}: {e}"})
+    c = {"copied": 0, "skipped": 0, "failed": 0}
+    done = 0
+
+    def one(run):
+        try:
+            st, _ = backup_run(run, pdir, not a.no_files, api.api_key)
+            return st, None
+        except Exception as e:                   # noqa: BLE001
+            return "failed", {"project": proj, "what": "run", "id": run.id, "error": f"{type(e).__name__}: {e}"}
+    with cf.ThreadPoolExecutor(max_workers=a.workers) as ex:
+        for st, err in ex.map(one, runs):
+            c[st] += 1
+            done += 1
+            if err:
+                errors.append(err)
+            if done % 500 == 0:
+                print(f"  {proj}: {done}/{len(runs)} runs ({c['copied']} copied, {c['skipped']} unchanged, "
+                      f"{c['failed']} failed)", flush=True)
+    counts[proj] = dict(c, sweeps=len(sweeps), runs=len(runs))
+    if a.verify:
+        fin = [r for r in runs if r.state == "finished"][:a.verify]
+        bad = [(r.id, verify_history(r)) for r in fin]
+        bad = [(i, d) for i, d in bad if d]
+        counts[proj]["verified"] = {"runs": len(fin), "mismatches": len(bad)}
+        errors += [{"project": proj, "what": "verify", "id": i, "error": d} for i, d in bad]
+        print(f"  {proj}: history verified on {len(fin)} run(s), {len(bad)} mismatch(es)", flush=True)
+    print(f"{proj:40s} sweeps {len(sweeps):5d}  runs {len(runs):6d}  copied {c['copied']}  unchanged "
+          f"{c['skipped']}  failed {c['failed']}", flush=True)
+
+
+def finish(a, started, errors, counts, stopped, nofile, wandb_version):
+    """The local files, README, index and MANIFEST, also after a failure or an interruption, so
+    the copy on disk is always described.  "complete" is false unless every project finished."""
     extra = copy_extra(a.dest, a.repo, a.extra)
     write_readme(a.dest)
     idx = build_index(a.dest, a.repo, errors)
     commit = subprocess.run(["git", "-C", a.repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    complete = stopped is None and not any(e["what"] == "project" for e in errors)
     write_json(os.path.join(a.dest, "MANIFEST.json"), {
         "started_utc": started, "finished_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-        "entity": a.entity, "projects": counts, "errors": len(errors), "local_files": [r["file"] for r in extra],
-        "index": idx, "script": "results/wandb_backup.py", "iqlpref_commit": commit, "wandb_version": wandb.__version__})
-    print(f"done: {idx['runs']} runs, {idx['sweeps']} sweeps in {idx['projects']} projects; {len(errors)} error(s)"
-          + (" -- see index/errors.csv; rerun to retry them" if errors else ""))
-    return 1 if errors else 0
+        "complete": complete, "stopped": stopped, "entity": a.entity, "projects": counts, "errors": len(errors),
+        "local_files": [r["file"] for r in extra], "index": idx, "open_file_limit": nofile,
+        "script": "results/wandb_backup.py", "iqlpref_commit": commit, "wandb_version": wandb_version})
+    print(f"{'done' if complete else 'STOPPED EARLY'}: {idx['runs']} runs, {idx['sweeps']} sweeps in "
+          f"{idx['projects']} projects on disk; {len(errors)} error(s)"
+          + (" -- see index/errors.csv; rerun to retry them" if errors or not complete else ""), flush=True)
 
 
 if __name__ == "__main__":
