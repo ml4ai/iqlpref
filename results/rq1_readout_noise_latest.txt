@@ -4,6 +4,7 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  LABEL NOISE, primary arm (
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: ke3b3hhg: ensemble_sweeps/n02/sweep_antmaze_medium_play_mean seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: 25hbjahy: ensemble_sweeps/n01/sweep_antmaze_medium_play_mean seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: ix1r2hj2: pt_sweeps/n045/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
   note: xvewvhdh: pt_sweeps/n04/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
@@ -70,7 +71,7 @@ PT
   VERDICT: SENSITIVE
 
 NMR
-  NOT READ -- 8 reason(s): candidate medium-play n045: INCOMPLETE (0/10 seeds scored); candidate medium-diverse n045: INCOMPLETE (0/10 seeds scored); candidate large-play n04: INCOMPLETE (0/10 seeds scored); standard large-play n045: INCOMPLETE (0/10 seeds scored) ...
+  NOT READ -- 3 reason(s): candidate large-play n04: INCOMPLETE (5/10 seeds scored); candidate large-play n045: no evaluation sweep; candidate large-diverse n045: INCOMPLETE (0/10 seeds scored)
 
 ENS_MEAN
   manipulation check, slope of A (all 4 variants): pooled +0.7552 [+0.7114, +0.7998]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
