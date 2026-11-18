@@ -1,0 +1,28 @@
+# Normalization test, stage 1 (handoff §14.104, §14.109, §14.144): lane BU on GPUs "2 3 4 5 0", 26 sweeps; grids first (they gate stage 2), then N/F/zero cells.
+# Usage (repo root): nohup ./stage4_queue.sh "2 3 4 5 0" 1 $(grep -v '^#' queues/normtest_BU.txt) > stage4_queue_BU.log 2>&1 &
+norm:grid_std_antmaze_large_diverse_nmr@normtest
+norm:grid_std_antmaze_large_play_nmr@normtest
+norm:grid_std_antmaze_medium_diverse_nmr@normtest
+norm:grid_std_antmaze_medium_play_nmr@normtest
+norm:grid_cand_antmaze_large_diverse_nmr@normtest
+norm:grid_cand_antmaze_large_play_nmr@normtest
+norm:grid_cand_antmaze_medium_diverse_nmr@normtest
+norm:grid_cand_antmaze_medium_play_nmr@normtest
+norm:eval_std_antmaze_large_diverse_mr_idx0@normtest
+norm:eval_std_antmaze_large_diverse_pt_idx0@normtest
+norm:eval_std_antmaze_large_play_mr_idx0@normtest
+norm:eval_std_antmaze_large_play_pt_idx0@normtest
+norm:eval_std_antmaze_medium_diverse_mr_idx0@normtest
+norm:eval_std_antmaze_medium_diverse_pt_idx0@normtest
+norm:eval_std_antmaze_medium_play_mr_idx0@normtest
+norm:eval_std_antmaze_medium_play_pt_idx0@normtest
+norm:eval_cand_antmaze_large_diverse_mr_idx0@normtest
+norm:eval_cand_antmaze_large_diverse_pt_idx0@normtest
+norm:eval_cand_antmaze_large_play_mr_idx0@normtest
+norm:eval_cand_antmaze_large_play_pt_idx0@normtest
+norm:eval_cand_antmaze_medium_diverse_mr_idx0@normtest
+norm:eval_cand_antmaze_medium_diverse_pt_idx0@normtest
+norm:eval_cand_antmaze_medium_play_mr_idx0@normtest
+norm:eval_cand_antmaze_medium_play_pt_idx0@normtest
+norm:zero_std_antmaze_medium_diverse@normtest
+norm:zero_cand_antmaze_medium_diverse@normtest
