@@ -71,7 +71,7 @@ PT
   VERDICT: SENSITIVE
 
 NMR
-  NOT READ -- 3 reason(s): candidate large-play n04: INCOMPLETE (5/10 seeds scored); candidate large-play n045: no evaluation sweep; candidate large-diverse n045: INCOMPLETE (0/10 seeds scored)
+  NOT READ -- 2 reason(s): candidate large-play n045: INCOMPLETE (5/10 seeds scored); candidate large-diverse n045: INCOMPLETE (5/10 seeds scored)
 
 ENS_MEAN
   manipulation check, slope of A (all 4 variants): pooled +0.7552 [+0.7114, +0.7998]   p = 9.095e-13 (W+ 820, n 40, 0 zero)   REJECTS
