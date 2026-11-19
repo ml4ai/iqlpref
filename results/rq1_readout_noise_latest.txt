@@ -4,6 +4,8 @@ RQ1 SENSITIVITY TEST (HANDOFF §14.5) -- REGISTERED.  LABEL NOISE, primary arm (
 one-sided exact Wilcoxon at 0.025 over pooled (variant, seed) units; exact stratified 95%
 ====================================================================================================
   BNN/CVaR HOLD (HANDOFF §14.1): BNN CVaR, BNN mean and ensemble CVaR are not part of RQ1's test
+  note: 37o2le9d: nmr_sweeps/n01/sweep_antmaze_medium_play seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 3 (anchor winner 1) -- not this experiment's lineage, ignored
+  note: tfs4abqs: ensemble_sweeps/n04/sweep_antmaze_medium_play_mean seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: hv08yvbg: ensemble_sweeps/n03/sweep_antmaze_medium_play_mean seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: ke3b3hhg: ensemble_sweeps/n02/sweep_antmaze_medium_play_mean seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
   note: 25hbjahy: ensemble_sweeps/n01/sweep_antmaze_medium_play_mean seed [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] index 2 (anchor winner 1) -- not this experiment's lineage, ignored
