@@ -1,0 +1,14 @@
+# Normalization test, stage 1, after the split (handoff §14.152): lane CD, 12 sweeps, split from BV (items 3-26); starts at once on new GPUs; N/F/zero cells only.
+# Launched by queues/normtest_split.sh. GPUs "3 4 5 0 1".
+norm:eval_std_antmaze_medium_play_mr_idx2@normtest
+norm:eval_std_antmaze_medium_play_pt_idx2@normtest
+norm:eval_cand_antmaze_large_diverse_mr_idx2@normtest
+norm:eval_cand_antmaze_large_diverse_pt_idx2@normtest
+norm:eval_cand_antmaze_large_play_mr_idx2@normtest
+norm:eval_cand_antmaze_large_play_pt_idx2@normtest
+norm:eval_cand_antmaze_medium_diverse_mr_idx2@normtest
+norm:eval_cand_antmaze_medium_diverse_pt_idx2@normtest
+norm:eval_cand_antmaze_medium_play_mr_idx2@normtest
+norm:eval_cand_antmaze_medium_play_pt_idx2@normtest
+norm:zero_std_antmaze_medium_play@normtest
+norm:zero_cand_antmaze_medium_play@normtest

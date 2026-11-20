@@ -1,0 +1,14 @@
+# Normalization test, stage 1, after the split (handoff §14.152): lane BZ, 12 sweeps, split from BV (items 3-26); waits for lane BV's running sweep (grid_std_antmaze_large_play_pt) to finish, on BV's GPUs; its grids first.
+# Launched by queues/normtest_split.sh. GPUs "5 0 1 2 3".
+norm:grid_std_antmaze_medium_diverse_pt@normtest
+norm:grid_std_antmaze_medium_play_pt@normtest
+norm:grid_cand_antmaze_large_diverse_pt@normtest
+norm:grid_cand_antmaze_large_play_pt@normtest
+norm:grid_cand_antmaze_medium_diverse_pt@normtest
+norm:grid_cand_antmaze_medium_play_pt@normtest
+norm:eval_std_antmaze_large_diverse_mr_idx2@normtest
+norm:eval_std_antmaze_large_diverse_pt_idx2@normtest
+norm:eval_std_antmaze_large_play_mr_idx2@normtest
+norm:eval_std_antmaze_large_play_pt_idx2@normtest
+norm:eval_std_antmaze_medium_diverse_mr_idx2@normtest
+norm:eval_std_antmaze_medium_diverse_pt_idx2@normtest
