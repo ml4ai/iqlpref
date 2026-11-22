@@ -36,6 +36,11 @@ import hold                                                # noqa: E402
 import rq1_readout as Q                                    # noqa: E402
 
 OFFSET = 100
+# §14.5's reading gate, for the replication: a family's candidate (no-terminals) ladder cells are
+# drawn or tabulated only after its registered reading on that ladder, as Study 1's
+# rescale_readout.REGISTERED_READ.  Add a family, by hand and in the handoff, as each registered
+# reading is made (results/replication_results.ipynb reads this record).
+REGISTERED_READ = {"sparsity": set(), "noise": set()}
 ACC_PATH = os.path.join(ROOT, "exp", "rq1_accuracy_repl.json")
 
 
