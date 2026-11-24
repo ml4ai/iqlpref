@@ -1,0 +1,4 @@
+# Normalization test, stage 2 (handoff §14.162): lane DE, 2 S cell(s); waits for CA to finish, then runs on CA's GPUs.
+# Launched by queues/normtest_stage2.sh. GPUs "0 1 2 4 5".
+norm:eval_std_antmaze_large_play_ens_mean_idx3@normtest
+norm:eval_cand_antmaze_large_play_mr_idx1@normtest
