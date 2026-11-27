@@ -7,10 +7,18 @@ normalization: return_range_split "length" at every index, in BOTH protocols, so
 normalized reward never depends on the terminals (results/leak_measure.py --audit: PASS).
 Study 1's files, specs and readers are untouched; every file here lives in repl_sweeps/.
 
-  GRIDS  (seed 100, full data; Study 1's stage-4 rule picks the index)
+  THE RULE (§14.104): the normalization test decides the index.  `replication.py rule <N|F|O3|S>
+  --write` records the adopted rule in results/repl_rule.json, once, from the test's registered
+  reading.  Until then only the model-free trivial cells are written.
+    N, F, O3  a FIXED index for every learned family (N 0, F 2, O3 the test's one index per
+              dataset), both protocols: NO grids at seed 100 (§14.104's decision rule); the
+              task reward at index 1, r - 1, no grid (§14.108 item 2, §14.163)
+    S         the leak-free selection at seed 100, the grids below (§14.83 decision 4)
+
+  GRIDS  (rule S only; seed 100, full data; Study 1's stage-4 rule picks the index)
     repl_sweeps/grid_{std,cand}_antmaze_<v>_<fam>   fam in mr, pt, nmr, ens_mean: indices 0-7
     repl_sweeps/grid_cand_antmaze_<v>_task          the task reward, candidate: indices 0-3
-  CELLS  (seeds 101-110, at the grid winner; nothing re-selected under a condition)
+  CELLS  (seeds 101-110, at the rule's index or the grid winner; nothing re-selected under a condition)
     repl_sweeps/{std,cand}_<level>_antmaze_<v>_<fam>   level in full, r16-r128, n01-n045
     repl_sweeps/cand_full_antmaze_<v>_task             usability (§14.5)
     repl_sweeps/cand_{zero,mean}_antmaze_<v>           usability and test (c), index 0
@@ -29,6 +37,7 @@ Study 1's files, specs and readers are untouched; every file here lives in repl_
   winner in results/repl_grid_winners.json.
 
 Run from the repo root:
+    python replication.py rule N [--write]           # record the adopted rule (once)
     python replication.py write [--write]          # every file that can be written now
     python replication.py winners [--write]         # score the finished grids (wandb)
     python replication.py --selftest
@@ -58,6 +67,41 @@ SEQ_LABELLER = 3
 TASK_GRID = list(P.ORACLE_INDICES)                  # 0-3, as Study 1's no-terminals task grid
 WINNERS = os.path.join("results", "repl_grid_winners.json")
 MARK = "Lineage: REPLICATION"
+RULE_FILE = os.path.join("results", "repl_rule.json")
+NORMTEST_WINNERS = os.path.join("results", "normtest_grid_winners.json")
+FIXED_RULES = {"N": 0, "F": 2}                      # §14.104; O3's index is the test's, per dataset
+TASK_FIXED_INDEX = 1                                # r - 1 under every fixed rule (§14.108 item 2, §14.163)
+
+
+def adopted_rule(root=ROOT):
+    """The adopted rule's record ({"rule", "index": {variant: k} or None, ...}), or None if not yet."""
+    path = os.path.join(root, RULE_FILE)
+    return json.load(open(path)) if os.path.exists(path) else None
+
+
+def rule_record(rule, root=ROOT):
+    """The record `rule --write` stores: the fixed index per dataset (None under S)."""
+    if rule in FIXED_RULES:
+        index = {v: FIXED_RULES[rule] for v in P.VARIANTS}
+    elif rule == "O3":
+        path = os.path.join(root, NORMTEST_WINNERS)
+        w = json.load(open(path)) if os.path.exists(path) else {}
+        missing = [v for v in P.VARIANTS if f"o3_{v}" not in w]
+        if missing:
+            raise ValueError(f"O3 index missing in {NORMTEST_WINNERS} for {missing}")
+        index = {v: int(w[f"o3_{v}"]) for v in P.VARIANTS}
+    elif rule == "S":
+        index = None
+    else:
+        raise ValueError(f"unknown rule {rule!r}; one of N, F, O3, S")
+    return {"rule": rule, "index": index,
+            "task_index": TASK_FIXED_INDEX if index is not None else None,
+            "source": "the normalization test's registered reading (HANDOFF §14.104, §14.108, §14.110)"}
+
+
+def _rule(rule):
+    """rule argument -> record or None: "file" reads results/repl_rule.json."""
+    return adopted_rule() if rule == "file" else rule
 
 
 def levels(E):
@@ -76,9 +120,17 @@ def family_fixed(sp, E, fam, v, level, prot):
     return f
 
 
-def grid_spec(sp, E):
-    """{grid name: dict(fam, v, prot, fixed, grid)}; fam "task" for the task reward."""
+def task_fixed(sp, v):
+    return dict(sp[f"tr_sweeps/sweep_antmaze_{v}"], drop_terminals=True, return_range_split=SPLIT)
+
+
+def grid_spec(sp, E, rule="file"):
+    """{grid name: dict(fam, v, prot, fixed, grid)}; fam "task" for the task reward.
+    Empty under a fixed rule (N, F, O3): nothing is selected at seed 100 (§14.104)."""
+    rec = _rule(rule)
     out = {}
+    if rec is not None and rec["index"] is not None:
+        return out
     for v in P.VARIANTS:
         for fam in ANCHORS:
             for prot in PROTOCOLS:
@@ -87,23 +139,31 @@ def grid_spec(sp, E):
                     grid=list(P.STAGE4_INDICES))
         out[f"{REPL_DIR}/grid_cand_antmaze_{v}_task"] = dict(
             fam="task", v=v, prot="cand", grid=TASK_GRID,
-            fixed=dict(sp[f"tr_sweeps/sweep_antmaze_{v}"], drop_terminals=True, return_range_split=SPLIT))
+            fixed=task_fixed(sp, v))
     return out
 
 
-def cell_spec(sp, E):
-    """{cell name: dict(fam, v, level, prot, fixed, grid name or None, index or None)}."""
+def cell_spec(sp, E, rule="file"):
+    """{cell name: dict(fam, v, level, prot, fixed, grid name or None, index or None, src)}.
+    Under a fixed rule every learned cell is at the rule's index and the task reward at index 1,
+    with no grid; under S (or before the rule is adopted) they take their grid's winner."""
+    rec = _rule(rule)
+    fixed_idx = rec["index"] if rec is not None else None
     out = {}
     for v in P.VARIANTS:
         for fam in ANCHORS:
             for prot in PROTOCOLS:
                 for lv in levels(E):
+                    g = None if fixed_idx else f"{REPL_DIR}/grid_{prot}_antmaze_{v}_{fam}"
                     out[f"{REPL_DIR}/{prot}_{lv}_antmaze_{v}_{fam}"] = dict(
                         fam=fam, v=v, level=lv, prot=prot, fixed=family_fixed(sp, E, fam, v, lv, prot),
-                        grid=f"{REPL_DIR}/grid_{prot}_antmaze_{v}_{fam}", index=None)
+                        grid=g, index=fixed_idx[v] if fixed_idx else None,
+                        src=f"the adopted rule {rec['rule']} (§14.104)" if fixed_idx else None)
         out[f"{REPL_DIR}/cand_full_antmaze_{v}_task"] = dict(
-            fam="task", v=v, level="full", prot="cand", grid=f"{REPL_DIR}/grid_cand_antmaze_{v}_task",
-            index=None, fixed=grid_spec(sp, E)[f"{REPL_DIR}/grid_cand_antmaze_{v}_task"]["fixed"])
+            fam="task", v=v, level="full", prot="cand",
+            grid=None if fixed_idx else f"{REPL_DIR}/grid_cand_antmaze_{v}_task",
+            index=TASK_FIXED_INDEX if fixed_idx else None, fixed=task_fixed(sp, v),
+            src=f"r - 1 under the adopted rule {rec['rule']} (§14.163)" if fixed_idx else None)
         for mode in P.TRIVIAL_MODES:
             out[f"{REPL_DIR}/cand_{mode}_antmaze_{v}"] = dict(
                 fam=f"trivial_{mode}", v=v, level="full", prot="cand", grid=None, index=P.TRIVIAL_INDEX,
@@ -129,7 +189,7 @@ def render(name, entry, kind, index=None):
     if kind == "grid":
         lin = f"{MARK} grid, seed {HELDOUT}, normalize_reward {entry['grid']} (selection)."
     else:
-        src = (f"the winner of {entry['grid']}" if entry["grid"] else "fixed in advance (§14.2)")
+        src = entry.get("src") or (f"the winner of {entry['grid']}" if entry["grid"] else "fixed in advance (§14.2)")
         lin = f"{MARK} eval, seeds 101-110, normalize_reward {index} ({src})."
     head = ["# GENERATED by replication.py -- do not hand-edit; regenerate instead",
             f"# (gp_reward-priors HANDOFF §14.83).  {lin}",
@@ -190,15 +250,21 @@ def selected(fam, v, cfg_dir=None):
     return os.path.exists(path) and "UNSELECTED-BASE" not in open(path).read()
 
 
-def plan(sp, E, gwin, cfg_dir=None):
-    """[(name, entry, kind, index or None, skip reason or None)] for every file."""
+def plan(sp, E, gwin, cfg_dir=None, rule="file"):
+    """[(name, entry, kind, index or None, skip reason or None)] for every file.  Before the rule
+    is adopted only the trivial cells (fixed in advance, no reward model) can be written."""
+    rec = _rule(rule)
+    pending = "waiting on the normalization test's rule (replication.py rule)"
     out = []
-    for name, g in grid_spec(sp, E).items():
+    for name, g in grid_spec(sp, E, rec).items():
         ok = selected(g["fam"], g["v"], cfg_dir)
-        out.append((name, g, "grid", None, None if ok else "replication config not selected yet"))
-    for name, c in cell_spec(sp, E).items():
+        why = pending if rec is None else (None if ok else "replication config not selected yet")
+        out.append((name, g, "grid", None, why))
+    for name, c in cell_spec(sp, E, rec).items():
         idx = c["index"] if c["grid"] is None else gwin.get(c["grid"])
         why = (None if selected(c["fam"], c["v"], cfg_dir) else "replication config not selected yet")
+        if rec is None and not c["fam"].startswith("trivial_"):
+            why = pending
         if why is None and idx is None:
             why = "no grid winner yet"
         out.append((name, c, "eval", idx, why))
@@ -207,10 +273,21 @@ def plan(sp, E, gwin, cfg_dir=None):
 
 def cmd_write(do_write, root=ROOT, cfg_dir=None):
     sp, E = P.spec(), P._conditions()
+    rec = adopted_rule(root)
+    print(f"  rule: {'NOT ADOPTED YET (only the trivial cells)' if rec is None else rec['rule']}"
+          + (f", index {rec['index']}, task reward {rec['task_index']}" if rec and rec["index"] else ""))
     path = os.path.join(root, WINNERS)
     gwin = json.load(open(path)) if os.path.exists(path) else {}
     n = skipped = bad = 0
-    for name, entry, kind, idx, why in plan(sp, E, gwin, cfg_dir):
+    pl = plan(sp, E, gwin, cfg_dir, rec)
+    names = {name for name, *_ in pl}
+    d = os.path.join(root, REPL_DIR)
+    obsolete = sorted(f"{REPL_DIR}/{f[:-5]}" for f in (os.listdir(d) if os.path.isdir(d) else [])
+                      if f.endswith(".yaml") and f"{REPL_DIR}/{f[:-5]}" not in names)
+    for name in obsolete:
+        print(f"  OBSOLETE under rule {rec['rule'] if rec else '?'}: {name}.yaml -- not in the plan; "
+              f"git rm it (never launch it)")
+    for name, entry, kind, idx, why in pl:
         if why:
             skipped += 1
             continue
@@ -230,7 +307,7 @@ def cmd_write(do_write, root=ROOT, cfg_dir=None):
         print(f"  {name:56s} {kind}{'' if idx is None else f' idx {idx}'}  {change}"
               f"{' (written)' if do_write and old != text else ''}")
     print(f"\n  {n} file(s) {'written' if do_write else 'checked (dry run; --write to apply)'}; "
-          f"{skipped} not writable yet (config unselected or no grid winner); {bad} FAILED")
+          f"{skipped} not writable yet (no rule adopted, config unselected or no grid winner); {bad} FAILED")
     return 1 if bad else 0
 
 
@@ -267,6 +344,20 @@ def score_grid(sw, entry):
         return None, None, notes
     win, table = iql_score.select_normalization(runs, entry["grid"])
     return int(win), table, []
+
+
+def cmd_rule(rule, do_write, root=ROOT):
+    """Record the adopted rule, once; refuses to change it."""
+    new = rule_record(rule, root)
+    old = adopted_rule(root)
+    if old is not None and (old["rule"], old["index"]) != (new["rule"], new["index"]):
+        sys.exit(f"!! {RULE_FILE} already records rule {old['rule']} {old['index']}: nothing written")
+    print(f"  rule {new['rule']}: learned-family index {new['index'] or 'per grid winner (seed 100)'}; "
+          f"task reward {new['task_index'] if new['task_index'] is not None else 'per its grid'}")
+    if do_write:
+        json.dump(new, open(os.path.join(root, RULE_FILE), "w"), indent=1)
+        print(f"  written to {RULE_FILE}")
+    return 0
 
 
 def cmd_winners(do_write):
@@ -307,7 +398,8 @@ def cmd_winners(do_write):
 def selftest():
     import tempfile
     sp, E = P.spec(), P._conditions()
-    gs, cs = grid_spec(sp, E), cell_spec(sp, E)
+    S = rule_record("S")                                   # the selection arm: grids at seed 100
+    gs, cs = grid_spec(sp, E, S), cell_spec(sp, E, S)
     assert len(gs) == 36 and len(cs) == 4 * 4 * 2 * 10 + 12, (len(gs), len(cs))   # 10 levels incl. full
     # every file renders to what §14.83 says, and differs from Study 1 only as allowed
     for name, g in gs.items():
@@ -344,14 +436,14 @@ def selftest():
             for v in P.VARIANTS:
                 open(os.path.join(d, "cfg", f"scripts_{m}", f"antmaze_{v}_{m}_antmaze_eval_repl.yaml"), "w").write(
                     "# UNSELECTED-BASE\nlr: 1\n")
-        pl = plan(sp, E, {}, os.path.join(d, "cfg"))
+        pl = plan(sp, E, {}, os.path.join(d, "cfg"), S)
         ok = [n for n, _, _, _, why in pl if why is None]
         assert sorted(ok) == sorted([f"{REPL_DIR}/grid_cand_antmaze_{v}_task" for v in P.VARIANTS] +
                                     [f"{REPL_DIR}/cand_{m}_antmaze_{v}" for v in P.VARIANTS for m in ("zero", "mean")]), ok
         open(os.path.join(d, "cfg", "scripts_mr", "antmaze_large_play_mr_antmaze_eval_repl.yaml"), "w").write(
             "# Production config (REPLICATION...)\nlr: 1\n")
         gw = {f"{REPL_DIR}/grid_cand_antmaze_large_play_mr": 5, f"{REPL_DIR}/grid_cand_antmaze_large_play_task": 1}
-        ok = {n: idx for n, _, _, idx, why in plan(sp, E, gw, os.path.join(d, "cfg")) if why is None}
+        ok = {n: idx for n, _, _, idx, why in plan(sp, E, gw, os.path.join(d, "cfg"), S) if why is None}
         assert ok[f"{REPL_DIR}/grid_std_antmaze_large_play_mr"] is None
         assert ok[f"{REPL_DIR}/grid_cand_antmaze_large_play_ens_mean"] is None          # reads MR's models
         assert ok[f"{REPL_DIR}/cand_r16_antmaze_large_play_mr"] == 5
@@ -359,13 +451,59 @@ def selftest():
         assert f"{REPL_DIR}/std_r16_antmaze_large_play_mr" not in ok                       # no std winner yet
         assert f"{REPL_DIR}/grid_cand_antmaze_large_play_pt" not in ok                     # PT unselected
         assert f"{REPL_DIR}/cand_r16_antmaze_large_play_ens_mean" not in ok                # no ens_mean winner
+        # BEFORE the rule is adopted: only the trivial cells, even with every config selected
+        for m in ("mr", "pt", "nmr"):
+            for v in P.VARIANTS:
+                open(os.path.join(d, "cfg", f"scripts_{m}", f"antmaze_{v}_{m}_antmaze_eval_repl.yaml"), "w").write(
+                    "# Production config (REPLICATION...)\nlr: 1\n")
+        ok = [n for n, _, _, _, why in plan(sp, E, gw, os.path.join(d, "cfg"), None) if why is None]
+        assert sorted(ok) == sorted(f"{REPL_DIR}/cand_{m}_antmaze_{v}" for v in P.VARIANTS for m in ("zero", "mean")), ok
+        # THE FIXED RULES (§14.104, §14.163): no grid; every learned cell, both protocols, at the
+        # rule's index; the task reward at index 1; the trivial cells unchanged at index 0
+        o3w = {f"o3_{v}": k for v, k in zip(P.VARIANTS, (0, 3, 3, 3))}
+        os.makedirs(os.path.join(d, "results"))
+        json.dump(o3w, open(os.path.join(d, NORMTEST_WINNERS), "w"))
+        for rule, want in (("N", dict.fromkeys(P.VARIANTS, 0)), ("F", dict.fromkeys(P.VARIANTS, 2)),
+                           ("O3", dict(zip(P.VARIANTS, (0, 3, 3, 3))))):
+            rec = rule_record(rule, d)
+            assert rec["index"] == want and rec["task_index"] == 1, (rule, rec)
+            assert grid_spec(sp, E, rec) == {}, rule
+            fcs = cell_spec(sp, E, rec)
+            assert set(fcs) == set(cs), rule                       # the same cells as under S
+            pl = plan(sp, E, {}, os.path.join(d, "cfg"), rec)      # no grid winners needed
+            assert all(kind == "eval" for _, _, kind, _, _ in pl), rule
+            ok = {n: idx for n, _, _, idx, why in pl if why is None}
+            assert len(ok) == len(cs), (rule, len(ok))
+            for n, c in fcs.items():
+                k = (1 if c["fam"] == "task" else P.TRIVIAL_INDEX if c["fam"].startswith("trivial_") else want[c["v"]])
+                assert ok[n] == k and c["grid"] is None, (rule, n, ok[n])
+                text = render(n, c, "eval", k)
+                assert not check(sp, E, n, c, text, "eval", k), (rule, n)
+                assert c["fixed"] == cs[n]["fixed"], (rule, n)         # only the index differs from S
+            t = render(f"{REPL_DIR}/cand_full_antmaze_medium_play_task", fcs[f"{REPL_DIR}/cand_full_antmaze_medium_play_task"], "eval", 1)
+            assert f"normalize_reward 1 (r - 1 under the adopted rule {rule}" in t, t[:300]
+        # the rule is recorded once and never changed
+        assert cmd_rule("F", True, d) == 0 and adopted_rule(d)["rule"] == "F"
+        assert cmd_rule("F", True, d) == 0                         # the same rule again: fine
+        try:
+            cmd_rule("N", True, d)
+            raise AssertionError("rule change accepted")
+        except SystemExit:
+            pass
+        assert adopted_rule(d)["rule"] == "F"
+        try:
+            rule_record("O3", os.path.join(d, "cfg"))              # no normtest winners there
+            raise AssertionError("O3 without its indices accepted")
+        except ValueError:
+            pass
     print("selftest OK")
     return 0
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", nargs="?", choices=("write", "winners"))
+    ap.add_argument("cmd", nargs="?", choices=("write", "winners", "rule"))
+    ap.add_argument("rule", nargs="?", choices=("N", "F", "O3", "S"), help="for `rule`: the adopted rule")
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -375,6 +513,10 @@ def main():
         return cmd_write(a.write)
     if a.cmd == "winners":
         return cmd_winners(a.write)
+    if a.cmd == "rule":
+        if not a.rule:
+            ap.error("rule needs N, F, O3 or S")
+        return cmd_rule(a.rule, a.write)
     ap.print_help()
     return 0
 
