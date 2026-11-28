@@ -118,7 +118,7 @@ def seed_stats(rec):
 # --------------------------------------------------------------------------
 # measure (box)
 # --------------------------------------------------------------------------
-def measure_one(v, s, device, models_root):
+def measure_one(v, s, device, models_root, bnn_root=None):
     import torch
     import diagnose_sampling_tail as D
     import rq1_accuracy as RA
@@ -126,7 +126,7 @@ def measure_one(v, s, device, models_root):
     from optbnn.utils import util
     sys.path.insert(0, os.path.join(ROOT, "algorithms", "offline"))
     import iql_eval as Q
-    run_dir = os.path.join(models_root, f"antmaze_{v}_bnn_eval_{s}")
+    run_dir = os.path.join(bnn_root or models_root, f"antmaze_{v}_bnn_eval_{s}")   # bnn_root: C-lite (§14.177)
     cfg = D._load_run_config(run_dir)
     (val, _) = D._resolve_dataset(cfg, "val")
     assert "/noise/" not in val and "/reduction/" not in val, val

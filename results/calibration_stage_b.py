@@ -141,13 +141,13 @@ def measure_base(fam, v, s, device, models_root):
     return {"y1": y1.tolist(), "d": (fx[:, 0] - fx[:, 1]).tolist(), "acc": acc, "dir": d, "device": device}
 
 
-def measure_bnn(v, s, device, models_root):
+def measure_bnn(v, s, device, models_root, bnn_root=None):
     import torch
     import diagnose_sampling_tail as D
     from optbnn.bnn.nets.mlp import MLP
     from optbnn.utils import util
     from optbnn.utils.util import bt_pool_logit_np
-    run_dir = os.path.join(models_root, f"antmaze_{v}_bnn_eval_{s}")
+    run_dir = os.path.join(bnn_root or models_root, f"antmaze_{v}_bnn_eval_{s}")   # bnn_root: C-lite (§14.177)
     cfg = D._load_run_config(run_dir)
     (val, _), (train, _) = D._resolve_dataset(cfg, "val"), D._resolve_dataset(cfg, "train")
     assert "/noise/" not in val and "/reduction/" not in val, val
