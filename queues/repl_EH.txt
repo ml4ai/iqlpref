@@ -1,0 +1,40 @@
+# The replication (handoff §14.83, rule N adopted §14.175): lane EH, 37 cells, GPUs "3 4 5 0 1".
+# Launched by queues/repl_launch.sh.  Order: the sparsity block (full data, task, trivial, then r16-r128,
+# both protocols), then the noise block (n01-n045, both protocols); cells dealt round-robin over EA-EI.
+repl:std_full_antmaze_medium_play_ens_mean@repl
+repl:cand_full_antmaze_large_play_mr@repl
+repl:std_full_antmaze_large_diverse_mr@repl
+repl:cand_full_antmaze_large_play_task@repl
+repl:cand_zero_antmaze_large_diverse@repl
+repl:cand_r16_antmaze_medium_diverse_mr@repl
+repl:std_r16_antmaze_large_play_mr@repl
+repl:cand_r16_antmaze_large_diverse_pt@repl
+repl:std_r32_antmaze_medium_play_pt@repl
+repl:cand_r32_antmaze_medium_diverse_nmr@repl
+repl:std_r32_antmaze_large_play_nmr@repl
+repl:cand_r32_antmaze_large_diverse_ens_mean@repl
+repl:std_r64_antmaze_medium_play_ens_mean@repl
+repl:cand_r64_antmaze_large_play_mr@repl
+repl:std_r64_antmaze_large_diverse_mr@repl
+repl:cand_r128_antmaze_medium_play_pt@repl
+repl:std_r128_antmaze_medium_diverse_pt@repl
+repl:cand_r128_antmaze_large_play_nmr@repl
+repl:std_r128_antmaze_large_diverse_nmr@repl
+repl:cand_n01_antmaze_medium_play_ens_mean@repl
+repl:std_n01_antmaze_medium_diverse_ens_mean@repl
+repl:cand_n01_antmaze_large_diverse_mr@repl
+repl:std_n02_antmaze_medium_play_mr@repl
+repl:cand_n02_antmaze_medium_diverse_pt@repl
+repl:std_n02_antmaze_large_play_pt@repl
+repl:cand_n02_antmaze_large_diverse_nmr@repl
+repl:std_n03_antmaze_medium_play_nmr@repl
+repl:cand_n03_antmaze_medium_diverse_ens_mean@repl
+repl:std_n03_antmaze_large_play_ens_mean@repl
+repl:cand_n04_antmaze_medium_play_mr@repl
+repl:std_n04_antmaze_medium_diverse_mr@repl
+repl:cand_n04_antmaze_large_play_pt@repl
+repl:std_n04_antmaze_large_diverse_pt@repl
+repl:cand_n045_antmaze_medium_play_nmr@repl
+repl:std_n045_antmaze_medium_diverse_nmr@repl
+repl:cand_n045_antmaze_large_play_ens_mean@repl
+repl:std_n045_antmaze_large_diverse_ens_mean@repl

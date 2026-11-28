@@ -1,0 +1,11 @@
+{
+ "rule": "N",
+ "index": {
+  "medium_play": 0,
+  "medium_diverse": 0,
+  "large_play": 0,
+  "large_diverse": 0
+ },
+ "task_index": 1,
+ "source": "the normalization test's registered reading (HANDOFF \u00a714.104, \u00a714.108, \u00a714.110)"
+}
