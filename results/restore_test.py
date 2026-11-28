@@ -11,6 +11,7 @@ with the same readout's output from W&B:
     leveling        leveling_readout.py             the shift ablation
     rescale         rescale_readout.py              the rescaling companions, sparsity
     rescale_noise   rescale_readout.py --axis noise the rescaling companions, noise
+    normtest        normtest_readout.py             the normalization test's registered reading (§14.175)
 rq1_readout reads A from the backup's copy of exp/rq1_accuracy.json (--acc), not the
 checkout's, so nothing but the backup and the repository's tracked files is used.
 
@@ -44,6 +45,7 @@ READOUTS = {                                     # name: (script, args, committe
     "leveling": ("leveling_readout.py", [], "leveling_readout_latest.txt"),
     "rescale": ("rescale_readout.py", [], None),
     "rescale_noise": ("rescale_readout.py", ["--axis", "noise"], None),
+    "normtest": ("normtest_readout.py", [], "normtest_readout_latest.txt"),
 }
 # Runs the readout in a child process with W&B replaced by the backup.
 OFFLINE = ("import runpy, sys; sys.path.insert(0, {here!r}); import wandb_offline; "
